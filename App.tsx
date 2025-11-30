@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { User, ChatSession, Message, AIModel, AppSettings, UserRole, Attachment } from './types';
 import { login, register } from './services/authService';
@@ -130,12 +131,6 @@ const App: React.FC = () => {
     } finally {
       setIsAuthLoading(false);
     }
-  };
-
-  const handleSkipLogin = () => {
-    const tempAdmin: User = { id: 'admin-temp', username: 'DevAdmin', role: UserRole.ADMIN };
-    setUser(tempAdmin);
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(tempAdmin));
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -385,10 +380,6 @@ const App: React.FC = () => {
               className="w-full bg-white text-black hover:bg-gray-100 font-bold py-3.5 rounded-lg transition-all transform active:scale-[0.98] shadow-lg disabled:opacity-70 disabled:cursor-not-allowed mt-2"
             >
               {isAuthLoading ? 'Processing...' : (authMode === 'login' ? 'Sign In' : 'Create Account')}
-            </button>
-
-            <button type="button" onClick={handleSkipLogin} className="w-full bg-dark-border hover:bg-zinc-700 text-gray-300 font-medium py-2 rounded-lg transition-colors text-xs mt-4">
-              Skip Login (Dev Mode)
             </button>
           </form>
           
