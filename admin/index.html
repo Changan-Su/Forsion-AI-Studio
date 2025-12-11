@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Forsion AI Studio - Admin Panel</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            admin: {
+              bg: '#0f172a',
+              card: '#1e293b',
+              border: '#334155',
+              accent: '#3b82f6',
+              text: '#e2e8f0',
+              muted: '#94a3b8'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .stat-card { transition: transform 0.2s, box-shadow 0.2s; }
+    .stat-card:hover { transform: translateY(-2px); box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+  </style>
+</head>
+<body class="bg-admin-bg min-h-screen text-admin-text">
+  <div id="app">
+    <!-- Login Screen -->
+    <div id="login-screen" class="min-h-screen flex items-center justify-center p-4">
+      <div class="bg-admin-card w-full max-w-md p-8 rounded-2xl border border-admin-border shadow-2xl">
+        <div class="text-center mb-8">
+          <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg">
+            <span class="text-3xl font-bold text-white">F</span>
+          </div>
+          <h1 class="text-2xl font-bold text-white mb-2">Admin Panel</h1>
+          <p class="text-admin-muted text-sm">Forsion AI Studio Management</p>
+        </div>
+        <form id="login-form" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Username</label>
+            <input type="text" id="username" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" placeholder="admin" required />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Password</label>
+            <input type="password" id="password" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" placeholder="admin" required />
+          </div>
+          <div id="login-error" class="hidden p-3 bg-red-900/30 border border-red-800 rounded-lg text-red-400 text-sm"></div>
+          <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors">
+            Sign In
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Dashboard Screen -->
+    <div id="dashboard-screen" class="hidden">
+      <!-- Sidebar -->
+      <div class="fixed left-0 top-0 bottom-0 w-64 bg-admin-card border-r border-admin-border p-4 flex flex-col">
+        <div class="flex items-center gap-3 mb-8 px-2">
+          <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+            <span class="text-xl font-bold text-white">F</span>
+          </div>
+          <div>
+            <h1 class="text-lg font-bold text-white">Admin Panel</h1>
+            <p class="text-xs text-admin-muted">Management Console</p>
+          </div>
+        </div>
+
+        <nav class="flex-1 space-y-2">
+          <button onclick="showSection('dashboard')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors hover:bg-admin-bg" data-section="dashboard">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+            Dashboard
+          </button>
+          <button onclick="showSection('users')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors hover:bg-admin-bg" data-section="users">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path></svg>
+            Users
+          </button>
+          <button onclick="showSection('models')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors hover:bg-admin-bg" data-section="models">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+            Models
+          </button>
+          <button onclick="showSection('usage')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors hover:bg-admin-bg" data-section="usage">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+            API Usage
+          </button>
+        </nav>
+
+        <button onclick="logout()" class="flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:bg-red-900/20 transition-colors mt-auto">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+          Logout
+        </button>
+      </div>
+
+      <!-- Main Content -->
+      <div class="ml-64 p-8">
+        <!-- Dashboard Section -->
+        <section id="section-dashboard" class="section">
+          <h2 class="text-2xl font-bold text-white mb-6">Dashboard</h2>
+          <div id="stats-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Stats will be loaded here -->
+          </div>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-admin-card rounded-xl border border-admin-border p-6">
+              <h3 class="text-lg font-semibold text-white mb-4">Usage by Model</h3>
+              <div id="usage-by-model" class="space-y-3">
+                <!-- Model usage will be loaded here -->
+              </div>
+            </div>
+            <div class="bg-admin-card rounded-xl border border-admin-border p-6">
+              <h3 class="text-lg font-semibold text-white mb-4">Usage by User</h3>
+              <div id="usage-by-user" class="space-y-3">
+                <!-- User usage will be loaded here -->
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Users Section -->
+        <section id="section-users" class="section hidden">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-2xl font-bold text-white">User Management</h2>
+            <button onclick="showAddUserModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+              Add User
+            </button>
+          </div>
+          <div class="bg-admin-card rounded-xl border border-admin-border overflow-hidden">
+            <table class="w-full">
+              <thead class="bg-admin-bg">
+                <tr>
+                  <th class="text-left px-6 py-4 text-xs font-semibold text-admin-muted uppercase">Username</th>
+                  <th class="text-left px-6 py-4 text-xs font-semibold text-admin-muted uppercase">Role</th>
+                  <th class="text-left px-6 py-4 text-xs font-semibold text-admin-muted uppercase">ID</th>
+                  <th class="text-right px-6 py-4 text-xs font-semibold text-admin-muted uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="users-table-body" class="divide-y divide-admin-border">
+                <!-- Users will be loaded here -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Models Section -->
+        <section id="section-models" class="section hidden">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-2xl font-bold text-white">Model Management</h2>
+            <button onclick="showAddModelModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+              Add Model
+            </button>
+          </div>
+          <div id="models-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Models will be loaded here -->
+          </div>
+        </section>
+
+        <!-- API Usage Section -->
+        <section id="section-usage" class="section hidden">
+          <h2 class="text-2xl font-bold text-white mb-6">API Usage Statistics</h2>
+          <div class="bg-admin-card rounded-xl border border-admin-border p-6 mb-6">
+            <div class="flex flex-wrap gap-4 mb-6">
+              <select id="usage-days" onchange="loadUsageStats()" class="bg-admin-bg border border-admin-border rounded-lg px-4 py-2 text-white">
+                <option value="7">Last 7 days</option>
+                <option value="30" selected>Last 30 days</option>
+                <option value="90">Last 90 days</option>
+              </select>
+              <select id="usage-user-filter" onchange="loadUsageStats()" class="bg-admin-bg border border-admin-border rounded-lg px-4 py-2 text-white">
+                <option value="">All Users</option>
+              </select>
+            </div>
+            <div id="usage-stats-summary" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <!-- Stats summary will be loaded here -->
+            </div>
+          </div>
+          <div class="bg-admin-card rounded-xl border border-admin-border overflow-hidden">
+            <div class="px-6 py-4 border-b border-admin-border">
+              <h3 class="text-lg font-semibold text-white">Recent API Calls</h3>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="bg-admin-bg">
+                  <tr>
+                    <th class="text-left px-6 py-4 text-xs font-semibold text-admin-muted uppercase">Time</th>
+                    <th class="text-left px-6 py-4 text-xs font-semibold text-admin-muted uppercase">User</th>
+                    <th class="text-left px-6 py-4 text-xs font-semibold text-admin-muted uppercase">Model</th>
+                    <th class="text-left px-6 py-4 text-xs font-semibold text-admin-muted uppercase">Tokens</th>
+                    <th class="text-left px-6 py-4 text-xs font-semibold text-admin-muted uppercase">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="usage-logs-table" class="divide-y divide-admin-border">
+                  <!-- Logs will be loaded here -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- Add User Modal -->
+    <div id="add-user-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div class="bg-admin-card w-full max-w-md rounded-2xl border border-admin-border p-6">
+        <h3 class="text-xl font-bold text-white mb-6">Add New User</h3>
+        <form id="add-user-form" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Username</label>
+            <input type="text" id="new-username" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white" required />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Password</label>
+            <input type="password" id="new-password" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white" required />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Role</label>
+            <select id="new-role" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white">
+              <option value="USER">User</option>
+              <option value="ADMIN">Admin</option>
+            </select>
+          </div>
+          <div class="flex gap-3 pt-4">
+            <button type="button" onclick="hideAddUserModal()" class="flex-1 bg-admin-bg border border-admin-border hover:bg-admin-border text-white py-3 rounded-lg font-medium">Cancel</button>
+            <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-medium">Create</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Add Model Modal -->
+    <div id="add-model-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div class="bg-admin-card w-full max-w-lg rounded-2xl border border-admin-border p-6">
+        <h3 class="text-xl font-bold text-white mb-6">Add New Model</h3>
+        <form id="add-model-form" class="space-y-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Model ID</label>
+              <input type="text" id="model-id" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white font-mono" placeholder="gpt-4o" required />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Display Name</label>
+              <input type="text" id="model-name" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white" placeholder="GPT-4o" required />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Provider</label>
+              <select id="model-provider" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white">
+                <option value="external">External API</option>
+                <option value="gemini">Gemini</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">API Model ID</label>
+              <input type="text" id="model-api-id" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white font-mono" placeholder="gpt-4o" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Description</label>
+            <input type="text" id="model-description" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white" placeholder="A powerful AI model" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Base URL</label>
+            <input type="text" id="model-base-url" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white" placeholder="https://api.openai.com/v1" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">API Key</label>
+            <div class="relative">
+              <input type="password" id="model-api-key" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 pr-12 text-white" placeholder="sk-..." />
+              <button type="button" onclick="togglePasswordVisibility('model-api-key', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-admin-muted hover:text-white transition-colors">
+                <svg class="w-5 h-5 eye-closed" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path></svg>
+                <svg class="w-5 h-5 eye-open hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+              </button>
+            </div>
+          </div>
+          <!-- Test Connection -->
+          <div id="add-model-test-result" class="hidden p-3 rounded-lg text-sm"></div>
+          <div class="flex gap-3 pt-4">
+            <button type="button" onclick="hideAddModelModal()" class="flex-1 bg-admin-bg border border-admin-border hover:bg-admin-border text-white py-3 rounded-lg font-medium">Cancel</button>
+            <button type="button" onclick="testAddModelConnection()" class="bg-green-600 hover:bg-green-500 text-white px-4 py-3 rounded-lg font-medium flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+              Test
+            </button>
+            <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-medium">Create</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Edit Model Modal -->
+    <div id="edit-model-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div class="bg-admin-card w-full max-w-lg rounded-2xl border border-admin-border p-6">
+        <h3 class="text-xl font-bold text-white mb-6">Edit Model</h3>
+        <form id="edit-model-form" class="space-y-4">
+          <input type="hidden" id="edit-model-id" />
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Model ID</label>
+              <input type="text" id="edit-model-id-display" class="w-full bg-admin-bg/50 border border-admin-border rounded-lg px-4 py-3 text-admin-muted font-mono cursor-not-allowed" disabled />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Display Name</label>
+              <input type="text" id="edit-model-name" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white" required />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Provider</label>
+              <select id="edit-model-provider" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white">
+                <option value="external">External API</option>
+                <option value="gemini">Gemini</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">API Model ID</label>
+              <input type="text" id="edit-model-api-id" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white font-mono" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Description</label>
+            <input type="text" id="edit-model-description" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Base URL</label>
+            <input type="text" id="edit-model-base-url" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">API Key</label>
+            <div class="relative">
+              <input type="password" id="edit-model-api-key" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 pr-12 text-white" placeholder="••••••••" />
+              <button type="button" onclick="togglePasswordVisibility('edit-model-api-key', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-admin-muted hover:text-white transition-colors">
+                <svg class="w-5 h-5 eye-closed" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path></svg>
+                <svg class="w-5 h-5 eye-open hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+              </button>
+            </div>
+            <p id="edit-model-api-key-hint" class="text-xs text-admin-muted mt-1">Leave empty to keep current key.</p>
+          </div>
+          <div class="flex items-center gap-3 pt-2">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="edit-model-enabled" class="w-5 h-5 rounded bg-admin-bg border-admin-border text-blue-600 focus:ring-blue-500" checked />
+              <span class="text-sm text-white">Enabled</span>
+            </label>
+          </div>
+          <!-- Test Connection Result -->
+          <div id="edit-model-test-result" class="hidden p-3 rounded-lg text-sm"></div>
+          <div class="flex gap-3 pt-4">
+            <button type="button" onclick="hideEditModelModal()" class="flex-1 bg-admin-bg border border-admin-border hover:bg-admin-border text-white py-3 rounded-lg font-medium">Cancel</button>
+            <button type="button" onclick="testEditModelConnection()" class="bg-green-600 hover:bg-green-500 text-white px-4 py-3 rounded-lg font-medium flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+              Test
+            </button>
+            <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-medium">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Configuration
+    const API_BASE = window.location.origin.includes('localhost') 
+      ? 'http://localhost:3001' 
+      : window.location.origin;
+    
+    let authToken = localStorage.getItem('adminToken');
+
+    // Toggle Password Visibility
+    function togglePasswordVisibility(inputId, button) {
+      const input = document.getElementById(inputId);
+      const eyeClosed = button.querySelector('.eye-closed');
+      const eyeOpen = button.querySelector('.eye-open');
+      
+      if (input.type === 'password') {
+        input.type = 'text';
+        eyeClosed.classList.add('hidden');
+        eyeOpen.classList.remove('hidden');
+      } else {
+        input.type = 'password';
+        eyeClosed.classList.remove('hidden');
+        eyeOpen.classList.add('hidden');
+      }
+    }
+
+    // Test API Connection
+    async function testApiConnection(baseUrl, apiKey, modelId) {
+      if (!baseUrl || !apiKey) {
+        return { success: false, message: 'Base URL and API Key are required' };
+      }
+      
+      // Ensure baseUrl doesn't end with /
+      baseUrl = baseUrl.replace(/\/+$/, '');
+      
+      try {
+        // Try to list models first (most APIs support this)
+        const response = await fetch(`${baseUrl}/models`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          const modelCount = data.data?.length || data.models?.length || 0;
+          return { 
+            success: true, 
+            message: `Connection successful! ${modelCount > 0 ? `Found ${modelCount} models.` : 'API is accessible.'}` 
+          };
+        }
+        
+        // If models endpoint fails, try a simple chat completion with minimal tokens
+        if (modelId) {
+          const chatResponse = await fetch(`${baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: modelId,
+              messages: [{ role: 'user', content: 'Hi' }],
+              max_tokens: 1
+            })
+          });
+          
+          if (chatResponse.ok) {
+            return { success: true, message: 'Connection successful! Model is responsive.' };
+          }
+          
+          const error = await chatResponse.json().catch(() => ({}));
+          return { 
+            success: false, 
+            message: `API returned ${chatResponse.status}: ${error.error?.message || error.message || 'Unknown error'}` 
+          };
+        }
+        
+        const error = await response.json().catch(() => ({}));
+        return { 
+          success: false, 
+          message: `API returned ${response.status}: ${error.error?.message || error.message || 'Unknown error'}` 
+        };
+      } catch (error) {
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+          return { success: false, message: 'Network error: Could not connect to the API. Check CORS or network issues.' };
+        }
+        return { success: false, message: `Connection failed: ${error.message}` };
+      }
+    }
+
+    // Test connection for Add Model form
+    async function testAddModelConnection() {
+      const baseUrl = document.getElementById('model-base-url').value;
+      const apiKey = document.getElementById('model-api-key').value;
+      const modelId = document.getElementById('model-api-id').value || document.getElementById('model-id').value;
+      const resultEl = document.getElementById('add-model-test-result');
+      
+      resultEl.classList.remove('hidden', 'bg-green-500/20', 'text-green-300', 'bg-red-500/20', 'text-red-300', 'bg-yellow-500/20', 'text-yellow-300');
+      resultEl.classList.add('bg-yellow-500/20', 'text-yellow-300');
+      resultEl.innerHTML = '<div class="flex items-center gap-2"><svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Testing connection...</div>';
+      
+      const result = await testApiConnection(baseUrl, apiKey, modelId);
+      
+      resultEl.classList.remove('bg-yellow-500/20', 'text-yellow-300');
+      if (result.success) {
+        resultEl.classList.add('bg-green-500/20', 'text-green-300');
+        resultEl.innerHTML = `<div class="flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> ${result.message}</div>`;
+      } else {
+        resultEl.classList.add('bg-red-500/20', 'text-red-300');
+        resultEl.innerHTML = `<div class="flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg> ${result.message}</div>`;
+      }
+    }
+
+    // Test connection for Edit Model form
+    async function testEditModelConnection() {
+      const modelId = document.getElementById('edit-model-id').value;
+      const baseUrl = document.getElementById('edit-model-base-url').value;
+      let apiKey = document.getElementById('edit-model-api-key').value;
+      const apiModelId = document.getElementById('edit-model-api-id').value || modelId;
+      const resultEl = document.getElementById('edit-model-test-result');
+      
+      // If no new API key entered, we need to fetch the existing one
+      if (!apiKey) {
+        resultEl.classList.remove('hidden', 'bg-green-500/20', 'text-green-300', 'bg-red-500/20', 'text-red-300', 'bg-yellow-500/20', 'text-yellow-300');
+        resultEl.classList.add('bg-yellow-500/20', 'text-yellow-300');
+        resultEl.innerHTML = '<div class="flex items-center gap-2"><svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Fetching API key...</div>';
+        
+        try {
+          const model = await api(`/api/admin/models/${modelId}`);
+          apiKey = model.apiKey;
+        } catch (error) {
+          resultEl.classList.remove('bg-yellow-500/20', 'text-yellow-300');
+          resultEl.classList.add('bg-red-500/20', 'text-red-300');
+          resultEl.innerHTML = `<div class="flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg> Could not fetch API key: ${error.message}</div>`;
+          return;
+        }
+      }
+      
+      resultEl.classList.remove('hidden', 'bg-green-500/20', 'text-green-300', 'bg-red-500/20', 'text-red-300', 'bg-yellow-500/20', 'text-yellow-300');
+      resultEl.classList.add('bg-yellow-500/20', 'text-yellow-300');
+      resultEl.innerHTML = '<div class="flex items-center gap-2"><svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Testing connection...</div>';
+      
+      const result = await testApiConnection(baseUrl, apiKey, apiModelId);
+      
+      resultEl.classList.remove('bg-yellow-500/20', 'text-yellow-300');
+      if (result.success) {
+        resultEl.classList.add('bg-green-500/20', 'text-green-300');
+        resultEl.innerHTML = `<div class="flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> ${result.message}</div>`;
+      } else {
+        resultEl.classList.add('bg-red-500/20', 'text-red-300');
+        resultEl.innerHTML = `<div class="flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg> ${result.message}</div>`;
+      }
+    }
+
+    // API Helper
+    async function api(endpoint, options = {}) {
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(authToken && { 'Authorization': `Bearer ${authToken}` }),
+        ...options.headers
+      };
+      
+      const response = await fetch(`${API_BASE}${endpoint}`, {
+        ...options,
+        headers
+      });
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+        throw new Error(error.detail || 'Request failed');
+      }
+      
+      return response.json();
+    }
+
+    // Auth Functions
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const errorEl = document.getElementById('login-error');
+      
+      try {
+        const result = await api('/api/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ username, password })
+        });
+        
+        if (result.user.role !== 'ADMIN') {
+          throw new Error('Admin access required');
+        }
+        
+        authToken = result.token;
+        localStorage.setItem('adminToken', authToken);
+        showDashboard();
+      } catch (error) {
+        errorEl.textContent = error.message;
+        errorEl.classList.remove('hidden');
+      }
+    });
+
+    function logout() {
+      authToken = null;
+      localStorage.removeItem('adminToken');
+      document.getElementById('login-screen').classList.remove('hidden');
+      document.getElementById('dashboard-screen').classList.add('hidden');
+    }
+
+    function showDashboard() {
+      document.getElementById('login-screen').classList.add('hidden');
+      document.getElementById('dashboard-screen').classList.remove('hidden');
+      showSection('dashboard');
+      loadDashboardData();
+    }
+
+    // Navigation
+    function showSection(section) {
+      document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
+      document.getElementById(`section-${section}`).classList.remove('hidden');
+      
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        if (btn.dataset.section === section) {
+          btn.classList.add('bg-blue-600/20', 'text-blue-400');
+        } else {
+          btn.classList.remove('bg-blue-600/20', 'text-blue-400');
+        }
+      });
+      
+      if (section === 'users') loadUsers();
+      if (section === 'models') loadModels();
+      if (section === 'usage') loadUsageStats();
+    }
+
+    // Dashboard
+    async function loadDashboardData() {
+      try {
+        const [users, usage] = await Promise.all([
+          api('/api/admin/users'),
+          api('/api/admin/usage?days=30')
+        ]);
+        
+        document.getElementById('stats-grid').innerHTML = `
+          <div class="stat-card bg-gradient-to-br from-blue-600/20 to-blue-800/20 rounded-xl border border-blue-500/30 p-6">
+            <div class="text-3xl font-bold text-white mb-2">${users.length}</div>
+            <div class="text-blue-300">Total Users</div>
+          </div>
+          <div class="stat-card bg-gradient-to-br from-green-600/20 to-green-800/20 rounded-xl border border-green-500/30 p-6">
+            <div class="text-3xl font-bold text-white mb-2">${usage.total_requests || 0}</div>
+            <div class="text-green-300">API Requests</div>
+          </div>
+          <div class="stat-card bg-gradient-to-br from-purple-600/20 to-purple-800/20 rounded-xl border border-purple-500/30 p-6">
+            <div class="text-3xl font-bold text-white mb-2">${((usage.total_tokens_input || 0) + (usage.total_tokens_output || 0)).toLocaleString()}</div>
+            <div class="text-purple-300">Total Tokens</div>
+          </div>
+          <div class="stat-card bg-gradient-to-br from-orange-600/20 to-orange-800/20 rounded-xl border border-orange-500/30 p-6">
+            <div class="text-3xl font-bold text-white mb-2">${usage.successful || 0}</div>
+            <div class="text-orange-300">Successful Calls</div>
+          </div>
+        `;
+        
+        // Usage by model
+        const modelUsage = usage.by_model || [];
+        document.getElementById('usage-by-model').innerHTML = modelUsage.length ? modelUsage.map(m => `
+          <div class="flex items-center justify-between p-3 bg-admin-bg rounded-lg">
+            <span class="text-white font-medium">${m.model_name || m.model_id}</span>
+            <span class="text-admin-muted">${m.count} calls</span>
+          </div>
+        `).join('') : '<p class="text-admin-muted">No usage data</p>';
+        
+        // Usage by user
+        const userUsage = usage.by_user || [];
+        document.getElementById('usage-by-user').innerHTML = userUsage.length ? userUsage.map(u => `
+          <div class="flex items-center justify-between p-3 bg-admin-bg rounded-lg">
+            <span class="text-white font-medium">${u.username}</span>
+            <span class="text-admin-muted">${u.count} calls</span>
+          </div>
+        `).join('') : '<p class="text-admin-muted">No usage data</p>';
+        
+      } catch (error) {
+        console.error('Failed to load dashboard:', error);
+      }
+    }
+
+    // Users
+    async function loadUsers() {
+      try {
+        const users = await api('/api/admin/users');
+        document.getElementById('users-table-body').innerHTML = users.map(u => `
+          <tr>
+            <td class="px-6 py-4 text-white font-medium">${u.username}</td>
+            <td class="px-6 py-4">
+              <span class="px-2 py-1 rounded text-xs font-medium ${u.role === 'ADMIN' ? 'bg-purple-500/20 text-purple-300' : 'bg-blue-500/20 text-blue-300'}">
+                ${u.role}
+              </span>
+            </td>
+            <td class="px-6 py-4 text-admin-muted font-mono text-sm">${u.id}</td>
+            <td class="px-6 py-4 text-right">
+              ${u.username !== 'admin' ? `
+                <button onclick="deleteUser('${u.username}')" class="text-red-400 hover:text-red-300 p-2">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
+              ` : '<span class="text-admin-muted text-sm">Protected</span>'}
+            </td>
+          </tr>
+        `).join('');
+        
+        // Update user filter in usage section
+        const userFilter = document.getElementById('usage-user-filter');
+        userFilter.innerHTML = '<option value="">All Users</option>' + 
+          users.map(u => `<option value="${u.username}">${u.username}</option>`).join('');
+          
+      } catch (error) {
+        console.error('Failed to load users:', error);
+      }
+    }
+
+    async function deleteUser(username) {
+      if (!confirm(`Delete user "${username}"?`)) return;
+      try {
+        await api(`/api/admin/users/${username}`, { method: 'DELETE' });
+        loadUsers();
+      } catch (error) {
+        alert('Failed to delete user: ' + error.message);
+      }
+    }
+
+    function showAddUserModal() {
+      document.getElementById('add-user-modal').classList.remove('hidden');
+    }
+
+    function hideAddUserModal() {
+      document.getElementById('add-user-modal').classList.add('hidden');
+      document.getElementById('add-user-form').reset();
+    }
+
+    document.getElementById('add-user-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('new-username').value;
+      const password = document.getElementById('new-password').value;
+      const role = document.getElementById('new-role').value;
+      
+      try {
+        await api('/api/admin/users', {
+          method: 'POST',
+          body: JSON.stringify({ username, password, role })
+        });
+        hideAddUserModal();
+        loadUsers();
+      } catch (error) {
+        alert('Failed to create user: ' + error.message);
+      }
+    });
+
+    // Models
+    let modelsCache = [];
+    
+    async function loadModels() {
+      try {
+        const models = await api('/api/admin/models');
+        modelsCache = models;
+        document.getElementById('models-grid').innerHTML = models.length ? models.map(m => `
+          <div class="bg-admin-card rounded-xl border border-admin-border p-6 cursor-pointer hover:border-blue-500/50 transition-colors group" onclick="editModel('${m.id}')">
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+              </div>
+              <div class="flex items-center gap-1">
+                <button onclick="event.stopPropagation(); editModel('${m.id}')" class="text-blue-400 hover:text-blue-300 p-2 opacity-0 group-hover:opacity-100 transition-opacity" title="Edit">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                </button>
+                <button onclick="event.stopPropagation(); deleteModel('${m.id}')" class="text-red-400 hover:text-red-300 p-2 opacity-0 group-hover:opacity-100 transition-opacity" title="Delete">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
+              </div>
+            </div>
+            <h3 class="text-lg font-semibold text-white mb-1">${m.name}</h3>
+            <p class="text-sm text-admin-muted mb-3">${m.description || 'No description'}</p>
+            <div class="flex items-center gap-2 text-xs flex-wrap">
+              <span class="px-2 py-1 bg-admin-bg rounded text-admin-muted">${m.provider}</span>
+              <span class="px-2 py-1 bg-admin-bg rounded text-admin-muted font-mono">${m.apiModelId || m.id}</span>
+              ${m.isEnabled === false ? '<span class="px-2 py-1 bg-red-500/20 rounded text-red-400">Disabled</span>' : ''}
+            </div>
+            <div class="mt-3 text-xs text-admin-muted opacity-0 group-hover:opacity-100 transition-opacity">Click to edit</div>
+          </div>
+        `).join('') : '<p class="text-admin-muted col-span-full text-center py-12">No global models configured. Add models using the button above.</p>';
+      } catch (error) {
+        console.error('Failed to load models:', error);
+      }
+    }
+
+    async function deleteModel(modelId) {
+      if (!confirm(`Delete model "${modelId}"?`)) return;
+      try {
+        await api(`/api/admin/models/${modelId}`, { method: 'DELETE' });
+        loadModels();
+      } catch (error) {
+        alert('Failed to delete model: ' + error.message);
+      }
+    }
+
+    function showAddModelModal() {
+      document.getElementById('add-model-modal').classList.remove('hidden');
+    }
+
+    function hideAddModelModal() {
+      document.getElementById('add-model-modal').classList.add('hidden');
+      document.getElementById('add-model-form').reset();
+    }
+
+    // Edit Model Functions
+    async function editModel(modelId) {
+      try {
+        // Fetch the full model details including API key
+        const model = await api(`/api/admin/models/${modelId}`);
+        
+        document.getElementById('edit-model-id').value = model.id;
+        document.getElementById('edit-model-id-display').value = model.id;
+        document.getElementById('edit-model-name').value = model.name || '';
+        document.getElementById('edit-model-provider').value = model.provider || 'external';
+        document.getElementById('edit-model-api-id').value = model.apiModelId || '';
+        document.getElementById('edit-model-description').value = model.description || '';
+        document.getElementById('edit-model-base-url').value = model.defaultBaseUrl || '';
+        
+        // Show existing API key status
+        const apiKeyInput = document.getElementById('edit-model-api-key');
+        const apiKeyHint = document.getElementById('edit-model-api-key-hint');
+        if (model.apiKey) {
+          apiKeyInput.placeholder = '••••••••••••' + model.apiKey.slice(-4);
+          if (apiKeyHint) apiKeyHint.textContent = 'API Key configured. Leave empty to keep current.';
+        } else {
+          apiKeyInput.placeholder = 'sk-...';
+          if (apiKeyHint) apiKeyHint.textContent = 'No API Key configured.';
+        }
+        apiKeyInput.value = '';
+        
+        document.getElementById('edit-model-enabled').checked = model.isEnabled !== false;
+        
+        // Reset test result
+        document.getElementById('edit-model-test-result').classList.add('hidden');
+        
+        document.getElementById('edit-model-modal').classList.remove('hidden');
+      } catch (error) {
+        alert('Failed to load model details: ' + error.message);
+      }
+    }
+
+    function hideEditModelModal() {
+      document.getElementById('edit-model-modal').classList.add('hidden');
+      document.getElementById('edit-model-form').reset();
+    }
+
+    document.getElementById('edit-model-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const modelId = document.getElementById('edit-model-id').value;
+      const apiKey = document.getElementById('edit-model-api-key').value;
+      
+      const updates = {
+        name: document.getElementById('edit-model-name').value,
+        provider: document.getElementById('edit-model-provider').value,
+        apiModelId: document.getElementById('edit-model-api-id').value,
+        description: document.getElementById('edit-model-description').value,
+        defaultBaseUrl: document.getElementById('edit-model-base-url').value,
+        isEnabled: document.getElementById('edit-model-enabled').checked
+      };
+      
+      // Only include API key if user entered a new one
+      if (apiKey && apiKey.trim() !== '') {
+        updates.apiKey = apiKey;
+      }
+      
+      try {
+        await api(`/api/admin/models/${modelId}`, {
+          method: 'PUT',
+          body: JSON.stringify(updates)
+        });
+        hideEditModelModal();
+        loadModels();
+      } catch (error) {
+        alert('Failed to update model: ' + error.message);
+      }
+    });
+
+    document.getElementById('add-model-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const model = {
+        id: document.getElementById('model-id').value,
+        name: document.getElementById('model-name').value,
+        provider: document.getElementById('model-provider').value,
+        description: document.getElementById('model-description').value,
+        apiModelId: document.getElementById('model-api-id').value,
+        defaultBaseUrl: document.getElementById('model-base-url').value,
+        apiKey: document.getElementById('model-api-key').value
+      };
+      
+      try {
+        await api('/api/admin/models', {
+          method: 'POST',
+          body: JSON.stringify(model)
+        });
+        hideAddModelModal();
+        loadModels();
+      } catch (error) {
+        alert('Failed to create model: ' + error.message);
+      }
+    });
+
+    // Usage Stats
+    async function loadUsageStats() {
+      const days = document.getElementById('usage-days').value;
+      const username = document.getElementById('usage-user-filter').value;
+      
+      try {
+        const params = new URLSearchParams({ days });
+        if (username) params.append('username', username);
+        
+        const usage = await api(`/api/admin/usage?${params}`);
+        
+        document.getElementById('usage-stats-summary').innerHTML = `
+          <div class="bg-admin-bg rounded-lg p-4">
+            <div class="text-2xl font-bold text-white">${usage.total_requests}</div>
+            <div class="text-admin-muted text-sm">Total Requests</div>
+          </div>
+          <div class="bg-admin-bg rounded-lg p-4">
+            <div class="text-2xl font-bold text-green-400">${usage.successful}</div>
+            <div class="text-admin-muted text-sm">Successful</div>
+          </div>
+          <div class="bg-admin-bg rounded-lg p-4">
+            <div class="text-2xl font-bold text-red-400">${usage.failed}</div>
+            <div class="text-admin-muted text-sm">Failed</div>
+          </div>
+          <div class="bg-admin-bg rounded-lg p-4">
+            <div class="text-2xl font-bold text-purple-400">${((usage.total_tokens_input || 0) + (usage.total_tokens_output || 0)).toLocaleString()}</div>
+            <div class="text-admin-muted text-sm">Total Tokens</div>
+          </div>
+        `;
+        
+        const logs = usage.recent_logs || [];
+        document.getElementById('usage-logs-table').innerHTML = logs.length ? logs.map(log => `
+          <tr>
+            <td class="px-6 py-4 text-admin-muted text-sm">${new Date(log.created_at).toLocaleString()}</td>
+            <td class="px-6 py-4 text-white">${log.username}</td>
+            <td class="px-6 py-4 text-white">${log.model_name || log.model_id}</td>
+            <td class="px-6 py-4 text-admin-muted">${log.tokens_input} / ${log.tokens_output}</td>
+            <td class="px-6 py-4">
+              <span class="px-2 py-1 rounded text-xs font-medium ${log.success ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}">
+                ${log.success ? 'Success' : 'Failed'}
+              </span>
+            </td>
+          </tr>
+        `).join('') : '<tr><td colspan="5" class="px-6 py-12 text-center text-admin-muted">No usage logs found</td></tr>';
+        
+      } catch (error) {
+        console.error('Failed to load usage stats:', error);
+      }
+    }
+
+    // Initialize
+    if (authToken) {
+      showDashboard();
+    }
+  </script>
+</body>
+</html>
+
