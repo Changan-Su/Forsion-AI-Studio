@@ -4,21 +4,23 @@ const normalize = (value?: string) => {
   return value.endsWith('/') ? value.slice(0, -1) : value;
 };
 
-const envApiBase = normalize(import.meta.env.VITE_API_URL);
-
-// In development, always use localhost:3002
-// In production, use same origin (Nginx proxy) or VITE_API_URL
-const getDefaultApiBase = () => {
-  if (typeof window === 'undefined') {
-    return 'http://localhost:3002/api';
+// Get API base URL - MUST be called at runtime, not at build time
+const getApiBaseUrl = (): string => {
+  // First check env variable (set at build time)
+  const envApiBase = normalize(import.meta.env.VITE_API_URL);
+  if (envApiBase) return envApiBase;
+  
+  // Runtime detection - only works in browser
+  if (typeof window !== 'undefined') {
+    // Production: use same origin, Nginx will proxy /api to backend
+    return `${window.location.origin}/api`;
   }
-  // Check if running in development (different ports, not standard web ports or backend port)
-  const isDev = window.location.port && !['80', '443', '3002', '1111'].includes(window.location.port);
-  if (isDev) {
-    return 'http://localhost:3002/api';
-  }
-  // Production: use same origin, Nginx will proxy /api to backend
-  return `${window.location.origin}/api`;
+  
+  // SSR/build time fallback - this should never be used in browser
+  return '/api';
 };
 
-export const API_BASE_URL = envApiBase || normalize(getDefaultApiBase()) || 'http://localhost:3002/api';
+// Export as getter to ensure runtime evaluation
+export const API_BASE_URL = typeof window !== 'undefined' 
+  ? getApiBaseUrl() 
+  : '/api';
