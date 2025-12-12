@@ -67,8 +67,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3002}
+      # Note: No VITE_API_URL arg - frontend detects API URL at runtime
     container_name: forsion_frontend
     restart: unless-stopped
     ports:

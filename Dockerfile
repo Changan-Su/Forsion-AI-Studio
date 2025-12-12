@@ -15,11 +15,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build argument for API URL (can be overridden at build time)
-ARG VITE_API_URL=http://localhost:3001
-ENV VITE_API_URL=$VITE_API_URL
-
 # Build the application
+# Note: VITE_API_URL is NOT set here - frontend will detect API URL at runtime
+# based on window.location.origin
 RUN npm run build
 
 # Production stage with Nginx
