@@ -2,21 +2,24 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import type { JwtPayload } from '../types/index.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-change-me';
+// 动态获取 JWT_SECRET，避免 ESM 模块加载顺序问题
+function getJwtSecret(): string {
+  return process.env.JWT_SECRET || 'default-secret-change-me';
+}
 
 export interface AuthRequest extends Request {
   user?: JwtPayload;
 }
 
 export function generateToken(payload: JwtPayload): string {
-  return jwt.sign(payload, JWT_SECRET, {
+  return jwt.sign(payload, getJwtSecret(), {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   } as jwt.SignOptions);
 }
 
 export function verifyToken(token: string): JwtPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as JwtPayload;
+    return jwt.verify(token, getJwtSecret()) as JwtPayload;
   } catch {
     return null;
   }
