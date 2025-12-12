@@ -31,6 +31,9 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Copy built files from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
+# Copy admin panel static
+COPY admin/index.html /usr/share/nginx/html/admin/index.html
+
 # Create non-root user (nginx runs as nginx user by default)
 RUN chown -R nginx:nginx /usr/share/nginx/html && \
     chown -R nginx:nginx /var/cache/nginx && \
