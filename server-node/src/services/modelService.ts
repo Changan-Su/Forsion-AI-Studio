@@ -233,7 +233,7 @@ export async function ensureBuiltinModels(): Promise<void> {
   ];
 
   for (const modelData of builtinModels) {
-    const existing = await getGlobalModel(modelData.id);
+    const existing = await getGlobalModel(modelData.id!);
     if (!existing) {
       await createGlobalModel({
         ...modelData,

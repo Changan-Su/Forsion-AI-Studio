@@ -10,8 +10,8 @@ export interface AuthRequest extends Request {
 
 export function generateToken(payload: JwtPayload): string {
   return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as string,
-  });
+    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  } as jwt.SignOptions);
 }
 
 export function verifyToken(token: string): JwtPayload | null {
