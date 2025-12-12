@@ -112,8 +112,8 @@ ask_mysql_config() {
     echo ""
     echo "请选择 MySQL 配置方式:"
     echo ""
-    echo -e "  ${GREEN}1)${NC} 使用 Docker 启动新的 MySQL 容器 (推荐新手)"
-    echo -e "  ${GREEN}2)${NC} 连接已有的 MySQL 服务器 (服务器已安装 MySQL)"
+    echo -e "  ${GREEN}1)${NC} 使用 Docker 启动新的 MySQL 容器 (首次部署推荐)"
+    echo -e "  ${GREEN}2)${NC} 连接已有的 MySQL (本机安装或其他 Docker 容器如 1Panel)"
     echo ""
     
     while true; do
@@ -142,29 +142,100 @@ ask_mysql_config() {
 configure_external_mysql() {
     echo ""
     echo -e "${YELLOW}配置外部 MySQL 连接信息...${NC}"
+    echo ""
+    
+    # 询问 MySQL 运行环境
+    echo "请选择 MySQL 运行方式:"
+    echo -e "  ${GREEN}1)${NC} MySQL 安装在本机 (非 Docker)"
+    echo -e "  ${GREEN}2)${NC} MySQL 运行在其他 Docker 容器中 (如 1Panel、宝塔)"
+    echo ""
+    
+    while true; do
+        read -p "请输入选项 [1/2]: " mysql_type
+        case $mysql_type in
+            1)
+                MYSQL_IN_DOCKER="no"
+                break
+                ;;
+            2)
+                MYSQL_IN_DOCKER="yes"
+                break
+                ;;
+            *)
+                echo -e "${RED}无效选项，请输入 1 或 2${NC}"
+                ;;
+        esac
+    done
+    
+    echo ""
     echo -e "${BLUE}(直接回车使用默认值)${NC}"
     echo ""
     
-    read -p "MySQL 主机 [localhost]: " db_host
-    DB_HOST=${db_host:-localhost}
+    if [ "$MYSQL_IN_DOCKER" = "yes" ]; then
+        # MySQL 在 Docker 容器中
+        echo -e "${YELLOW}请输入 MySQL 容器名称 (可通过 docker ps 查看):${NC}"
+        read -p "MySQL 容器名: " db_host
+        if [ -z "$db_host" ]; then
+            echo -e "${RED}容器名不能为空${NC}"
+            exit 1
+        fi
+        DB_HOST=$db_host
+        
+        # 获取 MySQL 容器所在网络
+        echo -e "${YELLOW}正在检测 MySQL 容器网络...${NC}"
+        MYSQL_NETWORK=$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{end}}' "$DB_HOST" 2>/dev/null | head -1)
+        if [ -n "$MYSQL_NETWORK" ]; then
+            echo -e "${GREEN}✓ 检测到 MySQL 网络: $MYSQL_NETWORK${NC}"
+            export EXTERNAL_MYSQL_NETWORK="$MYSQL_NETWORK"
+        else
+            echo -e "${YELLOW}⚠ 未能自动检测网络，请手动输入${NC}"
+            read -p "MySQL 容器所在网络名: " mysql_network
+            export EXTERNAL_MYSQL_NETWORK="$mysql_network"
+        fi
+    else
+        # MySQL 安装在本机
+        read -p "MySQL 主机 [127.0.0.1]: " db_host
+        DB_HOST=${db_host:-127.0.0.1}
+    fi
     
     read -p "MySQL 端口 [3306]: " db_port
     DB_PORT=${db_port:-3306}
     
-    read -p "MySQL 用户名 [root]: " db_user
-    DB_USER=${db_user:-root}
+    read -p "MySQL 用户名: " db_user
+    if [ -z "$db_user" ]; then
+        echo -e "${RED}用户名不能为空${NC}"
+        exit 1
+    fi
+    DB_USER=$db_user
     
     read -sp "MySQL 密码: " db_pass
     echo ""
-    DB_PASSWORD=${db_pass}
+    if [ -z "$db_pass" ]; then
+        echo -e "${RED}密码不能为空${NC}"
+        exit 1
+    fi
+    DB_PASSWORD=$db_pass
     
-    read -p "数据库名 [forsion_ai_studio]: " db_name
-    DB_NAME=${db_name:-forsion_ai_studio}
+    read -p "数据库名: " db_name
+    if [ -z "$db_name" ]; then
+        echo -e "${RED}数据库名不能为空${NC}"
+        exit 1
+    fi
+    DB_NAME=$db_name
     
     # 测试连接
     echo ""
     echo -e "${YELLOW}测试 MySQL 连接...${NC}"
-    if command -v mysql &> /dev/null; then
+    
+    if [ "$MYSQL_IN_DOCKER" = "yes" ]; then
+        # 通过 Docker 网络测试
+        if docker exec "$DB_HOST" mysqladmin ping -h localhost -u "$DB_USER" -p"$DB_PASSWORD" &> /dev/null; then
+            echo -e "${GREEN}✓ MySQL 容器连接成功${NC}"
+        else
+            echo -e "${YELLOW}⚠ MySQL 连接测试失败，请确认配置正确${NC}"
+            echo "  继续部署，稍后可手动修改 .env 文件"
+        fi
+    elif command -v mysql &> /dev/null; then
         if mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" -e "SELECT 1" &> /dev/null; then
             echo -e "${GREEN}✓ MySQL 连接成功${NC}"
         else
@@ -181,6 +252,7 @@ configure_external_mysql() {
     export EXTERNAL_DB_USER="$DB_USER"
     export EXTERNAL_DB_PASSWORD="$DB_PASSWORD"
     export EXTERNAL_DB_NAME="$DB_NAME"
+    export EXTERNAL_MYSQL_IN_DOCKER="$MYSQL_IN_DOCKER"
 }
 
 # 配置环境
@@ -257,6 +329,9 @@ start_services() {
     echo -e "${BLUE}停止现有容器（如果有）...${NC}"
     $COMPOSE_CMD down 2>/dev/null || true
     
+    # 删除可能残留的 forsion_mysql 容器
+    docker rm -f forsion_mysql 2>/dev/null || true
+    
     if [ "$USE_DOCKER_MYSQL" = "yes" ]; then
         # 启动所有服务（包括 MySQL）
         echo -e "${BLUE}构建并启动所有容器（含 MySQL）...${NC}"
@@ -265,6 +340,13 @@ start_services() {
         # 只启动 backend 和 frontend，不启动 mysql
         echo -e "${BLUE}构建并启动容器（不含 MySQL）...${NC}"
         $COMPOSE_CMD up -d --build backend frontend
+        
+        # 如果 MySQL 在其他 Docker 容器中，需要连接网络
+        if [ "$EXTERNAL_MYSQL_IN_DOCKER" = "yes" ] && [ -n "$EXTERNAL_MYSQL_NETWORK" ]; then
+            echo -e "${BLUE}将 backend 连接到 MySQL 网络 ($EXTERNAL_MYSQL_NETWORK)...${NC}"
+            docker network connect "$EXTERNAL_MYSQL_NETWORK" forsion_backend 2>/dev/null || true
+            echo -e "${GREEN}✓ 网络连接完成${NC}"
+        fi
     fi
     
     echo ""
