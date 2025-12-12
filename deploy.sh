@@ -2,7 +2,11 @@
 
 # =====================================================
 # Forsion AI Studio - Linux 部署脚本
-# 使用方法: chmod +x deploy.sh && ./deploy.sh
+# 
+# 使用方法:
+#   ./deploy.sh              # 交互式选择
+#   ./deploy.sh --with-mysql # 使用 Docker MySQL
+#   ./deploy.sh --no-mysql   # 使用已有 MySQL
 # =====================================================
 
 set -e
@@ -14,6 +18,43 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
+
+# 默认配置
+USE_DOCKER_MYSQL=""  # 空表示交互式询问
+
+# 解析命令行参数
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --with-mysql)
+                USE_DOCKER_MYSQL="yes"
+                shift
+                ;;
+            --no-mysql)
+                USE_DOCKER_MYSQL="no"
+                shift
+                ;;
+            -h|--help)
+                echo "用法: $0 [选项]"
+                echo ""
+                echo "选项:"
+                echo "  --with-mysql    使用 Docker 启动 MySQL 容器"
+                echo "  --no-mysql      使用已有的外部 MySQL（需配置 .env）"
+                echo "  -h, --help      显示帮助信息"
+                echo ""
+                echo "示例:"
+                echo "  $0                    # 交互式选择"
+                echo "  $0 --no-mysql         # 连接已有 MySQL"
+                exit 0
+                ;;
+            *)
+                echo -e "${RED}未知参数: $1${NC}"
+                echo "使用 -h 或 --help 查看帮助"
+                exit 1
+                ;;
+        esac
+    done
+}
 
 echo -e "${CYAN}========================================${NC}"
 echo -e "${CYAN}Forsion AI Studio 部署脚本 (Linux)${NC}"
@@ -59,31 +100,146 @@ check_requirements() {
     echo ""
 }
 
+# 询问 MySQL 配置
+ask_mysql_config() {
+    if [ -n "$USE_DOCKER_MYSQL" ]; then
+        return  # 已通过命令行参数指定
+    fi
+    
+    echo -e "${CYAN}========================================${NC}"
+    echo -e "${CYAN}MySQL 配置选项${NC}"
+    echo -e "${CYAN}========================================${NC}"
+    echo ""
+    echo "请选择 MySQL 配置方式:"
+    echo ""
+    echo -e "  ${GREEN}1)${NC} 使用 Docker 启动新的 MySQL 容器 (推荐新手)"
+    echo -e "  ${GREEN}2)${NC} 连接已有的 MySQL 服务器 (服务器已安装 MySQL)"
+    echo ""
+    
+    while true; do
+        read -p "请输入选项 [1/2]: " choice
+        case $choice in
+            1)
+                USE_DOCKER_MYSQL="yes"
+                echo -e "${GREEN}✓ 将使用 Docker MySQL${NC}"
+                break
+                ;;
+            2)
+                USE_DOCKER_MYSQL="no"
+                echo -e "${GREEN}✓ 将连接已有 MySQL${NC}"
+                configure_external_mysql
+                break
+                ;;
+            *)
+                echo -e "${RED}无效选项，请输入 1 或 2${NC}"
+                ;;
+        esac
+    done
+    echo ""
+}
+
+# 配置外部 MySQL
+configure_external_mysql() {
+    echo ""
+    echo -e "${YELLOW}配置外部 MySQL 连接信息...${NC}"
+    echo -e "${BLUE}(直接回车使用默认值)${NC}"
+    echo ""
+    
+    read -p "MySQL 主机 [localhost]: " db_host
+    DB_HOST=${db_host:-localhost}
+    
+    read -p "MySQL 端口 [3306]: " db_port
+    DB_PORT=${db_port:-3306}
+    
+    read -p "MySQL 用户名 [root]: " db_user
+    DB_USER=${db_user:-root}
+    
+    read -sp "MySQL 密码: " db_pass
+    echo ""
+    DB_PASSWORD=${db_pass}
+    
+    read -p "数据库名 [forsion_ai_studio]: " db_name
+    DB_NAME=${db_name:-forsion_ai_studio}
+    
+    # 测试连接
+    echo ""
+    echo -e "${YELLOW}测试 MySQL 连接...${NC}"
+    if command -v mysql &> /dev/null; then
+        if mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" -e "SELECT 1" &> /dev/null; then
+            echo -e "${GREEN}✓ MySQL 连接成功${NC}"
+        else
+            echo -e "${YELLOW}⚠ MySQL 连接测试失败，请确认配置正确${NC}"
+            echo "  继续部署，稍后可手动修改 .env 文件"
+        fi
+    else
+        echo -e "${BLUE}ℹ mysql 客户端未安装，跳过连接测试${NC}"
+    fi
+    
+    # 保存配置到环境变量（后续写入 .env）
+    export EXTERNAL_DB_HOST="$DB_HOST"
+    export EXTERNAL_DB_PORT="$DB_PORT"
+    export EXTERNAL_DB_USER="$DB_USER"
+    export EXTERNAL_DB_PASSWORD="$DB_PASSWORD"
+    export EXTERNAL_DB_NAME="$DB_NAME"
+}
+
 # 配置环境
 setup_env() {
-    if [ ! -f ".env" ]; then
-        echo -e "${YELLOW}创建 .env 配置文件...${NC}"
-        if [ -f ".env.example" ]; then
-            cp .env.example .env
-            # 生成随机 JWT 密钥
-            JWT_SECRET=$(openssl rand -hex 32 2>/dev/null || cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 64 | head -n 1)
-            sed -i "s/your-super-secret-jwt-key-change-in-production/$JWT_SECRET/" .env 2>/dev/null || true
-            echo -e "${GREEN}✓ 已创建 .env 文件${NC}"
-        else
-            cat > .env << EOF
+    echo -e "${YELLOW}配置环境变量...${NC}"
+    
+    # 生成随机 JWT 密钥
+    JWT_SECRET=$(openssl rand -hex 32 2>/dev/null || cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 64 | head -n 1)
+    
+    if [ "$USE_DOCKER_MYSQL" = "yes" ]; then
+        # Docker MySQL 配置
+        cat > .env << EOF
+# MySQL 配置 (Docker)
 MYSQL_ROOT_PASSWORD=rootpassword
 MYSQL_DATABASE=forsion_ai_studio
 MYSQL_USER=forsion
 MYSQL_PASSWORD=forsion123
-JWT_SECRET=$(openssl rand -hex 32 2>/dev/null || echo "change-this-secret-key")
+
+# 后端数据库连接 (Docker 内部网络)
+DB_HOST=mysql
+DB_PORT=3306
+DB_USER=forsion
+DB_PASSWORD=forsion123
+DB_NAME=forsion_ai_studio
+
+# JWT 密钥
+JWT_SECRET=$JWT_SECRET
+
+# 前端 API 地址
 VITE_API_URL=http://localhost:3001
 EOF
-            echo -e "${GREEN}✓ 已创建默认 .env 文件${NC}"
-        fi
-        echo -e "${YELLOW}⚠ 请编辑 .env 文件修改默认密码！${NC}"
+        echo -e "${GREEN}✓ 已创建 Docker MySQL 配置${NC}"
     else
-        echo -e "${GREEN}✓ .env 文件已存在${NC}"
+        # 外部 MySQL 配置
+        cat > .env << EOF
+# MySQL 配置 (外部已有)
+# 这些变量用于 docker-compose 中的 mysql 服务，但我们不启动它
+MYSQL_ROOT_PASSWORD=not_used
+MYSQL_DATABASE=${EXTERNAL_DB_NAME:-forsion_ai_studio}
+MYSQL_USER=${EXTERNAL_DB_USER:-root}
+MYSQL_PASSWORD=${EXTERNAL_DB_PASSWORD:-}
+
+# 后端数据库连接 (连接外部 MySQL)
+DB_HOST=${EXTERNAL_DB_HOST:-localhost}
+DB_PORT=${EXTERNAL_DB_PORT:-3306}
+DB_USER=${EXTERNAL_DB_USER:-root}
+DB_PASSWORD=${EXTERNAL_DB_PASSWORD:-}
+DB_NAME=${EXTERNAL_DB_NAME:-forsion_ai_studio}
+
+# JWT 密钥
+JWT_SECRET=$JWT_SECRET
+
+# 前端 API 地址
+VITE_API_URL=http://localhost:3001
+EOF
+        echo -e "${GREEN}✓ 已创建外部 MySQL 配置${NC}"
     fi
+    
+    echo -e "${YELLOW}⚠ 生产环境请修改 .env 中的默认密码！${NC}"
     echo ""
 }
 
@@ -101,9 +257,15 @@ start_services() {
     echo -e "${BLUE}停止现有容器（如果有）...${NC}"
     $COMPOSE_CMD down 2>/dev/null || true
     
-    # 构建并启动
-    echo -e "${BLUE}构建并启动容器...${NC}"
-    $COMPOSE_CMD up -d --build
+    if [ "$USE_DOCKER_MYSQL" = "yes" ]; then
+        # 启动所有服务（包括 MySQL）
+        echo -e "${BLUE}构建并启动所有容器（含 MySQL）...${NC}"
+        $COMPOSE_CMD up -d --build
+    else
+        # 只启动 backend 和 frontend，不启动 mysql
+        echo -e "${BLUE}构建并启动容器（不含 MySQL）...${NC}"
+        $COMPOSE_CMD up -d --build backend frontend
+    fi
     
     echo ""
     echo -e "${YELLOW}等待服务启动...${NC}"
@@ -117,27 +279,35 @@ start_services() {
 
 # 等待 MySQL 就绪
 wait_for_mysql() {
-    echo -e "${YELLOW}等待 MySQL 就绪...${NC}"
-    
-    COMPOSE_CMD="docker compose"
-    if ! docker compose version &> /dev/null; then
-        COMPOSE_CMD="docker-compose"
-    fi
-    
-    local max_retries=30
-    local retry=0
-    
-    while [ $retry -lt $max_retries ]; do
-        if $COMPOSE_CMD exec -T mysql mysqladmin ping -h localhost -u root -prootpassword &> /dev/null; then
-            echo -e "${GREEN}✓ MySQL 已就绪${NC}"
-            return 0
+    if [ "$USE_DOCKER_MYSQL" = "yes" ]; then
+        echo -e "${YELLOW}等待 Docker MySQL 就绪...${NC}"
+        
+        COMPOSE_CMD="docker compose"
+        if ! docker compose version &> /dev/null; then
+            COMPOSE_CMD="docker-compose"
         fi
-        retry=$((retry + 1))
-        sleep 2
-    done
-    
-    echo -e "${YELLOW}⚠ MySQL 启动超时，请手动检查${NC}"
-    return 1
+        
+        local max_retries=30
+        local retry=0
+        
+        while [ $retry -lt $max_retries ]; do
+            if $COMPOSE_CMD exec -T mysql mysqladmin ping -h localhost -u root -prootpassword &> /dev/null; then
+                echo -e "${GREEN}✓ Docker MySQL 已就绪${NC}"
+                return 0
+            fi
+            retry=$((retry + 1))
+            sleep 2
+            echo -n "."
+        done
+        
+        echo ""
+        echo -e "${YELLOW}⚠ MySQL 启动超时，请手动检查${NC}"
+        return 1
+    else
+        echo -e "${BLUE}ℹ 使用外部 MySQL，跳过等待${NC}"
+        # 简单等待后端连接外部数据库
+        sleep 5
+    fi
 }
 
 # 初始化数据库
@@ -182,7 +352,9 @@ show_completion() {
 
 # 主流程
 main() {
+    parse_args "$@"
     check_requirements
+    ask_mysql_config
     setup_env
     start_services
     wait_for_mysql
