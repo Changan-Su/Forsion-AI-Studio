@@ -41,7 +41,7 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      PORT: ${PORT:-3001}
+      PORT: ${PORT:-3002}
       # 支持从 .env 读取外部 MySQL 配置，默认连接 Docker MySQL
       DB_HOST: ${DB_HOST:-mysql}
       DB_PORT: ${DB_PORT:-3306}
@@ -50,7 +50,7 @@ services:
       DB_NAME: ${DB_NAME:-${MYSQL_DATABASE:-forsion_ai_studio}}
       JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
     ports:
-      - "${PORT:-3001}:${PORT:-3001}"
+      - "${PORT:-3002}:${PORT:-3002}"
     # 注意: 如果使用外部 MySQL，启动时用 docker compose up backend frontend
     # depends_on 只在启动 mysql 服务时生效
     depends_on:
@@ -58,7 +58,7 @@ services:
         condition: service_healthy
         required: false
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:${PORT:-3001}/api/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:${PORT:-3002}/api/health"]
       interval: 30s
       timeout: 10s
       start_period: 30s
