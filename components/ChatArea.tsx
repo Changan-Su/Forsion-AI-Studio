@@ -1,8 +1,126 @@
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { Message, AIModel } from '../types';
-import { Bot, User, Cpu, AlertCircle, BrainCircuit, ChevronDown, UploadCloud } from 'lucide-react';
+import { Bot, User, Cpu, AlertCircle, BrainCircuit, ChevronDown, ChevronRight, UploadCloud, Copy, Check, RefreshCw } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
+
+// Code Block Component with Copy functionality
+const CodeBlock: React.FC<{ language?: string; children: string }> = ({ language, children }) => {
+  const [copied, setCopied] = useState(false);
+  
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(children);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  
+  return (
+    <div className="relative group my-4 rounded-xl overflow-hidden bg-[#1e1e1e] dark:bg-[#0d1117] border border-gray-700 dark:border-gray-800">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-2 bg-[#2d2d2d] dark:bg-[#161b22] border-b border-gray-700 dark:border-gray-800">
+        <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+          {language || 'code'}
+        </span>
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-400 hover:text-white rounded-md hover:bg-gray-700 transition-colors"
+        >
+          {copied ? (
+            <>
+              <Check size={14} className="text-green-400" />
+              <span className="text-green-400">Copied!</span>
+            </>
+          ) : (
+            <>
+              <Copy size={14} />
+              <span>Copy</span>
+            </>
+          )}
+        </button>
+      </div>
+      {/* Code Content */}
+      <pre className="p-4 overflow-x-auto text-sm leading-relaxed">
+        <code className={`language-${language || 'text'} text-gray-100`}>
+          {children}
+        </code>
+      </pre>
+    </div>
+  );
+};
+
+// Thinking Block Component with collapsible preview
+const ThinkingBlock: React.FC<{ reasoning: string; isNotion: boolean }> = ({ reasoning, isNotion }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  // Get last 1-2 lines for preview
+  const previewLines = useMemo(() => {
+    const lines = reasoning.trim().split('\n').filter(l => l.trim());
+    const lastLines = lines.slice(-2);
+    return lastLines.join(' ').substring(0, 120) + (reasoning.length > 120 ? '...' : '');
+  }, [reasoning]);
+  
+  return (
+    <div className={`mb-4 rounded-xl overflow-hidden transition-all duration-300 ${
+      isNotion 
+        ? 'bg-gray-50 dark:bg-notion-darksidebar border border-gray-200 dark:border-gray-700' 
+        : 'bg-slate-50/80 dark:bg-gray-900/50 border border-slate-200/50 dark:border-gray-700/50'
+    }`}>
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className={`w-full flex items-center gap-2 px-4 py-3 text-left transition-colors ${
+          isNotion 
+            ? 'hover:bg-gray-100 dark:hover:bg-gray-800' 
+            : 'hover:bg-slate-100/50 dark:hover:bg-gray-800/50'
+        }`}
+      >
+        <BrainCircuit size={16} className={`flex-shrink-0 ${
+          isNotion ? 'text-gray-500 dark:text-gray-400' : 'text-forsion-500 dark:text-forsion-400'
+        }`} />
+        <span className={`text-xs font-bold uppercase tracking-wider ${
+          isNotion ? 'text-gray-500 dark:text-gray-400' : 'text-slate-500 dark:text-forsion-300'
+        }`}>
+          Deep Thinking
+        </span>
+        {isExpanded ? (
+          <ChevronDown size={14} className="text-gray-400 ml-auto" />
+        ) : (
+          <ChevronRight size={14} className="text-gray-400 ml-auto" />
+        )}
+      </button>
+      
+      {/* Preview when collapsed */}
+      {!isExpanded && previewLines && (
+        <div className={`px-4 pb-3 -mt-1 text-sm italic truncate ${
+          isNotion 
+            ? 'text-gray-500 dark:text-gray-400 font-serif' 
+            : 'text-slate-500 dark:text-gray-400'
+        }`}>
+          {previewLines}
+        </div>
+      )}
+      
+      {/* Full content when expanded */}
+      {isExpanded && (
+        <div className={`px-4 pb-4 border-t ${
+          isNotion 
+            ? 'border-gray-200 dark:border-gray-700' 
+            : 'border-slate-200/50 dark:border-gray-700/50'
+        }`}>
+          <div className={`mt-3 text-sm italic whitespace-pre-wrap leading-relaxed ${
+            isNotion 
+              ? 'text-gray-600 dark:text-gray-400 font-serif'
+              : 'text-slate-600 dark:text-gray-400'
+          }`}>
+            {reasoning}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface ChatAreaProps {
   messages: Message[];
@@ -10,12 +128,21 @@ interface ChatAreaProps {
   currentModel: AIModel;
   themePreset: 'default' | 'notion';
   onFileUpload: (file: File) => void;
+  onRegenerateMessage?: (messageId: string) => void;
 }
 
-const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentModel, themePreset, onFileUpload }) => {
+const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentModel, themePreset, onFileUpload, onRegenerateMessage }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const dragCounter = useRef(0);
+
+  // Copy message content to clipboard
+  const handleCopyMessage = async (messageId: string, content: string) => {
+    await navigator.clipboard.writeText(content);
+    setCopiedMessageId(messageId);
+    setTimeout(() => setCopiedMessageId(null), 2000);
+  };
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -213,26 +340,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
                 </div>
               )}
 
-              {/* Reasoning Block */}
+              {/* Reasoning Block - Using new collapsible component */}
               {msg.reasoning && (
-                <details className="mb-4 group/reasoning">
-                  <summary className={`flex items-center gap-2 cursor-pointer text-xs font-bold uppercase tracking-wider mb-2 select-none list-none ${
-                    isNotion 
-                      ? 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 p-1 rounded w-fit' 
-                      : 'text-slate-500 dark:text-forsion-300 hover:text-forsion-600 dark:hover:text-forsion-200'
-                  }`}>
-                     <BrainCircuit size={14} />
-                     <span>Deep Thinking</span>
-                     <ChevronDown size={14} className="group-open/reasoning:rotate-180 transition-transform" />
-                  </summary>
-                  <div className={`pl-3 border-l-2 text-sm italic whitespace-pre-wrap leading-relaxed animate-in fade-in slide-in-from-top-1 duration-200 rounded-r-md ${
-                    isNotion 
-                      ? 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-notion-darksidebar p-3 font-serif'
-                      : 'border-forsion-200 dark:border-gray-600/50 text-slate-600 dark:text-gray-400 bg-slate-50/50 dark:bg-gray-900/30 p-2'
-                  }`}>
-                    {msg.reasoning}
-                  </div>
-                </details>
+                <ThinkingBlock reasoning={msg.reasoning} isNotion={isNotion} />
               )}
 
               {/* Main Content (Generated Image) */}
@@ -244,17 +354,91 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
               
               {/* Main Text Content */}
               {msg.content && (
-                 <div className={`prose prose-sm max-w-none whitespace-pre-wrap leading-relaxed 
+                 <div className={`prose prose-sm max-w-none leading-relaxed 
                     ${isNotion 
                         ? 'prose-headings:font-serif prose-headings:font-bold prose-p:font-serif prose-p:leading-7 dark:prose-invert prose-blockquote:border-l-black dark:prose-blockquote:border-l-white' 
                         : (msg.role === 'user' 
                           ? 'prose-headings:text-white prose-p:text-white prose-strong:text-white prose-a:text-white/90' 
-                          : 'dark:prose-invert prose-p:text-slate-700 dark:prose-p:text-gray-200 prose-headings:text-slate-900 dark:prose-headings:text-white prose-strong:text-slate-900 dark:prose-strong:text-white prose-code:text-forsion-700 dark:prose-code:text-forsion-300 prose-code:bg-slate-100 dark:prose-code:bg-gray-700 prose-code:px-1 prose-code:rounded prose-a:text-forsion-600')
+                          : 'dark:prose-invert prose-p:text-slate-700 dark:prose-p:text-gray-200 prose-headings:text-slate-900 dark:prose-headings:text-white prose-strong:text-slate-900 dark:prose-strong:text-white prose-a:text-forsion-600')
                     }`}>
-                   <ReactMarkdown>{msg.content}</ReactMarkdown>
+                   <ReactMarkdown
+                     remarkPlugins={[remarkMath]}
+                     rehypePlugins={[rehypeKatex]}
+                     components={{
+                       code: ({ node, className, children, ...props }) => {
+                         const match = /language-(\w+)/.exec(className || '');
+                         const isInline = !match && !className;
+                         
+                         if (isInline) {
+                           return (
+                             <code 
+                               className={`px-1.5 py-0.5 rounded text-sm font-mono ${
+                                 msg.role === 'user'
+                                   ? 'bg-white/20 text-white'
+                                   : 'bg-slate-100 dark:bg-gray-700 text-forsion-700 dark:text-forsion-300'
+                               }`}
+                               {...props}
+                             >
+                               {children}
+                             </code>
+                           );
+                         }
+                         
+                         return (
+                           <CodeBlock language={match ? match[1] : undefined}>
+                             {String(children).replace(/\n$/, '')}
+                           </CodeBlock>
+                         );
+                       },
+                       pre: ({ children }) => <>{children}</>,
+                     }}
+                   >
+                     {msg.content}
+                   </ReactMarkdown>
                  </div>
               )}
             </div>
+            
+            {/* Message Actions (only for model messages) */}
+            {msg.role === 'model' && !msg.isError && (
+              <div className={`flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity ${
+                msg.role === 'user' ? 'justify-end' : 'justify-start'
+              }`}>
+                {/* Copy Button */}
+                <button
+                  onClick={() => handleCopyMessage(msg.id, msg.content)}
+                  className={`p-1.5 rounded-lg transition-all hover:scale-105 active:scale-95 ${
+                    copiedMessageId === msg.id
+                      ? 'text-green-500 dark:text-green-400 bg-green-100 dark:bg-green-900/30'
+                      : isNotion
+                        ? 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        : 'text-slate-400 hover:text-slate-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-slate-100 dark:hover:bg-gray-800'
+                  }`}
+                  title={copiedMessageId === msg.id ? 'Copied!' : 'Copy message'}
+                >
+                  {copiedMessageId === msg.id ? (
+                    <Check size={14} />
+                  ) : (
+                    <Copy size={14} />
+                  )}
+                </button>
+                
+                {/* Regenerate Button */}
+                {onRegenerateMessage && (
+                  <button
+                    onClick={() => onRegenerateMessage(msg.id)}
+                    className={`p-1.5 rounded-lg transition-all hover:scale-105 active:scale-95 ${
+                      isNotion
+                        ? 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        : 'text-slate-400 hover:text-slate-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-slate-100 dark:hover:bg-gray-800'
+                    }`}
+                    title="Regenerate response"
+                  >
+                    <RefreshCw size={14} />
+                  </button>
+                )}
+              </div>
+            )}
             
             <span className={`text-[10px] font-medium mt-1 px-1 opacity-0 group-hover:opacity-100 transition-opacity ${
               msg.role === 'user' ? 'text-slate-400' : 'text-slate-400'

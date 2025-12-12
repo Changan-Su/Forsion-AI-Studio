@@ -1,25 +1,97 @@
+# =====================================================
+# Forsion AI Studio - Docker Compose
+# 
+# 使用方式:
+#   完整部署:   docker compose up -d
+#   仅数据库:   docker compose up -d mysql
+#   查看日志:   docker compose logs -f
+#   停止服务:   docker compose down
+#   重建镜像:   docker compose build --no-cache
+# =====================================================
+
 services:
+  # MySQL 数据库
   mysql:
     image: mysql:8.0
     container_name: forsion_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: forsion_ai_studio
-      MYSQL_USER: forsion
-      MYSQL_PASSWORD: forsion123
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-forsion_ai_studio}
+      MYSQL_USER: ${MYSQL_USER:-forsion}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-forsion123}
     ports:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - forsion_network
+
+  # Node.js 后端服务
+  backend:
+    build:
+      context: ./server-node
+      dockerfile: Dockerfile
+    container_name: forsion_backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: ${MYSQL_USER:-forsion}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-forsion123}
+      DB_NAME: ${MYSQL_DATABASE:-forsion_ai_studio}
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+    ports:
+      - "3001:3001"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    networks:
+      - forsion_network
+
+  # React 前端服务 (Nginx)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3001}
+    container_name: forsion_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+    networks:
+      - forsion_network
 
 volumes:
   mysql_data:
+    driver: local
+
+networks:
+  forsion_network:
+    driver: bridge
 
 

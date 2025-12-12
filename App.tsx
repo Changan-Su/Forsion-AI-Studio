@@ -3,8 +3,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { User, ChatSession, Message, AIModel, AppSettings, UserRole, Attachment } from './types';
 import { login } from './services/authService';
 import { backendService } from './services/backendService'; // New backend
-import { generateGeminiResponse } from './services/geminiService';
-import { generateExternalResponse } from './services/externalApiService';
+import { generateGeminiResponse, generateGeminiResponseStream } from './services/geminiService';
+import { generateExternalResponse, generateExternalResponseStream } from './services/externalApiService';
 import { BUILTIN_MODELS, DEFAULT_MODEL_ID, getAllModels, getConfiguredModels, STORAGE_KEYS } from './constants';
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
@@ -28,19 +28,31 @@ const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   
+  // Streaming response state
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+  
   const hasManualModelSelection = useRef(false);
+  const previousDefaultModelId = useRef<string | null>(null);
 
   // Theme & Settings
-  const [theme, setTheme] = useState<'light' | 'dark'>('light'); // Default to Light
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark'); // Default to Dark
   const [themePreset, setThemePreset] = useState<'default' | 'notion'>('default');
   const [customModels, setCustomModels] = useState<AIModel[]>([]);
   const [globalModels, setGlobalModels] = useState<AIModel[]>([]); // Models from backend admin
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [isOfflineMode, setIsOfflineMode] = useState(!backendService.isBackendOnline());
+  
+  // Deep Thinking Toggle
+  const [isDeepThinking, setIsDeepThinking] = useState<boolean>(false);
 
   // Media Upload State
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Expanded Input Modal State
+  const [isInputExpanded, setIsInputExpanded] = useState(false);
+  const [expandedInput, setExpandedInput] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Mobile UI State
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -54,8 +66,10 @@ const App: React.FC = () => {
       ]);
       
       setAppSettings(settings);
-      setTheme(settings.theme || 'light');
-      setThemePreset(settings.themePreset || 'default');
+      // Only update theme if backend has a non-default saved theme
+      // Don't override user's current dark theme with backend's default 'light'
+      if (settings.theme && settings.theme !== 'light') setTheme(settings.theme);
+      if (settings.themePreset) setThemePreset(settings.themePreset);
       setCustomModels(settings.customModels || []);
       
       // Convert backend models to AIModel format
@@ -81,9 +95,24 @@ const App: React.FC = () => {
       const preferredModel = allAvailable.length > 0 && allAvailable.some(m => m.id === desiredModel) 
         ? desiredModel 
         : (allAvailable.length > 0 ? allAvailable[0].id : DEFAULT_MODEL_ID);
+      
+      // Check if default model has changed
+      const defaultModelChanged = previousDefaultModelId.current !== null && 
+                                  previousDefaultModelId.current !== preferredModel;
+      
+      // Update selected model if:
+      // 1. User hasn't manually selected a model, OR
+      // 2. Default model changed AND current selection was the old default (follow default changes)
       if (!hasManualModelSelection.current) {
         setSelectedModelId(preferredModel);
+      } else if (defaultModelChanged && selectedModelId === previousDefaultModelId.current) {
+        // Default model changed and user was using the old default, update to new default
+        setSelectedModelId(preferredModel);
+        hasManualModelSelection.current = false; // Reset flag so future default changes apply
       }
+      
+      // Update previous default model reference
+      previousDefaultModelId.current = preferredModel;
     } catch (e) {
       console.error("Failed to load settings from backend", e);
     }
@@ -92,7 +121,7 @@ const App: React.FC = () => {
   // Initial Load (Backend Simulation)
   useEffect(() => {
     const unsubscribe = backendService.subscribeToConnection((online) => setIsOfflineMode(!online));
-    return unsubscribe;
+    return () => { unsubscribe(); };
   }, []);
 
   useEffect(() => {
@@ -192,6 +221,7 @@ const App: React.FC = () => {
     setCurrentSessionId(null);
     setIsSidebarOpen(false);
     hasManualModelSelection.current = false;
+    previousDefaultModelId.current = null;
     setSelectedModelId(DEFAULT_MODEL_ID);
   };
 
@@ -359,9 +389,25 @@ const App: React.FC = () => {
     setAttachment(null);
     setIsProcessing(true);
 
+    // Create placeholder bot message for streaming
+    const botMessageId = (Date.now() + 1).toString();
+    const botMessage: Message = {
+      id: botMessageId,
+      role: 'model',
+      content: '',
+      timestamp: Date.now()
+    };
+
+    // Add empty bot message to start streaming into
+    setSessions(prev => prev.map(s => {
+      if (s.id === sessionId) {
+        return { ...s, messages: [...s.messages, botMessage], updatedAt: Date.now() };
+      }
+      return s;
+    }));
+    setStreamingMessageId(botMessageId);
+
     try {
-      let responseText = "";
-      let responseReasoning: string | undefined;
       let responseImage: string | undefined;
       const session = sessions.find(s => s.id === sessionId);
 
@@ -369,76 +415,289 @@ const App: React.FC = () => {
       const configKey = currentModel.configKey || currentModel.id;
       const config = appSettings?.externalApiConfigs?.[configKey];
 
+      // Update message callback for streaming
+      const updateStreamingMessage = (content: string, reasoning?: string) => {
+        setSessions(prev => prev.map(s => {
+          if (s.id === sessionId) {
+            return {
+              ...s,
+              messages: s.messages.map(m => 
+                m.id === botMessageId 
+                  ? { ...m, content, reasoning }
+                  : m
+              ),
+              updatedAt: Date.now()
+            };
+          }
+          return s;
+        }));
+      };
+
       if (currentModel.provider === 'gemini') {
-         // Gemini Logic
+         // Gemini Logic with streaming
          const history = currentModel.id === 'gemini-2.5-flash-image' ? [] : 
-            (session?.messages || []).map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.content }] }));
+            (session?.messages || []).filter(m => m.id !== botMessageId).map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.content }] }));
          
-         const result = await generateGeminiResponse(currentModel.id, userMessage.content, history, config?.apiKey, currentAttachments);
-         responseText = result.text;
+         const result = await generateGeminiResponseStream(
+           currentModel.id, 
+           userMessage.content, 
+           history, 
+           config?.apiKey, 
+           currentAttachments,
+           updateStreamingMessage,
+           isDeepThinking
+         );
          responseImage = result.imageUrl;
-         responseReasoning = result.reasoning;
+
+         // Final update with image if present
+         if (responseImage) {
+           setSessions(prev => prev.map(s => {
+             if (s.id === sessionId) {
+               return {
+                 ...s,
+                 messages: s.messages.map(m => 
+                   m.id === botMessageId 
+                     ? { ...m, imageUrl: responseImage }
+                     : m
+                 )
+               };
+             }
+             return s;
+           }));
+         }
 
       } else {
         // External Logic
-        const history = (session?.messages || []).map(m => ({
+        const history = (session?.messages || []).filter(m => m.id !== botMessageId).map(m => ({
             role: m.role === 'model' ? 'assistant' : m.role === 'user' ? 'user' : 'system',
             content: m.content
         }));
         history.push({ role: 'user', content: userMessage.content });
 
-        // Check if this is a global model (uses backend proxy)
+        // Check if this is a global model (uses backend proxy) - no streaming for now
         if ((currentModel as any).isGlobal) {
-           // Use backend proxy for global models
            const result = await backendService.proxyChatCompletions(
              currentModel.id,
              history,
-             0.7
+             0.7,
+             isDeepThinking
            );
-           responseText = result.content;
-           responseReasoning = result.reasoning;
+           updateStreamingMessage(result.content, result.reasoning);
         } else if (!config || !config.apiKey) {
            throw new Error(`API Key for ${currentModel.name} is missing. Please configure it in Settings.`);
         } else {
            const apiModelId = currentModel.apiModelId || currentModel.id;
-           const result = await generateExternalResponse(config, apiModelId, history, currentModel.defaultBaseUrl, currentAttachments);
-           responseText = result.content;
-           responseReasoning = result.reasoning;
+           await generateExternalResponseStream(
+             config, 
+             apiModelId, 
+             history, 
+             currentModel.defaultBaseUrl, 
+             currentAttachments,
+             updateStreamingMessage,
+             isDeepThinking
+           );
         }
       }
 
-      const botMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'model',
-        content: responseText,
-        reasoning: responseReasoning,
-        imageUrl: responseImage,
-        timestamp: Date.now()
-      };
-
-      setSessions(prev => prev.map(s => {
-        if (s.id === sessionId) {
-          return { ...s, messages: [...s.messages, botMessage], updatedAt: Date.now() };
-        }
-        return s;
-      }));
-
     } catch (error: any) {
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'model',
-        content: `Error: ${error.message}`,
-        timestamp: Date.now(),
-        isError: true
-      };
+      // Update the streaming message to show error
       setSessions(prev => prev.map(s => {
         if (s.id === sessionId) {
-          return { ...s, messages: [...s.messages, errorMessage] };
+          return {
+            ...s,
+            messages: s.messages.map(m => 
+              m.id === botMessageId 
+                ? { ...m, content: `Error: ${error.message}`, isError: true }
+                : m
+            )
+          };
         }
         return s;
       }));
     } finally {
       setIsProcessing(false);
+      setStreamingMessageId(null);
+    }
+  };
+
+  // Regenerate a specific model response
+  const handleRegenerateMessage = async (messageId: string) => {
+    if (!currentSessionId || isProcessing) return;
+    
+    const session = sessions.find(s => s.id === currentSessionId);
+    if (!session) return;
+    
+    // Find the message to regenerate and the previous user message
+    const messageIndex = session.messages.findIndex(m => m.id === messageId);
+    if (messageIndex === -1) return;
+    
+    // Find the last user message before this model message
+    let userMessageIndex = messageIndex - 1;
+    while (userMessageIndex >= 0 && session.messages[userMessageIndex].role !== 'user') {
+      userMessageIndex--;
+    }
+    
+    if (userMessageIndex < 0) return;
+    
+    const userMessage = session.messages[userMessageIndex];
+    const userAttachments = userMessage.attachments || [];
+    
+    // Extract the original input (without document attachment text)
+    const originalInput = userMessage.content.split('\n\n---\n📄')[0];
+    
+    // Remove all messages from the model response onwards
+    const messagesBeforeRegenerate = session.messages.slice(0, messageIndex);
+    
+    // Update sessions to remove the old response
+    setSessions(prev => prev.map(s => {
+      if (s.id === currentSessionId) {
+        return {
+          ...s,
+          messages: messagesBeforeRegenerate,
+          updatedAt: Date.now()
+        };
+      }
+      return s;
+    }));
+    
+    // Directly trigger regeneration with the captured content
+    await regenerateWithContent(currentSessionId, originalInput, userAttachments, messagesBeforeRegenerate);
+  };
+  
+  // Helper function to regenerate with specific content
+  const regenerateWithContent = async (
+    sessionId: string, 
+    content: string, 
+    attachments: Attachment[], 
+    historyMessages: Message[]
+  ) => {
+    if (isProcessing) return;
+    
+    const currentModel = allModels.find(m => m.id === selectedModelId) || allModels[0];
+    if (!currentModel) return;
+    
+    setIsProcessing(true);
+    
+    // Create placeholder bot message for streaming
+    const botMessageId = (Date.now() + 1).toString();
+    const botMessage: Message = {
+      id: botMessageId,
+      role: 'model',
+      content: '',
+      timestamp: Date.now()
+    };
+    
+    // Add empty bot message to start streaming into
+    setSessions(prev => prev.map(s => {
+      if (s.id === sessionId) {
+        return { ...s, messages: [...historyMessages, botMessage], updatedAt: Date.now() };
+      }
+      return s;
+    }));
+    setStreamingMessageId(botMessageId);
+    
+    try {
+      let responseImage: string | undefined;
+      
+      const configKey = currentModel.configKey || currentModel.id;
+      const config = appSettings?.externalApiConfigs?.[configKey];
+      
+      // Update message callback for streaming
+      const updateStreamingMessage = (streamContent: string, reasoning?: string) => {
+        setSessions(prev => prev.map(s => {
+          if (s.id === sessionId) {
+            return {
+              ...s,
+              messages: s.messages.map(m => 
+                m.id === botMessageId 
+                  ? { ...m, content: streamContent, reasoning }
+                  : m
+              ),
+              updatedAt: Date.now()
+            };
+          }
+          return s;
+        }));
+      };
+      
+      // Build history from the messages before regeneration (excluding the user message we're regenerating from)
+      const historyForApi = historyMessages.slice(0, -1).map(m => ({
+        role: m.role === 'model' ? 'assistant' : m.role === 'user' ? 'user' : 'system',
+        content: m.content
+      }));
+      historyForApi.push({ role: 'user', content });
+      
+      if (currentModel.provider === 'gemini') {
+        const geminiHistory = currentModel.id === 'gemini-2.5-flash-image' ? [] : 
+          historyMessages.slice(0, -1).map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.content }] }));
+        
+        const result = await generateGeminiResponseStream(
+          currentModel.id, 
+          content, 
+          geminiHistory, 
+          config?.apiKey, 
+          attachments,
+          updateStreamingMessage,
+          isDeepThinking
+        );
+        responseImage = result.imageUrl;
+        
+        if (responseImage) {
+          setSessions(prev => prev.map(s => {
+            if (s.id === sessionId) {
+              return {
+                ...s,
+                messages: s.messages.map(m => 
+                  m.id === botMessageId 
+                    ? { ...m, imageUrl: responseImage }
+                    : m
+                )
+              };
+            }
+            return s;
+          }));
+        }
+      } else {
+        if ((currentModel as any).isGlobal) {
+          const result = await backendService.proxyChatCompletions(
+            currentModel.id,
+            historyForApi,
+            0.7,
+            isDeepThinking
+          );
+          updateStreamingMessage(result.content, result.reasoning);
+        } else if (!config || !config.apiKey) {
+          throw new Error(`API Key for ${currentModel.name} is missing. Please configure it in Settings.`);
+        } else {
+          const apiModelId = currentModel.apiModelId || currentModel.id;
+          await generateExternalResponseStream(
+            config, 
+            apiModelId, 
+            historyForApi, 
+            currentModel.defaultBaseUrl, 
+            attachments,
+            updateStreamingMessage,
+            isDeepThinking
+          );
+        }
+      }
+    } catch (error: any) {
+      setSessions(prev => prev.map(s => {
+        if (s.id === sessionId) {
+          return {
+            ...s,
+            messages: s.messages.map(m => 
+              m.id === botMessageId 
+                ? { ...m, content: `Error: ${error.message}`, isError: true }
+                : m
+            )
+          };
+        }
+        return s;
+      }));
+    } finally {
+      setIsProcessing(false);
+      setStreamingMessageId(null);
     }
   };
 
@@ -633,6 +892,7 @@ const App: React.FC = () => {
           currentModel={currentModel} 
           themePreset={themePreset}
           onFileUpload={processFile}
+          onRegenerateMessage={handleRegenerateMessage}
         />
 
         {/* Input Area */}
@@ -642,6 +902,57 @@ const App: React.FC = () => {
             : 'bg-white/5 dark:bg-[#030712]/60 backdrop-blur-xl border-white/40 dark:border-white/10'
         }`}>
           <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto relative group">
+             {/* Deep Thinking Toggle */}
+             <div className="flex items-center gap-2 mb-3 ml-2">
+               <label className="flex items-center gap-2 cursor-pointer select-none">
+                 <div className="relative">
+                   <input
+                     type="checkbox"
+                     checked={isDeepThinking}
+                     onChange={(e) => setIsDeepThinking(e.target.checked)}
+                     className="sr-only peer"
+                   />
+                   <div className={`w-10 h-5 rounded-full transition-all ${
+                     isDeepThinking
+                       ? 'bg-gradient-to-r from-purple-500 to-indigo-500'
+                       : isNotion
+                         ? 'bg-gray-300 dark:bg-gray-600'
+                         : 'bg-gray-300 dark:bg-gray-700'
+                   }`}></div>
+                   <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                     isDeepThinking ? 'translate-x-5' : 'translate-x-0'
+                   }`}></div>
+                 </div>
+                 <div className="flex items-center gap-1.5">
+                   <BrainCircuit size={16} className={`${
+                     isDeepThinking
+                       ? 'text-purple-500 dark:text-purple-400'
+                       : isNotion
+                         ? 'text-gray-400 dark:text-gray-500'
+                         : 'text-gray-400 dark:text-gray-500'
+                   }`} />
+                   <span className={`text-sm font-medium ${
+                     isDeepThinking
+                       ? isNotion
+                         ? 'text-gray-900 dark:text-white'
+                         : 'text-purple-600 dark:text-purple-400'
+                       : 'text-gray-500 dark:text-gray-400'
+                   }`}>
+                     Deep Thinking
+                   </span>
+                 </div>
+               </label>
+               {isDeepThinking && (
+                 <span className={`text-xs px-2 py-0.5 rounded-full ${
+                   isNotion
+                     ? 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+                     : 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300'
+                 }`}>
+                   Enhanced reasoning enabled
+                 </span>
+               )}
+             </div>
+
              {/* Attachment Preview */}
              {attachment && (
                <div className="absolute bottom-full left-0 mb-3 ml-2">
@@ -687,26 +998,55 @@ const App: React.FC = () => {
                <button 
                  type="button"
                  onClick={() => fileInputRef.current?.click()}
-                 className={`p-3 rounded-full transition-all duration-300 ${
+                 className={`p-3 rounded-full transition-all duration-300 flex-shrink-0 self-end ${
                     isNotion 
                       ? 'text-gray-400 hover:text-gray-800 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
                       : 'text-slate-500 hover:text-forsion-400 dark:text-slate-300 dark:hover:text-cyan-200 hover:bg-white/60 dark:hover:bg-white/10 border border-transparent dark:border-white/10 shadow-sm'
                  } hover:-translate-y-0.5 active:scale-95 shadow-sm`}
-                 title="Attach Image"
+                 title="Attach File"
                >
                  <Paperclip size={20} />
                </button>
 
-               <input
-                 type="text"
+               <textarea
+                 ref={textareaRef}
                  value={input}
-                 onChange={(e) => setInput(e.target.value)}
+                 onChange={(e) => {
+                   setInput(e.target.value);
+                   // Auto-resize textarea
+                   if (textareaRef.current) {
+                     textareaRef.current.style.height = 'auto';
+                     textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + 'px';
+                   }
+                 }}
+                 onKeyDown={(e) => {
+                   if (e.key === 'Enter' && !e.shiftKey) {
+                     e.preventDefault();
+                     handleSendMessage();
+                   }
+                 }}
                  placeholder={`Message ${currentModel.name}...`}
                  disabled={isProcessing}
-                 className={`w-full bg-transparent py-3 px-2 focus:outline-none placeholder-slate-400 dark:placeholder-gray-600 ${
+                 rows={1}
+                 className={`w-full bg-transparent py-3 px-2 focus:outline-none placeholder-slate-400 dark:placeholder-gray-600 resize-none overflow-y-auto ${
                     isNotion ? 'text-gray-900 dark:text-white font-serif' : 'text-slate-800 dark:text-gray-100'
                  }`}
+                 style={{ maxHeight: '200px' }}
                />
+               
+               {/* Expand Button */}
+               <button 
+                 type="button"
+                 onClick={() => { setExpandedInput(input); setIsInputExpanded(true); }}
+                 className={`p-2 rounded-full transition-all duration-300 flex-shrink-0 self-end ${
+                    isNotion 
+                      ? 'text-gray-400 hover:text-gray-800 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
+                      : 'text-slate-500 hover:text-forsion-400 dark:text-slate-300 dark:hover:text-cyan-200 hover:bg-white/60 dark:hover:bg-white/10'
+                 }`}
+                 title="Expand Input"
+               >
+                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+               </button>
                
                <button 
                  type="submit"
@@ -740,6 +1080,104 @@ const App: React.FC = () => {
           isOffline={isOfflineMode}
           onReconnect={attemptReconnect}
         />
+      )}
+      
+      {/* Expanded Input Modal with bounce animation */}
+      {isInputExpanded && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={(e) => e.target === e.currentTarget && setIsInputExpanded(false)}
+        >
+          <div 
+            className={`w-full max-w-4xl h-[70vh] flex flex-col rounded-2xl shadow-2xl transform transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] animate-[modalBounce_0.5s_ease-out] ${
+              isNotion 
+                ? 'bg-notion-bg dark:bg-notion-darkbg border border-notion-border dark:border-notion-darkborder'
+                : 'bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border'
+            }`}
+            style={{
+              animation: 'modalBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)'
+            }}
+          >
+            <style>{`
+              @keyframes modalBounce {
+                0% {
+                  opacity: 0;
+                  transform: scale(0.3) translateY(100px);
+                }
+                50% {
+                  opacity: 1;
+                  transform: scale(1.05) translateY(-10px);
+                }
+                70% {
+                  transform: scale(0.95) translateY(5px);
+                }
+                100% {
+                  transform: scale(1) translateY(0);
+                }
+              }
+            `}</style>
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-dark-border">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Compose Message</h3>
+              <button 
+                onClick={() => setIsInputExpanded(false)}
+                className="p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                <XIcon size={20} />
+              </button>
+            </div>
+            <div className="flex-1 p-4 overflow-hidden">
+              <textarea
+                value={expandedInput}
+                onChange={(e) => setExpandedInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    setInput(expandedInput);
+                    setIsInputExpanded(false);
+                    setTimeout(() => handleSendMessage(), 100);
+                  }
+                }}
+                placeholder={`Message ${currentModel.name}... (Ctrl+Enter to send)`}
+                className={`w-full h-full bg-transparent focus:outline-none resize-none text-lg leading-relaxed ${
+                  isNotion 
+                    ? 'text-gray-900 dark:text-white font-serif placeholder-gray-400'
+                    : 'text-slate-800 dark:text-gray-100 placeholder-slate-400 dark:placeholder-gray-600'
+                }`}
+                autoFocus
+              />
+            </div>
+            <div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-dark-border">
+              <span className="text-xs text-gray-400 dark:text-gray-500">
+                Press Ctrl+Enter to send directly
+              </span>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsInputExpanded(false)}
+                  className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setInput(expandedInput);
+                    setIsInputExpanded(false);
+                    if (textareaRef.current) {
+                      textareaRef.current.style.height = 'auto';
+                      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + 'px';
+                    }
+                  }}
+                  className={`px-6 py-2 font-semibold rounded-lg transition-all transform hover:scale-105 active:scale-95 ${
+                    isNotion
+                      ? 'bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-100'
+                      : 'bg-gradient-to-r from-forsion-500 to-indigo-500 text-white hover:from-forsion-400 hover:to-indigo-400 shadow-lg'
+                  }`}
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

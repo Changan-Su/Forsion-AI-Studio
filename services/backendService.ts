@@ -89,7 +89,7 @@ export const backendService = {
   isBackendOnline: () => isOnline,
   async pingBackend(): Promise<boolean> {
     try {
-      const res = await fetch(`${API_ROOT || API_URL}/`);
+      const res = await fetch(`${API_URL}/health`);
       if (!res.ok) throw new Error('Health check failed');
       markOnline();
       return true;
@@ -189,13 +189,21 @@ export const backendService = {
   },
 
   // 5. Change Password
-  async changePassword(username: string, newPassword: string): Promise<boolean> {
+  async changePassword(username: string, newPassword: string, currentPassword?: string): Promise<boolean> {
      try {
        const res = await fetch(`${API_URL}/auth/password`, {
-         method: 'POST',
+         method: 'PUT',
          headers: getHeaders(),
-         body: JSON.stringify({ new_password: newPassword })
+         body: JSON.stringify({ 
+           currentPassword: currentPassword || '', 
+           newPassword 
+         })
        });
+       if (!res.ok) {
+         markOnline();
+         const err = await res.json().catch(() => ({}));
+         throw new Error(err.detail || 'Failed to update password');
+       }
        const data = await res.json();
        markOnline();
        return data.success === true;
@@ -255,7 +263,26 @@ export const backendService = {
     }
   },
 
-  // 8. Admin - Delete User
+  // 8. Admin - Get User Details
+  async getUserDetails(username: string): Promise<User> {
+    try {
+      const res = await fetch(`${API_URL}/admin/users/${username}`, {
+        headers: getHeaders()
+      });
+      if (!res.ok) {
+        markOnline();
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to load user details');
+      }
+      markOnline();
+      return await res.json();
+    } catch (error) {
+      markOffline();
+      throw error;
+    }
+  },
+
+  // 9. Admin - Delete User
   async deleteUserAccount(username: string): Promise<boolean> {
     try {
       const res = await fetch(`${API_URL}/admin/users/${username}`, {
@@ -275,7 +302,7 @@ export const backendService = {
     }
   },
 
-  // 9. Parse File - Extract text from PDF, Word, etc.
+  // 10. Parse File - Extract text from PDF, Word, etc.
   async parseFile(file: File): Promise<{ text: string | null; base64: string | null; filename: string }> {
     try {
       const formData = new FormData();
@@ -303,7 +330,7 @@ export const backendService = {
     }
   },
 
-  // 10. Parse Base64 - Extract text from base64 encoded file
+  // 11. Parse Base64 - Extract text from base64 encoded file
   async parseBase64(base64Data: string, filename: string, contentType: string): Promise<{ text: string | null }> {
     try {
       const res = await fetch(`${API_URL}/parse-base64`, {
@@ -329,7 +356,7 @@ export const backendService = {
     }
   },
 
-  // 11. Get Global Models from backend
+  // 12. Get Global Models from backend
   async getGlobalModels(): Promise<any[]> {
     try {
       const res = await fetch(`${API_URL}/models`, {
@@ -346,7 +373,7 @@ export const backendService = {
     }
   },
 
-  // 12. Log API Usage
+  // 13. Log API Usage
   async logApiUsage(
     modelId: string,
     modelName: string,
@@ -377,20 +404,34 @@ export const backendService = {
     }
   },
 
-  // 13. Proxy Chat Completions (for global models)
+  // 14. Proxy Chat Completions (for global models)
   async proxyChatCompletions(
     modelId: string,
     messages: Array<{ role: string; content: string }>,
     temperature: number = 0.7,
+    enableThinking: boolean = false,
     maxTokens?: number
   ): Promise<{ content: string; reasoning?: string; usage?: { prompt_tokens: number; completion_tokens: number } }> {
     try {
+      // Modify messages if thinking is enabled
+      let finalMessages = [...messages];
+      if (enableThinking && finalMessages.length > 0) {
+        const lastMsgIdx = finalMessages.length - 1;
+        if (finalMessages[lastMsgIdx].role === 'user') {
+          const thinkingPrefix = "Think step by step carefully before answering. Show your reasoning process in <think></think> tags before providing your final answer.\n\n";
+          finalMessages[lastMsgIdx] = {
+            ...finalMessages[lastMsgIdx],
+            content: thinkingPrefix + finalMessages[lastMsgIdx].content
+          };
+        }
+      }
+
       const res = await fetch(`${API_URL}/chat/completions`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify({
           model_id: modelId,
-          messages,
+          messages: finalMessages,
           temperature,
           max_tokens: maxTokens
         })
@@ -406,8 +447,20 @@ export const backendService = {
       
       // Extract content from OpenAI-style response
       const choice = data.choices?.[0];
-      const content = choice?.message?.content || '';
-      const reasoning = choice?.message?.reasoning_content || choice?.message?.reasoning;
+      let content = choice?.message?.content || '';
+      let reasoning = choice?.message?.reasoning_content || choice?.message?.reasoning;
+      
+      // Extract <think> tags from content if no explicit reasoning
+      if (!reasoning && content) {
+        const thinkRegex = /<think>([\s\S]*?)<\/think>/gi;
+        const matches = content.match(thinkRegex);
+        if (matches) {
+          reasoning = matches
+            .map((m: string) => m.replace(/<\/?think>/gi, '').trim())
+            .join('\n');
+          content = content.replace(thinkRegex, '').trim();
+        }
+      }
       
       return {
         content,

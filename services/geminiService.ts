@@ -2,6 +2,132 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { Attachment } from "../types";
 
+// Streaming version of generateGeminiResponse
+export const generateGeminiResponseStream = async (
+  modelId: string,
+  prompt: string,
+  history: { role: string; parts: { text: string }[] }[] = [],
+  apiKey?: string,
+  attachments: Attachment[] = [],
+  onChunk: (text: string, reasoning?: string) => void = () => {},
+  enableThinking: boolean = false
+): Promise<{ text: string; imageUrl?: string; reasoning?: string }> => {
+  const finalKey = apiKey || process.env.API_KEY;
+
+  if (!finalKey) {
+    throw new Error("Gemini API Key is missing. Please configure it in Admin Settings.");
+  }
+
+  const aiClient = new GoogleGenAI({ apiKey: finalKey });
+
+  try {
+    // Handle Nano Banana (Image Generation) - no streaming for image gen
+    if (modelId === 'gemini-2.5-flash-image' && attachments.length === 0) {
+      const response = await aiClient.models.generateContent({
+        model: modelId,
+        contents: { parts: [{ text: prompt }] }
+      });
+
+      let generatedText = "";
+      let generatedImageUrl: string | undefined = undefined;
+
+      const parts = response.candidates?.[0]?.content?.parts || [];
+      for (const part of parts) {
+        if (part.inlineData) {
+          generatedImageUrl = `data:image/png;base64,${part.inlineData.data}`;
+        } else if (part.text) {
+          generatedText += part.text;
+        }
+      }
+
+      if (!generatedText && !generatedImageUrl) {
+        return { text: "No content generated." };
+      }
+
+      onChunk(generatedText);
+      return { text: generatedText, imageUrl: generatedImageUrl };
+
+    } else {
+      // Standard Chat Models with streaming
+      const contents = history.map(msg => ({
+        role: msg.role === 'admin' ? 'model' : msg.role,
+        parts: msg.parts
+      }));
+
+      const currentParts: any[] = [];
+      
+      // Add thinking instruction if enabled
+      const thinkingPrefix = enableThinking 
+        ? "Think step by step carefully before answering. Show your reasoning process in <think></think> tags before providing your final answer.\n\n"
+        : "";
+      
+      if (prompt) currentParts.push({ text: thinkingPrefix + prompt });
+
+      if (attachments && attachments.length > 0) {
+        attachments.forEach(att => {
+          if (att.type === 'image') {
+            const base64Data = att.url.split(',')[1];
+            currentParts.push({
+              inlineData: { mimeType: att.mimeType, data: base64Data }
+            });
+          }
+        });
+      }
+
+      contents.push({ role: 'user', parts: currentParts });
+
+      // Use streaming
+      const streamResult = await aiClient.models.generateContentStream({
+        model: modelId,
+        contents: contents,
+      });
+
+      let fullText = '';
+      let reasoning: string | undefined = undefined;
+
+      for await (const chunk of streamResult) {
+        const chunkText = chunk.text || '';
+        fullText += chunkText;
+        
+        // Check for think tags in progress
+        const thinkRegex = /<think>([\s\S]*?)<\/think>/i;
+        const match = fullText.match(thinkRegex);
+        if (match) {
+          reasoning = match[1].trim();
+          const displayText = fullText.replace(thinkRegex, '').trim();
+          onChunk(displayText, reasoning);
+        } else {
+          onChunk(fullText, reasoning);
+        }
+      }
+
+      // Final cleanup - handle all think tags
+      const thinkRegexGlobal = /<think>([\s\S]*?)<\/think>/gi;
+      const allMatches = fullText.match(thinkRegexGlobal);
+      if (allMatches) {
+        // Extract all reasoning content
+        const extractedReasoning = allMatches
+          .map(m => m.replace(/<\/?think>/gi, '').trim())
+          .join('\n');
+        if (extractedReasoning) {
+          reasoning = extractedReasoning;
+        }
+        // Remove all think tags from content
+        fullText = fullText.replace(thinkRegexGlobal, '').trim();
+      }
+
+      // Final callback with cleaned content
+      onChunk(fullText, reasoning);
+
+      return { text: fullText, reasoning };
+    }
+
+  } catch (error: any) {
+    console.error("Gemini API Error:", error);
+    throw new Error(error.message || "Failed to generate content");
+  }
+};
+
 export const generateGeminiResponse = async (
   modelId: string,
   prompt: string,

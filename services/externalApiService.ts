@@ -6,6 +6,213 @@ interface ExternalApiConfig {
   baseUrl?: string;
 }
 
+// Helper function to build URL and messages
+const prepareRequest = (
+  config: ExternalApiConfig,
+  modelId: string,
+  messages: { role: string; content: string }[],
+  defaultBaseUrl?: string,
+  attachments: Attachment[] = []
+) => {
+  let baseUrl = config.baseUrl || defaultBaseUrl || 'https://api.openai.com/v1';
+  
+  baseUrl = baseUrl.trim();
+  if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+    baseUrl = `https://${baseUrl}`;
+  }
+  baseUrl = baseUrl.replace(/\/+$/, '');
+
+  let primaryUrl = '';
+  let fallbackUrl = '';
+
+  if (baseUrl.endsWith('/chat/completions')) {
+    primaryUrl = baseUrl;
+  } else if (baseUrl.endsWith('/v1')) {
+    primaryUrl = `${baseUrl}/chat/completions`;
+  } else {
+    primaryUrl = `${baseUrl}/chat/completions`;
+    if (!baseUrl.includes('/v1')) {
+      fallbackUrl = `${baseUrl}/v1/chat/completions`;
+    }
+  }
+
+  if (baseUrl === 'https://api.openai.com') {
+    primaryUrl = 'https://api.openai.com/v1/chat/completions';
+    fallbackUrl = '';
+  }
+
+  const finalMessages = [...messages];
+  
+  if (attachments.length > 0) {
+    const contentArray: any[] = [];
+    const lastMsg = finalMessages.pop();
+    
+    if (lastMsg && lastMsg.role === 'user') {
+       contentArray.push({ type: "text", text: lastMsg.content });
+       
+       attachments.forEach(att => {
+         if (att.type === 'image') {
+           contentArray.push({
+             type: "image_url",
+             image_url: { url: att.url }
+           });
+         }
+       });
+
+       finalMessages.push({ role: 'user', content: contentArray as any }); 
+    } else {
+      if(lastMsg) finalMessages.push(lastMsg);
+    }
+  }
+
+  return { primaryUrl, fallbackUrl, finalMessages };
+};
+
+// Streaming version of generateExternalResponse
+export const generateExternalResponseStream = async (
+  config: ExternalApiConfig,
+  modelId: string,
+  messages: { role: string; content: string }[],
+  defaultBaseUrl?: string,
+  attachments: Attachment[] = [],
+  onChunk: (chunk: string, reasoning?: string) => void = () => {},
+  enableThinking: boolean = false
+): Promise<{ content: string; reasoning?: string }> => {
+  // Modify the last user message if thinking is enabled
+  let finalMessages = [...messages];
+  if (enableThinking && finalMessages.length > 0) {
+    const lastMsgIdx = finalMessages.length - 1;
+    if (finalMessages[lastMsgIdx].role === 'user') {
+      const thinkingPrefix = "Think step by step carefully before answering. Show your reasoning process in <think></think> tags before providing your final answer.\n\n";
+      finalMessages[lastMsgIdx] = {
+        ...finalMessages[lastMsgIdx],
+        content: thinkingPrefix + finalMessages[lastMsgIdx].content
+      };
+    }
+  }
+  
+  const { primaryUrl, fallbackUrl, finalMessages: processedMessages } = prepareRequest(config, modelId, finalMessages, defaultBaseUrl, attachments);
+
+  const performStreamRequest = async (url: string) => {
+    return fetch(url, {
+      method: 'POST',
+      credentials: 'omit',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify({
+        model: modelId,
+        messages: processedMessages,
+        temperature: 0.7,
+        stream: true
+      })
+    });
+  };
+
+  let response: Response | undefined;
+  let usedUrl = primaryUrl;
+
+  try {
+    response = await performStreamRequest(primaryUrl);
+    if (response.status === 404 && fallbackUrl) {
+      response = await performStreamRequest(fallbackUrl);
+      usedUrl = fallbackUrl;
+    }
+  } catch (err) {
+    if (fallbackUrl) {
+      try {
+        response = await performStreamRequest(fallbackUrl);
+        usedUrl = fallbackUrl;
+      } catch (fallbackErr) {
+        throw new Error(`Network Error: Failed to connect. Check CORS or connection.`);
+      }
+    } else {
+      throw new Error(`Network Error: Failed to connect to ${usedUrl}.`);
+    }
+  }
+
+  if (!response || !response.ok) {
+    const errorText = response ? await response.text() : 'No response';
+    throw new Error(`API Error: ${response?.status || 'Unknown'} - ${errorText.slice(0, 200)}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('No response body');
+
+  const decoder = new TextDecoder();
+  let fullContent = '';
+  let fullReasoning = '';
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed === 'data: [DONE]') continue;
+      if (!trimmed.startsWith('data: ')) continue;
+
+      try {
+        const json = JSON.parse(trimmed.slice(6));
+        const delta = json.choices?.[0]?.delta;
+        
+        if (delta?.content) {
+          fullContent += delta.content;
+          // Check for <think> tags in progress
+          const thinkMatch = fullContent.match(/<think>([\s\S]*?)<\/think>/i);
+          if (thinkMatch) {
+            const extractedReasoning = thinkMatch[1].trim();
+            const cleanContent = fullContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+            onChunk(cleanContent, extractedReasoning || fullReasoning || undefined);
+          } else {
+            // Check for incomplete <think> tag (still streaming)
+            const incompleteMatch = fullContent.match(/<think>([\s\S]*)$/i);
+            if (incompleteMatch) {
+              const cleanContent = fullContent.replace(/<think>[\s\S]*$/i, '').trim();
+              onChunk(cleanContent, incompleteMatch[1].trim() || fullReasoning || undefined);
+            } else {
+              onChunk(fullContent, fullReasoning || undefined);
+            }
+          }
+        }
+        if (delta?.reasoning_content) {
+          fullReasoning += delta.reasoning_content;
+          onChunk(fullContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim(), fullReasoning);
+        }
+      } catch (e) {
+        // Skip invalid JSON lines
+      }
+    }
+  }
+
+  // Final cleanup and extraction of <think> tags
+  const thinkRegex = /<think>([\s\S]*?)<\/think>/gi;
+  const allThinkMatches = fullContent.match(thinkRegex);
+  if (allThinkMatches) {
+    // Extract all reasoning content from think tags
+    const extractedReasoning = allThinkMatches
+      .map(m => m.replace(/<\/?think>/gi, '').trim())
+      .join('\n');
+    if (extractedReasoning && !fullReasoning) {
+      fullReasoning = extractedReasoning;
+    }
+    // Remove all think tags from content
+    fullContent = fullContent.replace(thinkRegex, '').trim();
+  }
+
+  // Final callback with cleaned content and reasoning
+  onChunk(fullContent, fullReasoning || undefined);
+
+  return { content: fullContent, reasoning: fullReasoning || undefined };
+};
+
 export const generateExternalResponse = async (
   config: ExternalApiConfig,
   modelId: string, // The API model ID (e.g., gpt-4o)
