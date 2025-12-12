@@ -2,6 +2,7 @@
   "name": "forsion-ai-studio-server",
   "version": "1.0.0",
   "description": "Forsion AI Studio Backend Server",
+  "type": "module",
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -29,6 +30,8 @@
     "@types/jsonwebtoken": "^9.0.5",
     "@types/multer": "^1.4.11",
     "@types/uuid": "^9.0.7",
+    "@types/pdf-parse": "^1.1.4",
+    "@types/mammoth": "^1.6.4",
     "@types/node": "^20.10.4",
     "typescript": "^5.3.3",
     "tsx": "^4.6.2"

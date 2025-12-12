@@ -78,7 +78,7 @@ router.post('/chat/completions', authMiddleware, async (req: AuthRequest, res) =
       return res.status(response.status).json({ detail: errorDetail });
     }
 
-    const result = await response.json();
+    const result = await response.json() as any;
 
     // Log successful request
     const usage = result.usage || {};

@@ -152,7 +152,7 @@ export async function deleteGlobalModel(modelId: string): Promise<boolean> {
 }
 
 export async function ensureBuiltinModels(): Promise<void> {
-  const builtinModels = [
+  const builtinModels: Partial<GlobalModel>[] = [
     // Google Models
     {
       id: 'gemini-2.5-flash',
