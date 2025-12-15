@@ -7,6 +7,8 @@ import {
   updatePassword as updateUserPassword 
 } from '../services/userService.js';
 import { generateToken, authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { validateInviteCode, useInviteCode } from '../services/inviteCodeService.js';
+import { ensureCreditAccount, addCredits } from '../services/creditService.js';
 
 const router = Router();
 
@@ -59,14 +61,24 @@ router.post('/login', async (req, res) => {
 // Register
 router.post('/register', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, invite_code } = req.body;
 
     if (!username || !password) {
       return res.status(400).json({ detail: 'Username and password are required' });
     }
 
+    if (!invite_code) {
+      return res.status(400).json({ detail: 'Invite code is required' });
+    }
+
     if (password.length < 4) {
       return res.status(400).json({ detail: 'Password must be at least 4 characters' });
+    }
+
+    // Validate invite code
+    const validation = await validateInviteCode(invite_code);
+    if (!validation.valid || !validation.inviteCode) {
+      return res.status(400).json({ detail: validation.error || 'Invalid invite code' });
     }
 
     const existing = await getUserByUsername(username);
@@ -74,7 +86,22 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ detail: 'Username already exists' });
     }
 
+    // Create user
     const user = await createUser(username, password, 'USER');
+
+    // Use invite code (increment used_count)
+    await useInviteCode(invite_code, user.id);
+
+    // Create credit account and add initial credits
+    await ensureCreditAccount(user.id);
+    if (validation.inviteCode.initialCredits > 0) {
+      await addCredits(
+        user.id,
+        validation.inviteCode.initialCredits,
+        'initial',
+        `Initial credits from invite code: ${invite_code}`
+      );
+    }
 
     const token = generateToken({
       userId: user.id,
@@ -92,7 +119,7 @@ router.post('/register', async (req, res) => {
     });
   } catch (error: any) {
     console.error('Register error:', error);
-    res.status(500).json({ detail: 'Registration failed' });
+    res.status(500).json({ detail: error.message || 'Registration failed' });
   }
 });
 
@@ -146,4 +173,5 @@ router.put('/password', authMiddleware, async (req: AuthRequest, res) => {
 });
 
 export default router;
+
 

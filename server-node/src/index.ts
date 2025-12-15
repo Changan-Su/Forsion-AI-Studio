@@ -17,6 +17,9 @@ import modelRoutes from './routes/models.js';
 import chatRoutes from './routes/chat.js';
 import fileRoutes from './routes/files.js';
 import usageRoutes from './routes/usage.js';
+import inviteCodeRoutes from './routes/inviteCodes.js';
+import creditRoutes from './routes/credits.js';
+import creditPricingRoutes from './routes/creditPricing.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -59,6 +62,9 @@ app.use('/api', modelRoutes);
 app.use('/api', chatRoutes);
 app.use('/api', fileRoutes);
 app.use('/api', usageRoutes);
+app.use('/api', inviteCodeRoutes);
+app.use('/api', creditRoutes);
+app.use('/api', creditPricingRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -66,10 +72,20 @@ app.get('/api/health', (req, res) => {
 });
 
 // Serve admin panel static files
-const adminPath = path.join(__dirname, '../../admin');
-app.use('/admin', express.static(adminPath));
+// Resolve admin path: from dist/ to project root/admin
+const adminPath = path.resolve(__dirname, '../../admin');
+console.log('📁 Admin panel path:', adminPath);
 
-// Serve admin index.html for admin routes
+// Serve static files from admin directory (CSS, JS, etc.)
+app.use('/admin', express.static(adminPath, {
+  index: false // Don't serve index.html automatically
+}));
+
+// Serve admin index.html for all admin routes (SPA fallback)
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(adminPath, 'index.html'));
+});
+
 app.get('/admin/*', (req, res) => {
   res.sendFile(path.join(adminPath, 'index.html'));
 });
@@ -105,6 +121,15 @@ async function startServer() {
     await ensureBuiltinModels();
   } catch (error) {
     console.error('⚠️ Failed to ensure builtin models:', error);
+  }
+
+  // Fix any null created_at in usage logs
+  try {
+    const { fixNullCreatedAt } = await import('./services/usageService.js');
+    await fixNullCreatedAt();
+    console.log('✅ Usage logs created_at check complete');
+  } catch (error) {
+    console.error('⚠️ Failed to fix usage logs:', error);
   }
 
   app.listen(PORT, () => {

@@ -8,6 +8,20 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 50173,
         host: 'localhost',
+        proxy: {
+          // Proxy /admin requests to backend
+          '/admin': {
+            target: 'http://localhost:3001',
+            changeOrigin: true,
+            secure: false,
+          },
+          // Proxy /api requests to backend
+          '/api': {
+            target: 'http://localhost:3001',
+            changeOrigin: true,
+            secure: false,
+          },
+        },
       },
       plugins: [react()],
       define: {

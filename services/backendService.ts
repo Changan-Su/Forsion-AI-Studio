@@ -11,6 +11,14 @@ type ConnectionListener = (online: boolean) => void;
 let isOnline = true;
 const connectionListeners = new Set<ConnectionListener>();
 
+class AuthRequiredError extends Error {
+  code = 'AUTH_REQUIRED' as const;
+  constructor(message = 'Authentication required') {
+    super(message);
+    this.name = 'AuthRequiredError';
+  }
+}
+
 const notifyConnection = (online: boolean) => {
   if (isOnline === online) return;
   isOnline = online;
@@ -29,6 +37,26 @@ const markOffline = () => notifyConnection(false);
 const subscribeToConnection = (listener: ConnectionListener) => {
   connectionListeners.add(listener);
   return () => connectionListeners.delete(listener);
+};
+
+const isNetworkError = (err: unknown) => {
+  // In browsers, failed fetch typically throws TypeError
+  return err instanceof TypeError;
+};
+
+const clearAuth = () => {
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('current_username');
+  localStorage.removeItem('forsion_current_user');
+};
+
+const extractDetail = async (res: Response): Promise<string | undefined> => {
+  try {
+    const data: any = await res.json();
+    return data?.detail || data?.message;
+  } catch {
+    return undefined;
+  }
 };
 
 const getHeaders = () => {
@@ -90,49 +118,61 @@ export const backendService = {
   async pingBackend(): Promise<boolean> {
     try {
       const res = await fetch(`${API_URL}/health`);
-      if (!res.ok) throw new Error('Health check failed');
+      // Any HTTP response means backend is reachable
       markOnline();
-      return true;
+      return res.ok;
     } catch (error) {
       console.warn('Backend ping failed', error);
-      markOffline();
+      if (isNetworkError(error)) markOffline();
       return false;
     }
   },
   // 1. Login
   async login(username: string, password: string): Promise<User | null> {
     try {
-      // Try Online Backend
       const res = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       });
-      
+
+      markOnline();
+
       if (res.ok) {
         const data = await res.json();
         localStorage.setItem('auth_token', data.token);
-        // Store username for offline settings retrieval context if needed
-        localStorage.setItem('current_username', data.user.username); 
-        markOnline();
+        localStorage.setItem('current_username', data.user.username);
         return data.user as User;
       }
-      throw new Error("Backend login failed"); // Trigger fallback if 401 or network error
-    } catch (e) {
-      console.warn("Backend unavailable, using Offline Mock Mode for Login.");
-      markOffline();
-      
-      // Offline Fallback
-      const users = getMockUsers();
-      const user = users.find(u => u.username === username && u.password === password);
-      
-      if (user) {
-        localStorage.setItem('current_username', user.username);
-        // Simulate a token
-        localStorage.setItem('auth_token', `mock-token-${user.username}`);
-        return { id: user.id, username: user.username, role: user.role };
+
+      // Invalid credentials are NOT "offline"
+      if (res.status === 401 || res.status === 403) {
+        return null;
       }
-      return null;
+
+      const detail = await extractDetail(res);
+      throw new Error(detail || 'Login failed');
+    } catch (e) {
+      if (isNetworkError(e)) {
+        console.warn("Backend unavailable, using Offline Mock Mode for Login.");
+        markOffline();
+
+        // Offline Fallback
+        const users = getMockUsers();
+        const user = users.find(u => u.username === username && u.password === password);
+
+        if (user) {
+          localStorage.setItem('current_username', user.username);
+          // Simulate a token
+          localStorage.setItem('auth_token', `mock-token-${user.username}`);
+          return { id: user.id, username: user.username, role: user.role };
+        }
+        return null;
+      }
+
+      // Backend reachable but error happened
+      markOnline();
+      throw e;
     }
   },
 
@@ -145,18 +185,32 @@ export const backendService = {
         method: 'GET',
         headers: getHeaders()
       });
-      if (res.ok) {
-        markOnline();
-        return await res.json();
+      markOnline();
+
+      if (res.status === 401) {
+        clearAuth();
+        throw new AuthRequiredError();
       }
-      throw new Error("Fetch settings failed");
+
+      if (res.ok) return await res.json();
+
+      const detail = await extractDetail(res);
+      throw new Error(detail || 'Fetch settings failed');
     } catch (e) {
-      markOffline();
-      // Offline Fallback
-      if (currentUser) {
-        return { defaultModelId: DEFAULT_MODEL_ID, ...getMockSettings(currentUser) };
+      if (e instanceof AuthRequiredError) throw e;
+
+      if (isNetworkError(e)) {
+        markOffline();
+        // Offline Fallback
+        if (currentUser) {
+          return { defaultModelId: DEFAULT_MODEL_ID, ...getMockSettings(currentUser) };
+        }
+        return { externalApiConfigs: {}, defaultModelId: DEFAULT_MODEL_ID };
       }
-      return { externalApiConfigs: {}, defaultModelId: DEFAULT_MODEL_ID };
+
+      // Backend reachable but request failed
+      markOnline();
+      throw e;
     }
   },
 
@@ -170,19 +224,32 @@ export const backendService = {
         headers: getHeaders(),
         body: JSON.stringify(newSettings)
       });
-      if (res.ok) {
-        markOnline();
-        return await res.json();
+      markOnline();
+
+      if (res.status === 401) {
+        clearAuth();
+        throw new AuthRequiredError();
       }
-      throw new Error("Update settings failed");
+
+      if (res.ok) return await res.json();
+
+      const detail = await extractDetail(res);
+      throw new Error(detail || 'Update settings failed');
     } catch (e) {
-      markOffline();
-      // Offline Fallback
-      if (currentUser) {
-        const current = getMockSettings(currentUser);
-        const updated = { ...current, ...newSettings };
-        saveMockSettings(currentUser, updated);
-        return updated;
+      if (e instanceof AuthRequiredError) throw e;
+
+      if (isNetworkError(e)) {
+        markOffline();
+        // Offline Fallback
+        if (currentUser) {
+          const current = getMockSettings(currentUser);
+          const updated = { ...current, ...newSettings };
+          saveMockSettings(currentUser, updated);
+          return updated;
+        }
+      } else {
+        markOnline();
+        throw e;
       }
     }
     return newSettings as AppSettings;
@@ -199,27 +266,35 @@ export const backendService = {
            newPassword 
          })
        });
+       markOnline();
+       if (res.status === 401) {
+         clearAuth();
+         throw new AuthRequiredError();
+       }
        if (!res.ok) {
-         markOnline();
-         const err = await res.json().catch(() => ({}));
-         throw new Error(err.detail || 'Failed to update password');
+         const detail = await extractDetail(res);
+         throw new Error(detail || 'Failed to update password');
        }
        const data = await res.json();
-       markOnline();
        return data.success === true;
      } catch (e) {
-       console.warn("Backend unavailable, using Offline Mock Mode for Password Change.");
-       markOffline();
-       
-       // Offline Fallback
-       const users = getMockUsers();
-       const userIdx = users.findIndex(u => u.username === username);
-       if (userIdx !== -1) {
-         users[userIdx].password = newPassword;
-         saveMockUsers(users);
-         return true;
+       if (e instanceof AuthRequiredError) throw e;
+       if (isNetworkError(e)) {
+         console.warn("Backend unavailable, using Offline Mock Mode for Password Change.");
+         markOffline();
+         
+         // Offline Fallback
+         const users = getMockUsers();
+         const userIdx = users.findIndex(u => u.username === username);
+         if (userIdx !== -1) {
+           users[userIdx].password = newPassword;
+           saveMockUsers(users);
+           return true;
+         }
+         return false;
        }
-       return false;
+       markOnline();
+       throw e;
      }
   },
 
@@ -231,13 +306,19 @@ export const backendService = {
       });
       if (!res.ok) {
         markOnline();
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || 'Failed to load users');
+        if (res.status === 401) {
+          clearAuth();
+          throw new AuthRequiredError();
+        }
+        const detail = await extractDetail(res);
+        throw new Error(detail || 'Failed to load users');
       }
       markOnline();
       return await res.json();
     } catch (error) {
-      markOffline();
+      if (error instanceof AuthRequiredError) throw error;
+      if (isNetworkError(error)) markOffline();
+      else markOnline();
       throw error;
     }
   },
@@ -271,13 +352,19 @@ export const backendService = {
       });
       if (!res.ok) {
         markOnline();
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || 'Failed to load user details');
+        if (res.status === 401) {
+          clearAuth();
+          throw new AuthRequiredError();
+        }
+        const detail = await extractDetail(res);
+        throw new Error(detail || 'Failed to load user details');
       }
       markOnline();
       return await res.json();
     } catch (error) {
-      markOffline();
+      if (error instanceof AuthRequiredError) throw error;
+      if (isNetworkError(error)) markOffline();
+      else markOnline();
       throw error;
     }
   },
@@ -362,12 +449,17 @@ export const backendService = {
       const res = await fetch(`${API_URL}/models`, {
         headers: getHeaders()
       });
-      if (res.ok) {
-        markOnline();
-        return await res.json();
+      markOnline();
+      if (res.status === 401) {
+        clearAuth();
+        throw new AuthRequiredError();
       }
+      if (res.ok) return await res.json();
       return [];
     } catch (error) {
+      if (error instanceof AuthRequiredError) throw error;
+      if (isNetworkError(error)) markOffline();
+      else markOnline();
       console.warn('Failed to fetch global models', error);
       return [];
     }
@@ -438,8 +530,13 @@ export const backendService = {
       });
 
       if (!res.ok) {
-        const error = await res.json().catch(() => ({ detail: 'Request failed' }));
-        throw new Error(error.detail || `API error: ${res.status}`);
+        markOnline();
+        if (res.status === 401) {
+          clearAuth();
+          throw new AuthRequiredError();
+        }
+        const detail = await extractDetail(res);
+        throw new Error(detail || `API error: ${res.status}`);
       }
 
       markOnline();
@@ -467,6 +564,236 @@ export const backendService = {
         reasoning,
         usage: data.usage
       };
+    } catch (error) {
+      if (error instanceof AuthRequiredError) throw error;
+      if (isNetworkError(error)) markOffline();
+      else markOnline();
+      throw error;
+    }
+  },
+
+  // 15. Register
+  async register(username: string, password: string, inviteCode: string): Promise<User> {
+    try {
+      const res = await fetch(`${API_URL}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, invite_code: inviteCode })
+      });
+      
+      if (!res.ok) {
+        markOnline();
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Registration failed');
+      }
+      
+      const data = await res.json();
+      localStorage.setItem('auth_token', data.token);
+      localStorage.setItem('current_username', data.user.username);
+      markOnline();
+      return data.user as User;
+    } catch (error: any) {
+      markOffline();
+      throw error;
+    }
+  },
+
+  // 16. Get Credit Balance
+  async getCreditBalance(): Promise<number> {
+    try {
+      const res = await fetch(`${API_URL}/credits/balance`, {
+        headers: getHeaders()
+      });
+      markOnline();
+      if (res.status === 401) {
+        clearAuth();
+        throw new AuthRequiredError();
+      }
+      if (!res.ok) {
+        const detail = await extractDetail(res);
+        throw new Error(detail || 'Failed to get credit balance');
+      }
+      const data = await res.json();
+      return data.balance || 0;
+    } catch (error) {
+      if (error instanceof AuthRequiredError) throw error;
+      if (isNetworkError(error)) markOffline();
+      else markOnline();
+      return 0;
+    }
+  },
+
+  // 17. Get Credit Transactions
+  async getCreditTransactions(limit: number = 50): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_URL}/credits/transactions?limit=${limit}`, {
+        headers: getHeaders()
+      });
+      markOnline();
+      if (res.status === 401) {
+        clearAuth();
+        throw new AuthRequiredError();
+      }
+      if (!res.ok) {
+        const detail = await extractDetail(res);
+        throw new Error(detail || 'Failed to get transactions');
+      }
+      return await res.json();
+    } catch (error) {
+      if (error instanceof AuthRequiredError) throw error;
+      if (isNetworkError(error)) markOffline();
+      else markOnline();
+      return [];
+    }
+  },
+
+  // 18. Admin - List Invite Codes
+  async listInviteCodes(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_URL}/admin/invite-codes`, {
+        headers: getHeaders()
+      });
+      if (!res.ok) {
+        markOnline();
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to list invite codes');
+      }
+      markOnline();
+      return await res.json();
+    } catch (error) {
+      markOffline();
+      throw error;
+    }
+  },
+
+  // 19. Admin - Create Invite Code
+  async createInviteCode(
+    code: string,
+    maxUses: number,
+    initialCredits: number,
+    expiresAt?: string,
+    notes?: string
+  ): Promise<any> {
+    try {
+      const res = await fetch(`${API_URL}/admin/invite-codes`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          code,
+          max_uses: maxUses,
+          initial_credits: initialCredits,
+          expires_at: expiresAt,
+          notes
+        })
+      });
+      if (!res.ok) {
+        markOnline();
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to create invite code');
+      }
+      markOnline();
+      return await res.json();
+    } catch (error) {
+      markOffline();
+      throw error;
+    }
+  },
+
+  // 20. Admin - Update Invite Code
+  async updateInviteCode(
+    id: string,
+    updates: {
+      max_uses?: number;
+      initial_credits?: number;
+      expires_at?: string | null;
+      is_active?: boolean;
+      notes?: string;
+    }
+  ): Promise<any> {
+    try {
+      const res = await fetch(`${API_URL}/admin/invite-codes/${id}`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify(updates)
+      });
+      if (!res.ok) {
+        markOnline();
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to update invite code');
+      }
+      markOnline();
+      return await res.json();
+    } catch (error) {
+      markOffline();
+      throw error;
+    }
+  },
+
+  // 21. Admin - Delete Invite Code
+  async deleteInviteCode(id: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_URL}/admin/invite-codes/${id}`, {
+        method: 'DELETE',
+        headers: getHeaders()
+      });
+      if (!res.ok) {
+        markOnline();
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to delete invite code');
+      }
+      markOnline();
+      return true;
+    } catch (error) {
+      markOffline();
+      throw error;
+    }
+  },
+
+  // 22. Admin - List Credit Pricing
+  async listCreditPricing(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_URL}/admin/credit-pricing`, {
+        headers: getHeaders()
+      });
+      if (!res.ok) {
+        markOnline();
+        throw new Error('Failed to list pricing');
+      }
+      markOnline();
+      return await res.json();
+    } catch (error) {
+      markOffline();
+      return [];
+    }
+  },
+
+  // 23. Admin - Set Credit Pricing
+  async setCreditPricing(
+    modelId: string,
+    tokensPerCredit: number,
+    inputMultiplier: number = 1.0,
+    outputMultiplier: number = 1.0,
+    provider?: string
+  ): Promise<any> {
+    try {
+      const res = await fetch(`${API_URL}/admin/credit-pricing`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          model_id: modelId,
+          tokens_per_credit: tokensPerCredit,
+          input_multiplier: inputMultiplier,
+          output_multiplier: outputMultiplier,
+          provider
+        })
+      });
+      if (!res.ok) {
+        markOnline();
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to set pricing');
+      }
+      markOnline();
+      return await res.json();
     } catch (error) {
       markOffline();
       throw error;

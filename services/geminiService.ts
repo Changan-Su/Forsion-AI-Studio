@@ -1,6 +1,7 @@
 
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { Attachment } from "../types";
+import { estimateGeminiMessageTokens, estimateGeminiTokens } from "./tokenUtils.js";
 
 // Streaming version of generateGeminiResponse
 export const generateGeminiResponseStream = async (
@@ -11,7 +12,7 @@ export const generateGeminiResponseStream = async (
   attachments: Attachment[] = [],
   onChunk: (text: string, reasoning?: string) => void = () => {},
   enableThinking: boolean = false
-): Promise<{ text: string; imageUrl?: string; reasoning?: string }> => {
+): Promise<{ text: string; imageUrl?: string; reasoning?: string; usage?: { prompt_tokens: number; completion_tokens: number } }> => {
   const finalKey = apiKey || process.env.API_KEY;
 
   if (!finalKey) {
@@ -45,7 +46,16 @@ export const generateGeminiResponseStream = async (
       }
 
       onChunk(generatedText);
-      return { text: generatedText, imageUrl: generatedImageUrl };
+      
+      // Estimate tokens for image generation
+      const inputTokens = estimateGeminiTokens(prompt);
+      const outputTokens = generatedText ? estimateGeminiTokens(generatedText) : 0;
+      const usage = {
+        prompt_tokens: inputTokens,
+        completion_tokens: outputTokens
+      };
+      
+      return { text: generatedText, imageUrl: generatedImageUrl, usage };
 
     } else {
       // Standard Chat Models with streaming
@@ -119,7 +129,15 @@ export const generateGeminiResponseStream = async (
       // Final callback with cleaned content
       onChunk(fullText, reasoning);
 
-      return { text: fullText, reasoning };
+      // Estimate tokens for Gemini (Gemini API doesn't return usage in streaming)
+      const tokenEstimate = estimateGeminiMessageTokens(contents, prompt, attachments);
+      const outputTokens = estimateGeminiTokens(fullText);
+      const usage = {
+        prompt_tokens: tokenEstimate.input,
+        completion_tokens: outputTokens
+      };
+
+      return { text: fullText, reasoning, usage };
     }
 
   } catch (error: any) {
@@ -134,7 +152,7 @@ export const generateGeminiResponse = async (
   history: { role: string; parts: { text: string }[] }[] = [],
   apiKey?: string,
   attachments: Attachment[] = []
-): Promise<{ text: string; imageUrl?: string; reasoning?: string }> => {
+): Promise<{ text: string; imageUrl?: string; reasoning?: string; usage?: { prompt_tokens: number; completion_tokens: number } }> => {
   
   // Prioritize passed key (from Admin Panel), fallback to env
   const finalKey = apiKey || process.env.API_KEY;
@@ -173,7 +191,15 @@ export const generateGeminiResponse = async (
         return { text: "No content generated." };
       }
 
-      return { text: generatedText, imageUrl: generatedImageUrl };
+      // Estimate tokens for image generation
+      const inputTokens = estimateGeminiTokens(prompt);
+      const outputTokens = generatedText ? estimateGeminiTokens(generatedText) : 0;
+      const usage = {
+        prompt_tokens: inputTokens,
+        completion_tokens: outputTokens
+      };
+
+      return { text: generatedText, imageUrl: generatedImageUrl, usage };
 
     } else {
       // Standard Chat Models (Gemini Flash, Gemini Pro) OR Image Generation with Reference
@@ -230,7 +256,15 @@ export const generateGeminiResponse = async (
         rawText = rawText.replace(thinkRegex, '').trim();
       }
 
-      return { text: rawText, reasoning: reasoning };
+      // Estimate tokens for Gemini
+      const tokenEstimate = estimateGeminiMessageTokens(contents, prompt, attachments);
+      const outputTokens = estimateGeminiTokens(rawText);
+      const usage = {
+        prompt_tokens: tokenEstimate.input,
+        completion_tokens: outputTokens
+      };
+
+      return { text: rawText, reasoning: reasoning, usage };
     }
 
   } catch (error: any) {

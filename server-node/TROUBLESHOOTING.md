@@ -139,3 +139,5 @@ Invoke-WebRequest -Uri "http://localhost:3001/api/settings" -Method GET
    docker logs forsion_mysql
    ```
 
+
+

@@ -120,3 +120,5 @@ router.post('/parse-base64', authMiddleware, async (req: AuthRequest, res) => {
 
 export default router;
 
+
+

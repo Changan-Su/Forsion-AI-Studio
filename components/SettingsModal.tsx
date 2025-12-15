@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Save, Lock, User, Monitor, Key, Shield, Plus, Trash2, Box, Command, Code, ToggleLeft, ToggleRight } from 'lucide-react';
+import { X, Save, Lock, User, Monitor, Key, Shield, Plus, Trash2, Box, Command, Code, ToggleLeft, ToggleRight, Ticket, Coins } from 'lucide-react';
 import { AppSettings, UserRole, AIModel, User as UserType } from '../types';
 import { BUILTIN_MODELS, DEFAULT_MODEL_ID } from '../constants';
 import { changePassword } from '../services/authService';
@@ -18,7 +18,7 @@ interface SettingsModalProps {
   onReconnect: () => Promise<boolean>;
 }
 
-type TabType = 'general' | 'account' | 'developer' | 'models' | 'users';
+type TabType = 'general' | 'account' | 'developer' | 'models' | 'users' | 'invite-codes' | 'credit-pricing';
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ 
   onClose, 
@@ -42,6 +42,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [userMessage, setUserMessage] = useState<{ text: string; type: 'success' | 'error' | '' }>({ text: '', type: '' });
   const [isUserActionLoading, setIsUserActionLoading] = useState(false);
   const [developerMode, setDeveloperMode] = useState(false);
+  
+  // Invite codes state
+  const [inviteCodes, setInviteCodes] = useState<any[]>([]);
+  const [inviteCodeForm, setInviteCodeForm] = useState({ code: '', max_uses: 1, initial_credits: 0, expires_at: '', notes: '' });
+  const [isInviteCodeLoading, setIsInviteCodeLoading] = useState(false);
+  
+  // Credit pricing state
+  const [creditPricing, setCreditPricing] = useState<any[]>([]);
+  const [pricingForm, setPricingForm] = useState({ model_id: '', tokens_per_credit: 100, input_multiplier: 1, output_multiplier: 1, provider: '' });
+  const [isPricingLoading, setIsPricingLoading] = useState(false);
   
   // New Model Form State
   const [newModelName, setNewModelName] = useState('');
@@ -69,6 +79,23 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           ? settings.defaultModelId
           : DEFAULT_MODEL_ID;
         setDefaultModelId(desiredDefault);
+        
+        // Load invite codes and pricing if admin
+        if (userRole === UserRole.ADMIN) {
+          try {
+            const codes = await backendService.listInviteCodes();
+            setInviteCodes(codes);
+          } catch (e) {
+            console.error('Failed to load invite codes', e);
+          }
+          
+          try {
+            const pricing = await backendService.listCreditPricing();
+            setCreditPricing(pricing);
+          } catch (e) {
+            console.error('Failed to load credit pricing', e);
+          }
+        }
       } catch (e) {
         console.error("Failed to load settings in modal", e);
       } finally {
@@ -76,7 +103,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       }
     };
     loadData();
-  }, []);
+  }, [userRole]);
 
   const saveToBackend = async (newConfigs = configs, newCustomModels = customModels) => {
     // We only send the partial updates we care about here
@@ -256,6 +283,78 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const generateRandomCode = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 8; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  };
+
+  const handleCreateInviteCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteCodeForm.code) {
+      alert('Code is required');
+      return;
+    }
+    setIsInviteCodeLoading(true);
+    try {
+      await backendService.createInviteCode(
+        inviteCodeForm.code.toUpperCase(),
+        inviteCodeForm.max_uses,
+        inviteCodeForm.initial_credits,
+        inviteCodeForm.expires_at || undefined,
+        inviteCodeForm.notes
+      );
+      setInviteCodeForm({ code: '', max_uses: 1, initial_credits: 0, expires_at: '', notes: '' });
+      const codes = await backendService.listInviteCodes();
+      setInviteCodes(codes);
+      alert('Invite code created successfully');
+    } catch (error: any) {
+      alert(error.message || 'Failed to create invite code');
+    } finally {
+      setIsInviteCodeLoading(false);
+    }
+  };
+
+  const handleDeleteInviteCode = async (id: string) => {
+    if (!window.confirm('Delete this invite code?')) return;
+    try {
+      await backendService.deleteInviteCode(id);
+      const codes = await backendService.listInviteCodes();
+      setInviteCodes(codes);
+    } catch (error: any) {
+      alert(error.message || 'Failed to delete invite code');
+    }
+  };
+
+  const handleSetPricing = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pricingForm.model_id || !pricingForm.tokens_per_credit) {
+      alert('Model ID and tokens per credit are required');
+      return;
+    }
+    setIsPricingLoading(true);
+    try {
+      await backendService.setCreditPricing(
+        pricingForm.model_id,
+        pricingForm.tokens_per_credit,
+        pricingForm.input_multiplier,
+        pricingForm.output_multiplier,
+        pricingForm.provider || undefined
+      );
+      setPricingForm({ model_id: '', tokens_per_credit: 100, input_multiplier: 1, output_multiplier: 1, provider: '' });
+      const pricing = await backendService.listCreditPricing();
+      setCreditPricing(pricing);
+      alert('Pricing set successfully');
+    } catch (error: any) {
+      alert(error.message || 'Failed to set pricing');
+    } finally {
+      setIsPricingLoading(false);
+    }
+  };
+
   // Built-in Providers
   const builtinProviders = Array.from(new Set(BUILTIN_MODELS.map(m => m.configKey || m.id)));
   const allAvailableModels = [...BUILTIN_MODELS, ...customModels];
@@ -348,6 +447,32 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               >
                 <Shield size={18} />
                 Users (Admin)
+              </button>
+            )}
+            {userRole === UserRole.ADMIN && (
+              <button
+                onClick={() => setActiveTab('invite-codes')}
+                className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  activeTab === 'invite-codes' 
+                    ? 'bg-forsion-100 text-forsion-700 dark:bg-forsion-900/20 dark:text-forsion-400' 
+                    : 'text-gray-600 dark:text-dark-muted hover:bg-gray-100 dark:hover:bg-zinc-800'
+                }`}
+              >
+                <Ticket size={18} />
+                Invite Codes
+              </button>
+            )}
+            {userRole === UserRole.ADMIN && (
+              <button
+                onClick={() => setActiveTab('credit-pricing')}
+                className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  activeTab === 'credit-pricing' 
+                    ? 'bg-forsion-100 text-forsion-700 dark:bg-forsion-900/20 dark:text-forsion-400' 
+                    : 'text-gray-600 dark:text-dark-muted hover:bg-gray-100 dark:hover:bg-zinc-800'
+                }`}
+              >
+                <Coins size={18} />
+                Credit Pricing
               </button>
             )}
           </div>
@@ -789,6 +914,218 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     ))}
                     {managedUsers.length === 0 && (
                       <p className="text-sm text-gray-500 dark:text-dark-muted">No users found.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* --- INVITE CODES TAB (ADMIN) --- */}
+            {activeTab === 'invite-codes' && userRole === UserRole.ADMIN && (
+              <div className="space-y-8 max-w-3xl">
+                <div className="bg-gray-50 dark:bg-zinc-900/40 p-6 rounded-xl border border-gray-200 dark:border-dark-border">
+                  <div className="flex items-center gap-2 mb-4 text-forsion-600 dark:text-forsion-400">
+                    <Ticket size={20} />
+                    <h3 className="text-lg font-bold">Create Invite Code</h3>
+                  </div>
+                  <form onSubmit={handleCreateInviteCode} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-dark-muted uppercase mb-1">Code</label>
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            value={inviteCodeForm.code} 
+                            onChange={(e) => setInviteCodeForm(prev => ({ ...prev, code: e.target.value.toUpperCase() }))} 
+                            className="flex-1 bg-white dark:bg-zinc-900 border border-gray-300 dark:border-dark-border rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white" 
+                            placeholder="INVITE123"
+                            required
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setInviteCodeForm(prev => ({ ...prev, code: generateRandomCode() }))}
+                            className="px-3 py-2 bg-gray-200 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 rounded-lg text-sm hover:bg-gray-300 dark:hover:bg-zinc-700"
+                          >
+                            Generate
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-dark-muted uppercase mb-1">Max Uses</label>
+                        <input 
+                          type="number" 
+                          value={inviteCodeForm.max_uses} 
+                          onChange={(e) => setInviteCodeForm(prev => ({ ...prev, max_uses: parseInt(e.target.value) || 1 }))} 
+                          className="w-full bg-white dark:bg-zinc-900 border border-gray-300 dark:border-dark-border rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white" 
+                          min="1"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-dark-muted uppercase mb-1">Initial Credits</label>
+                        <input 
+                          type="number" 
+                          step="0.01"
+                          value={inviteCodeForm.initial_credits} 
+                          onChange={(e) => setInviteCodeForm(prev => ({ ...prev, initial_credits: parseFloat(e.target.value) || 0 }))} 
+                          className="w-full bg-white dark:bg-zinc-900 border border-gray-300 dark:border-dark-border rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white" 
+                          min="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-dark-muted uppercase mb-1">Expires At (optional)</label>
+                        <input 
+                          type="datetime-local" 
+                          value={inviteCodeForm.expires_at} 
+                          onChange={(e) => setInviteCodeForm(prev => ({ ...prev, expires_at: e.target.value }))} 
+                          className="w-full bg-white dark:bg-zinc-900 border border-gray-300 dark:border-dark-border rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white" 
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-dark-muted uppercase mb-1">Notes (optional)</label>
+                      <textarea 
+                        value={inviteCodeForm.notes} 
+                        onChange={(e) => setInviteCodeForm(prev => ({ ...prev, notes: e.target.value }))} 
+                        className="w-full bg-white dark:bg-zinc-900 border border-gray-300 dark:border-dark-border rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white" 
+                        rows={2}
+                      />
+                    </div>
+                    <button 
+                      type="submit" 
+                      disabled={isInviteCodeLoading} 
+                      className="bg-gray-900 dark:bg-white text-white dark:text-black px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-60"
+                    >
+                      {isInviteCodeLoading ? 'Creating...' : 'Create Invite Code'}
+                    </button>
+                  </form>
+                </div>
+
+                <div>
+                  <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">Existing Invite Codes</h3>
+                  <div className="space-y-3">
+                    {inviteCodes.map((code) => (
+                      <div key={code.id} className="flex items-center justify-between p-3 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-dark-border rounded-lg">
+                        <div className="flex-1">
+                          <div className="font-semibold text-gray-900 dark:text-white">{code.code}</div>
+                          <div className="text-xs text-gray-500 dark:text-dark-muted">
+                            Uses: {code.usedCount}/{code.maxUses} | Credits: {code.initialCredits} | 
+                            {code.isActive ? ' Active' : ' Inactive'}
+                            {code.expiresAt && ` | Expires: ${new Date(code.expiresAt).toLocaleDateString()}`}
+                          </div>
+                          {code.notes && (
+                            <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">{code.notes}</div>
+                          )}
+                        </div>
+                        <button 
+                          onClick={() => handleDeleteInviteCode(code.id)} 
+                          className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-md transition-colors ml-2"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                    {inviteCodes.length === 0 && (
+                      <p className="text-sm text-gray-500 dark:text-dark-muted">No invite codes found.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* --- CREDIT PRICING TAB (ADMIN) --- */}
+            {activeTab === 'credit-pricing' && userRole === UserRole.ADMIN && (
+              <div className="space-y-8 max-w-3xl">
+                <div className="bg-gray-50 dark:bg-zinc-900/40 p-6 rounded-xl border border-gray-200 dark:border-dark-border">
+                  <div className="flex items-center gap-2 mb-4 text-forsion-600 dark:text-forsion-400">
+                    <Coins size={20} />
+                    <h3 className="text-lg font-bold">Set Credit Pricing</h3>
+                  </div>
+                  <form onSubmit={handleSetPricing} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-dark-muted uppercase mb-1">Model ID</label>
+                        <input 
+                          type="text" 
+                          value={pricingForm.model_id} 
+                          onChange={(e) => setPricingForm(prev => ({ ...prev, model_id: e.target.value }))} 
+                          className="w-full bg-white dark:bg-zinc-900 border border-gray-300 dark:border-dark-border rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white" 
+                          placeholder="gpt-4"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-dark-muted uppercase mb-1">Provider (optional)</label>
+                        <input 
+                          type="text" 
+                          value={pricingForm.provider} 
+                          onChange={(e) => setPricingForm(prev => ({ ...prev, provider: e.target.value }))} 
+                          className="w-full bg-white dark:bg-zinc-900 border border-gray-300 dark:border-dark-border rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white" 
+                          placeholder="openai"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-dark-muted uppercase mb-1">Tokens per Credit</label>
+                        <input 
+                          type="number" 
+                          step="0.01"
+                          value={pricingForm.tokens_per_credit} 
+                          onChange={(e) => setPricingForm(prev => ({ ...prev, tokens_per_credit: parseFloat(e.target.value) || 100 }))} 
+                          className="w-full bg-white dark:bg-zinc-900 border border-gray-300 dark:border-dark-border rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white" 
+                          min="0.01"
+                          required
+                        />
+                        <p className="text-xs text-gray-400 mt-1">1 credit = N tokens</p>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-dark-muted uppercase mb-1">Input Multiplier</label>
+                        <input 
+                          type="number" 
+                          step="0.01"
+                          value={pricingForm.input_multiplier} 
+                          onChange={(e) => setPricingForm(prev => ({ ...prev, input_multiplier: parseFloat(e.target.value) || 1 }))} 
+                          className="w-full bg-white dark:bg-zinc-900 border border-gray-300 dark:border-dark-border rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white" 
+                          min="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-dark-muted uppercase mb-1">Output Multiplier</label>
+                        <input 
+                          type="number" 
+                          step="0.01"
+                          value={pricingForm.output_multiplier} 
+                          onChange={(e) => setPricingForm(prev => ({ ...prev, output_multiplier: parseFloat(e.target.value) || 1 }))} 
+                          className="w-full bg-white dark:bg-zinc-900 border border-gray-300 dark:border-dark-border rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white" 
+                          min="0"
+                        />
+                      </div>
+                    </div>
+                    <button 
+                      type="submit" 
+                      disabled={isPricingLoading} 
+                      className="bg-gray-900 dark:bg-white text-white dark:text-black px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-60"
+                    >
+                      {isPricingLoading ? 'Saving...' : 'Set Pricing'}
+                    </button>
+                  </form>
+                </div>
+
+                <div>
+                  <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">Current Pricing Configurations</h3>
+                  <div className="space-y-3">
+                    {creditPricing.map((pricing) => (
+                      <div key={pricing.id} className="p-3 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-dark-border rounded-lg">
+                        <div className="font-semibold text-gray-900 dark:text-white">{pricing.modelId}</div>
+                        <div className="text-xs text-gray-500 dark:text-dark-muted mt-1">
+                          {pricing.tokensPerCredit} tokens/credit | 
+                          Input: {pricing.inputMultiplier}x | 
+                          Output: {pricing.outputMultiplier}x
+                          {pricing.provider && ` | Provider: ${pricing.provider}`}
+                        </div>
+                      </div>
+                    ))}
+                    {creditPricing.length === 0 && (
+                      <p className="text-sm text-gray-500 dark:text-dark-muted">No pricing configurations found. Default: 100 tokens per credit.</p>
                     )}
                   </div>
                 </div>

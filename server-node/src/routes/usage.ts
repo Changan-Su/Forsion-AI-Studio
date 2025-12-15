@@ -45,23 +45,29 @@ router.post('/usage/log', authMiddleware, async (req: AuthRequest, res) => {
       error_message 
     } = req.query;
 
+    if (!model_id) {
+      return res.status(400).json({ detail: 'model_id is required' });
+    }
+
     await logApiUsage(
       req.user!.username,
       model_id as string,
-      model_name as string,
-      provider as string,
+      (model_name as string) || undefined,
+      (provider as string) || undefined,
       parseInt(tokens_input as string) || 0,
       parseInt(tokens_output as string) || 0,
       success !== 'false',
-      error_message as string
+      (error_message as string) || undefined
     );
 
     res.json({ success: true });
   } catch (error: any) {
     console.error('Log usage error:', error);
-    res.status(500).json({ detail: 'Failed to log usage' });
+    res.status(500).json({ detail: error.message || 'Failed to log usage' });
   }
 });
 
 export default router;
+
+
 

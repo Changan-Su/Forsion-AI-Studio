@@ -1,6 +1,7 @@
 import React from 'react';
 import { MessageSquare, Plus, Trash2, LogOut, Settings, X, Moon, Sun } from 'lucide-react';
 import { ChatSession, User, UserRole } from '../types';
+import CreditBalance from './CreditBalance';
 
 interface SidebarProps {
   sessions: ChatSession[];
@@ -108,6 +109,10 @@ const Sidebar: React.FC<SidebarProps> = ({
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{user.username}</p>
               <p className="text-xs text-gray-500 truncate">{user.role}</p>
             </div>
+          </div>
+
+          <div className="mb-4">
+            <CreditBalance />
           </div>
 
           <div className="space-y-1">

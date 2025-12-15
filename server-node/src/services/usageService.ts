@@ -11,11 +11,28 @@ export async function logApiUsage(
   success: boolean = true,
   errorMessage?: string
 ): Promise<void> {
-  await query(
-    `INSERT INTO api_usage_logs (username, model_id, model_name, provider, tokens_input, tokens_output, success, error_message)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [username, modelId, modelName ?? null, provider ?? null, tokensInput, tokensOutput, success ? 1 : 0, errorMessage ?? null]
-  );
+  try {
+    // Explicitly include created_at to ensure it's always set
+    await query(
+      `INSERT INTO api_usage_logs (username, model_id, model_name, provider, tokens_input, tokens_output, success, error_message, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [username, modelId, modelName ?? null, provider ?? null, tokensInput, tokensOutput, success ? 1 : 0, errorMessage ?? null]
+    );
+  } catch (error: any) {
+    // Log error but don't fail the main request
+    console.error('Failed to log API usage:', error.message);
+  }
+}
+
+// Fix existing null created_at records
+export async function fixNullCreatedAt(): Promise<void> {
+  try {
+    await query(
+      `UPDATE api_usage_logs SET created_at = NOW() WHERE created_at IS NULL`
+    );
+  } catch (error: any) {
+    console.error('Failed to fix null created_at:', error.message);
+  }
 }
 
 export async function getUsageStats(
@@ -54,7 +71,8 @@ export async function getUsageStats(
     created_at: Date | undefined;
   }>;
 }> {
-  let whereClause = 'WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)';
+  // Include records where created_at is null OR within the date range
+  let whereClause = 'WHERE (created_at >= DATE_SUB(NOW(), INTERVAL ? DAY) OR created_at IS NULL)';
   const params: any[] = [days];
 
   if (username) {
@@ -84,7 +102,11 @@ export async function getUsageStats(
 
   // By model
   const byModelRows = await query<any[]>(
-    `SELECT model_id, model_name, COUNT(*) as count
+    `SELECT 
+      model_id, 
+      model_name, 
+      COUNT(*) as count,
+      SUM(tokens_input + tokens_output) as tokens
      FROM api_usage_logs ${whereClause}
      GROUP BY model_id, model_name
      ORDER BY count DESC
@@ -106,7 +128,10 @@ export async function getUsageStats(
 
   // By user
   const byUserRows = await query<any[]>(
-    `SELECT username, COUNT(*) as count
+    `SELECT 
+      username, 
+      COUNT(*) as count,
+      SUM(tokens_input + tokens_output) as tokens
      FROM api_usage_logs ${whereClause}
      GROUP BY username
      ORDER BY count DESC
@@ -114,14 +139,27 @@ export async function getUsageStats(
     params
   );
 
-  // Recent logs
+  // Recent logs - get unique logs only
   const recentLogs = await getRecentLogs(20, username);
+  
+  // Ensure no duplicates by ID
+  const seenIds = new Set();
+  const uniqueRecentLogs = recentLogs.filter(log => {
+    if (log.id && seenIds.has(log.id)) {
+      return false;
+    }
+    if (log.id) {
+      seenIds.add(log.id);
+    }
+    return true;
+  });
 
   // Build camelCase format
   const byModel = byModelRows.map(row => ({
     modelId: row.model_id,
     modelName: row.model_name || row.model_id,
     count: Number(row.count),
+    tokens: Number(row.tokens) || 0,
   }));
 
   const byDay = byDayRows.map(row => ({
@@ -133,6 +171,7 @@ export async function getUsageStats(
   const byUser = byUserRows.map(row => ({
     username: row.username,
     count: Number(row.count),
+    tokens: Number(row.tokens) || 0,
   }));
 
   // Build snake_case format for admin panel compatibility
@@ -140,6 +179,7 @@ export async function getUsageStats(
     model_id: row.model_id,
     model_name: row.model_name || row.model_id,
     count: Number(row.count),
+    tokens: Number(row.tokens) || 0,
   }));
 
   const by_day = byDayRows.map(row => ({
@@ -151,10 +191,11 @@ export async function getUsageStats(
   const by_user = byUserRows.map(row => ({
     username: row.username,
     count: Number(row.count),
+    tokens: Number(row.tokens) || 0,
   }));
 
-  // Convert recent logs to snake_case for admin panel
-  const recent_logs = recentLogs.map(log => ({
+  // Convert recent logs to snake_case for admin panel - use unique logs only
+  const recent_logs = uniqueRecentLogs.map(log => ({
     id: log.id,
     username: log.username,
     model_id: log.modelId,
@@ -178,8 +219,8 @@ export async function getUsageStats(
     byModel,
     byDay,
     byUser,
-    recentLogs,
-    // snake_case (backward compatibility)
+    recentLogs: uniqueRecentLogs, // Use deduplicated logs
+    // snake_case (backward compatibility) - only return recent_logs, not both
     total_requests: totalRequests,
     total_tokens_input: totalTokensInput,
     total_tokens_output: totalTokensOutput,
@@ -187,7 +228,7 @@ export async function getUsageStats(
     by_model,
     by_day,
     by_user,
-    recent_logs,
+    recent_logs, // Use this in frontend, not recentLogs
   };
 }
 
@@ -200,22 +241,59 @@ export async function getRecentLogs(limit: number = 50, username?: string): Prom
     params.push(username);
   }
 
-  sql += ' ORDER BY created_at DESC LIMIT ?';
-  params.push(limit);
+  // Ensure limit is a safe integer and embed directly in SQL (mysql2 LIMIT doesn't work well with prepared stmt params)
+  const limitInt = Math.max(1, Math.min(1000, Math.floor(limit)));
+  sql += ` ORDER BY created_at DESC LIMIT ${limitInt}`;
 
   const rows = await query<any[]>(sql, params);
 
-  return rows.map(row => ({
-    id: row.id,
-    username: row.username,
-    modelId: row.model_id,
-    modelName: row.model_name,
-    provider: row.provider,
-    tokensInput: row.tokens_input,
-    tokensOutput: row.tokens_output,
-    success: !!row.success,
-    errorMessage: row.error_message,
-    createdAt: row.created_at,
-  }));
+  // Remove duplicates at database level (in case of any data issues)
+  const seenRowIds = new Set();
+  const uniqueRows = rows.filter(row => {
+    if (!row.id) return true; // Include rows without ID
+    if (seenRowIds.has(row.id)) return false;
+    seenRowIds.add(row.id);
+    return true;
+  });
+
+  return uniqueRows.map(row => {
+    // Ensure created_at is properly formatted as ISO string
+    let createdAt = row.created_at;
+    
+    if (createdAt instanceof Date) {
+      createdAt = createdAt.toISOString();
+    } else if (typeof createdAt === 'string') {
+      // If it's already a string, ensure it's in a parseable format
+      // MySQL DATETIME format: "2024-01-01 12:00:00"
+      if (createdAt.includes(' ') && !createdAt.includes('T')) {
+        createdAt = createdAt.replace(' ', 'T') + 'Z';
+      }
+    } else if (createdAt) {
+      // Try to convert to date if it's a timestamp or other format
+      try {
+        const date = new Date(createdAt);
+        if (!isNaN(date.getTime())) {
+          createdAt = date.toISOString();
+        }
+      } catch (e) {
+        console.warn('Could not parse created_at:', createdAt, e);
+      }
+    }
+    
+    return {
+      id: row.id,
+      username: row.username,
+      modelId: row.model_id,
+      modelName: row.model_name,
+      provider: row.provider,
+      tokensInput: row.tokens_input,
+      tokensOutput: row.tokens_output,
+      success: !!row.success,
+      errorMessage: row.error_message,
+      createdAt: createdAt,
+    };
+  });
 }
+
+
 

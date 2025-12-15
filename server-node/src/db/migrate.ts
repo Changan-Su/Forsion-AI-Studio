@@ -76,6 +76,68 @@ const migrations = [
     value TEXT,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  // Invite codes table
+  `CREATE TABLE IF NOT EXISTS invite_codes (
+    id VARCHAR(36) PRIMARY KEY,
+    code VARCHAR(50) UNIQUE NOT NULL,
+    max_uses INT NOT NULL DEFAULT 1,
+    used_count INT DEFAULT 0,
+    initial_credits DECIMAL(10, 2) DEFAULT 0.00,
+    created_by VARCHAR(36),
+    expires_at DATETIME,
+    is_active BOOLEAN DEFAULT TRUE,
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_code (code),
+    INDEX idx_is_active (is_active)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  // User credits table
+  `CREATE TABLE IF NOT EXISTS user_credits (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) UNIQUE NOT NULL,
+    balance DECIMAL(10, 2) DEFAULT 0.00,
+    total_earned DECIMAL(10, 2) DEFAULT 0.00,
+    total_spent DECIMAL(10, 2) DEFAULT 0.00,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  // Credit transactions table
+  `CREATE TABLE IF NOT EXISTS credit_transactions (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    type ENUM('initial', 'usage', 'refund', 'bonus', 'adjustment') NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,
+    balance_before DECIMAL(10, 2) NOT NULL,
+    balance_after DECIMAL(10, 2) NOT NULL,
+    description TEXT,
+    reference_id VARCHAR(255),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_type (type),
+    INDEX idx_created_at (created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  // Credit pricing table
+  `CREATE TABLE IF NOT EXISTS credit_pricing (
+    id VARCHAR(36) PRIMARY KEY,
+    model_id VARCHAR(100) NOT NULL,
+    provider VARCHAR(50),
+    tokens_per_credit DECIMAL(10, 4) NOT NULL DEFAULT 100.0,
+    input_multiplier DECIMAL(10, 4) DEFAULT 1.0,
+    output_multiplier DECIMAL(10, 4) DEFAULT 1.0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_model (model_id),
+    INDEX idx_model_id (model_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
 async function runMigrations() {
@@ -108,4 +170,5 @@ runMigrations().catch((error) => {
   console.error('Migration failed:', error);
   process.exit(1);
 });
+
 

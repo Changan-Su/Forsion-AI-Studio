@@ -70,3 +70,52 @@ export interface ChatCompletionRequest {
   stream?: boolean;
 }
 
+export interface InviteCode {
+  id: string;
+  code: string;
+  maxUses: number;
+  usedCount: number;
+  initialCredits: number;
+  createdBy?: string;
+  expiresAt?: Date;
+  isActive: boolean;
+  notes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface UserCredit {
+  id: string;
+  userId: string;
+  balance: number;
+  totalEarned: number;
+  totalSpent: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface CreditTransaction {
+  id: string;
+  userId: string;
+  type: 'initial' | 'usage' | 'refund' | 'bonus' | 'adjustment';
+  amount: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  description?: string;
+  referenceId?: string;
+  createdAt?: Date;
+}
+
+export interface CreditPricing {
+  id: string;
+  modelId: string;
+  provider?: string;
+  tokensPerCredit: number;
+  inputMultiplier: number;
+  outputMultiplier: number;
+  isActive: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+

@@ -9,6 +9,7 @@ import { BUILTIN_MODELS, DEFAULT_MODEL_ID, getAllModels, getConfiguredModels, ST
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 import SettingsModal from './components/SettingsModal';
+import RegisterModal from './components/RegisterModal';
 import { Send, Zap, Menu, Sparkles, MessageSquare, Code, Brain, BrainCircuit, Image as ImageIcon, ChevronDown, Paperclip, X as XIcon, Box } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -18,6 +19,7 @@ const App: React.FC = () => {
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
 
   // App State
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -56,6 +58,19 @@ const App: React.FC = () => {
 
   // Mobile UI State
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const clearAuthState = useCallback((reason?: string) => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('current_username');
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    setUser(null);
+    setAuthError(reason || '');
+    setCurrentSessionId(null);
+    setIsSidebarOpen(false);
+    hasManualModelSelection.current = false;
+    previousDefaultModelId.current = null;
+    setSelectedModelId(DEFAULT_MODEL_ID);
+  }, []);
 
   const syncSettingsFromBackend = useCallback(async () => {
     try {
@@ -113,14 +128,25 @@ const App: React.FC = () => {
       
       // Update previous default model reference
       previousDefaultModelId.current = preferredModel;
-    } catch (e) {
+    } catch (e: any) {
+      // Token expired/invalid: backend reachable but auth is not.
+      if (e?.code === 'AUTH_REQUIRED' || e?.name === 'AuthRequiredError') {
+        clearAuthState('Session expired. Please sign in again.');
+        return;
+      }
       console.error("Failed to load settings from backend", e);
     }
-  }, []);
+  }, [clearAuthState]);
 
   // Initial Load (Backend Simulation)
   useEffect(() => {
     const unsubscribe = backendService.subscribeToConnection((online) => setIsOfflineMode(!online));
+    
+    // Ping backend on startup to check connection
+    backendService.pingBackend().catch(() => {
+      console.warn('Initial backend ping failed, will retry on first API call');
+    });
+    
     return () => { unsubscribe(); };
   }, []);
 
@@ -186,7 +212,15 @@ const App: React.FC = () => {
     if (newSettings.customModels) setCustomModels(newSettings.customModels);
 
     // Sync with backend
-    await backendService.updateSettings(updated);
+    try {
+      await backendService.updateSettings(updated);
+    } catch (e: any) {
+      if (e?.code === 'AUTH_REQUIRED' || e?.name === 'AuthRequiredError') {
+        clearAuthState('Session expired. Please sign in again.');
+        return;
+      }
+      throw e;
+    }
   };
 
   // Combined Model List - global models from backend + configured built-ins + user custom models
@@ -216,13 +250,13 @@ const App: React.FC = () => {
   };
 
   const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-    setCurrentSessionId(null);
-    setIsSidebarOpen(false);
-    hasManualModelSelection.current = false;
-    previousDefaultModelId.current = null;
-    setSelectedModelId(DEFAULT_MODEL_ID);
+    clearAuthState();
+  };
+
+  const handleRegisterSuccess = (registeredUser: User) => {
+    setUser(registeredUser);
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(registeredUser));
+    setShowRegisterModal(false);
   };
 
   // Chat Handlers
@@ -433,6 +467,8 @@ const App: React.FC = () => {
         }));
       };
 
+      let usage: { prompt_tokens: number; completion_tokens: number } | undefined;
+
       if (currentModel.provider === 'gemini') {
          // Gemini Logic with streaming
          const history = currentModel.id === 'gemini-2.5-flash-image' ? [] : 
@@ -448,6 +484,7 @@ const App: React.FC = () => {
            isDeepThinking
          );
          responseImage = result.imageUrl;
+         usage = result.usage;
 
          // Final update with image if present
          if (responseImage) {
@@ -483,11 +520,12 @@ const App: React.FC = () => {
              isDeepThinking
            );
            updateStreamingMessage(result.content, result.reasoning);
+           usage = result.usage;
         } else if (!config || !config.apiKey) {
            throw new Error(`API Key for ${currentModel.name} is missing. Please configure it in Settings.`);
         } else {
            const apiModelId = currentModel.apiModelId || currentModel.id;
-           await generateExternalResponseStream(
+           const result = await generateExternalResponseStream(
              config, 
              apiModelId, 
              history, 
@@ -496,10 +534,32 @@ const App: React.FC = () => {
              updateStreamingMessage,
              isDeepThinking
            );
+           usage = result.usage;
+        }
+      }
+
+      // Log API usage after successful completion
+      if (usage && user) {
+        try {
+          await backendService.logApiUsage(
+            currentModel.id,
+            currentModel.name,
+            currentModel.provider || 'unknown',
+            usage.prompt_tokens || 0,
+            usage.completion_tokens || 0,
+            true
+          );
+        } catch (logError) {
+          // Silent fail for usage logging - don't interrupt user experience
+          console.warn('Failed to log API usage:', logError);
         }
       }
 
     } catch (error: any) {
+      if (error?.code === 'AUTH_REQUIRED' || error?.name === 'AuthRequiredError') {
+        clearAuthState('Session expired. Please sign in again.');
+        return;
+      }
       // Update the streaming message to show error
       setSessions(prev => prev.map(s => {
         if (s.id === sessionId) {
@@ -627,6 +687,8 @@ const App: React.FC = () => {
       }));
       historyForApi.push({ role: 'user', content });
       
+      let usage: { prompt_tokens: number; completion_tokens: number } | undefined;
+
       if (currentModel.provider === 'gemini') {
         const geminiHistory = currentModel.id === 'gemini-2.5-flash-image' ? [] : 
           historyMessages.slice(0, -1).map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.content }] }));
@@ -641,6 +703,7 @@ const App: React.FC = () => {
           isDeepThinking
         );
         responseImage = result.imageUrl;
+        usage = result.usage;
         
         if (responseImage) {
           setSessions(prev => prev.map(s => {
@@ -666,11 +729,12 @@ const App: React.FC = () => {
             isDeepThinking
           );
           updateStreamingMessage(result.content, result.reasoning);
+          usage = result.usage;
         } else if (!config || !config.apiKey) {
           throw new Error(`API Key for ${currentModel.name} is missing. Please configure it in Settings.`);
         } else {
           const apiModelId = currentModel.apiModelId || currentModel.id;
-          await generateExternalResponseStream(
+          const result = await generateExternalResponseStream(
             config, 
             apiModelId, 
             historyForApi, 
@@ -679,9 +743,54 @@ const App: React.FC = () => {
             updateStreamingMessage,
             isDeepThinking
           );
+          usage = result.usage;
+        }
+      }
+
+      // Log API usage after successful completion
+      if (usage && user) {
+        try {
+          await backendService.logApiUsage(
+            currentModel.id,
+            currentModel.name,
+            currentModel.provider || 'unknown',
+            usage.prompt_tokens || 0,
+            usage.completion_tokens || 0,
+            true
+          );
+        } catch (logError) {
+          // Silent fail for usage logging - don't interrupt user experience
+          console.warn('Failed to log API usage:', logError);
         }
       }
     } catch (error: any) {
+      if (error?.code === 'AUTH_REQUIRED' || error?.name === 'AuthRequiredError') {
+        clearAuthState('Session expired. Please sign in again.');
+        return;
+      }
+      
+      // Log failed API usage
+      if (currentModel) {
+        try {
+          // Try to get username from user object or localStorage
+          const username = user?.username || localStorage.getItem('current_username') || 'anonymous';
+          if (username && username !== 'anonymous') {
+            await backendService.logApiUsage(
+              currentModel.id,
+              currentModel.name,
+              currentModel.provider || 'unknown',
+              0,
+              0,
+              false,
+              error.message || 'Unknown error'
+            );
+          }
+        } catch (logError) {
+          // Silent fail for usage logging
+          console.warn('Failed to log API usage error:', logError);
+        }
+      }
+      
       setSessions(prev => prev.map(s => {
         if (s.id === sessionId) {
           return {
@@ -775,6 +884,16 @@ const App: React.FC = () => {
             >
               {isAuthLoading ? 'Processing...' : 'Sign In'}
             </button>
+            
+            <div className="mt-4 text-center">
+              <button
+                type="button"
+                onClick={() => setShowRegisterModal(true)}
+                className="text-dark-muted hover:text-white text-sm transition-colors"
+              >
+                Don't have an account? <span className="text-forsion-400 font-medium">Register</span>
+              </button>
+            </div>
           </form>
           
           <p className="mt-6 text-center text-xs text-dark-muted">
@@ -1067,6 +1186,13 @@ const App: React.FC = () => {
         </div>
       </div>
 
+      {showRegisterModal && (
+        <RegisterModal
+          onClose={() => setShowRegisterModal(false)}
+          onSuccess={handleRegisterSuccess}
+        />
+      )}
+      
       {showSettings && (
         <SettingsModal 
           onClose={() => setShowSettings(false)} 

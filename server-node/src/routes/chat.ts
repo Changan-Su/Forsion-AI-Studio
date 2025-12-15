@@ -2,6 +2,9 @@ import { Router } from 'express';
 import { getGlobalModel } from '../services/modelService.js';
 import { logApiUsage } from '../services/usageService.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { checkSufficientCredits, deductCredits, ensureCreditAccount } from '../services/creditService.js';
+import { calculateCost } from '../services/creditPricingService.js';
+import { getUserById } from '../services/userService.js';
 import type { ChatCompletionRequest } from '../types/index.js';
 
 const router = Router();
@@ -34,6 +37,28 @@ router.post('/chat/completions', authMiddleware, async (req: AuthRequest, res) =
 
     const baseUrl = (model.defaultBaseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
     const apiModelId = model.apiModelId || model_id;
+
+    // Get user for credit check
+    const user = await getUserById(req.user!.userId);
+    if (!user) {
+      return res.status(404).json({ detail: 'User not found' });
+    }
+
+    // Ensure credit account exists
+    await ensureCreditAccount(user.id);
+
+    // Estimate cost based on input tokens (rough estimate)
+    const estimatedInputTokens = JSON.stringify(messages).length / 4; // Rough estimate
+    const estimatedOutputTokens = max_tokens || 500; // Default estimate
+    const estimatedCost = await calculateCost(model_id, estimatedInputTokens, estimatedOutputTokens);
+
+    // Check if user has sufficient credits
+    const hasCredits = await checkSufficientCredits(user.id, estimatedCost);
+    if (!hasCredits) {
+      return res.status(402).json({ 
+        detail: `Insufficient credits. Required: ${estimatedCost.toFixed(2)}, please recharge your account.` 
+      });
+    }
 
     // Build request payload
     const payload: any = {
@@ -82,15 +107,32 @@ router.post('/chat/completions', authMiddleware, async (req: AuthRequest, res) =
 
     // Log successful request
     const usage = result.usage || {};
+    const tokensInput = usage.prompt_tokens || 0;
+    const tokensOutput = usage.completion_tokens || 0;
+
     await logApiUsage(
       req.user!.username,
       model_id,
       model.name,
       model.provider,
-      usage.prompt_tokens || 0,
-      usage.completion_tokens || 0,
+      tokensInput,
+      tokensOutput,
       true
     );
+
+    // Calculate actual cost and deduct credits
+    const actualCost = await calculateCost(model_id, tokensInput, tokensOutput);
+    const deducted = await deductCredits(
+      user.id,
+      actualCost,
+      `API usage: ${model.name} (${tokensInput} input + ${tokensOutput} output tokens)`,
+      usage.id || undefined
+    );
+
+    if (!deducted) {
+      console.error(`Failed to deduct credits for user ${user.id}, cost: ${actualCost}`);
+      // Still return the result, but log the error
+    }
 
     res.json(result);
   } catch (error: any) {
@@ -105,4 +147,5 @@ router.post('/chat/completions', authMiddleware, async (req: AuthRequest, res) =
 });
 
 export default router;
+
 

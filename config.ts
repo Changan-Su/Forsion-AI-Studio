@@ -12,6 +12,15 @@ const getApiBaseUrl = (): string => {
   
   // Runtime detection - only works in browser
   if (typeof window !== 'undefined') {
+    // Development: if running on localhost with non-standard port, use default backend
+    const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const isNonStandardPort = window.location.port !== '' && window.location.port !== '80' && window.location.port !== '443';
+    
+    if (isDev && isNonStandardPort) {
+      // Development mode: use default backend on port 3001
+      return 'http://localhost:3001/api';
+    }
+    
     // Production: use same origin, Nginx will proxy /api to backend
     return `${window.location.origin}/api`;
   }

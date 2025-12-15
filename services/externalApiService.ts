@@ -1,5 +1,6 @@
 
 import { Attachment } from "../types";
+import { estimateMessageTokens, estimateTokens } from "./tokenUtils.js";
 
 interface ExternalApiConfig {
   apiKey: string;
@@ -77,7 +78,7 @@ export const generateExternalResponseStream = async (
   attachments: Attachment[] = [],
   onChunk: (chunk: string, reasoning?: string) => void = () => {},
   enableThinking: boolean = false
-): Promise<{ content: string; reasoning?: string }> => {
+): Promise<{ content: string; reasoning?: string; usage?: { prompt_tokens: number; completion_tokens: number } }> => {
   // Modify the last user message if thinking is enabled
   let finalMessages = [...messages];
   if (enableThinking && finalMessages.length > 0) {
@@ -145,6 +146,7 @@ export const generateExternalResponseStream = async (
   let fullContent = '';
   let fullReasoning = '';
   let buffer = '';
+  let usage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | undefined;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -162,6 +164,11 @@ export const generateExternalResponseStream = async (
       try {
         const json = JSON.parse(trimmed.slice(6));
         const delta = json.choices?.[0]?.delta;
+        
+        // Extract usage information if available (usually in the last chunk)
+        if (json.usage) {
+          usage = json.usage;
+        }
         
         if (delta?.content) {
           fullContent += delta.content;
@@ -210,7 +217,21 @@ export const generateExternalResponseStream = async (
   // Final callback with cleaned content and reasoning
   onChunk(fullContent, fullReasoning || undefined);
 
-  return { content: fullContent, reasoning: fullReasoning || undefined };
+  // If usage wasn't provided in the stream, estimate it
+  if (!usage) {
+    const inputTokens = estimateMessageTokens(processedMessages);
+    const outputTokens = estimateTokens(fullContent);
+    usage = {
+      prompt_tokens: inputTokens,
+      completion_tokens: outputTokens
+    };
+  }
+
+  return { 
+    content: fullContent, 
+    reasoning: fullReasoning || undefined,
+    usage: usage
+  };
 };
 
 export const generateExternalResponse = async (
@@ -219,7 +240,7 @@ export const generateExternalResponse = async (
   messages: { role: string; content: string }[],
   defaultBaseUrl?: string,
   attachments: Attachment[] = []
-): Promise<{ content: string; reasoning?: string }> => {
+): Promise<{ content: string; reasoning?: string; usage?: { prompt_tokens: number; completion_tokens: number } }> => {
   let baseUrl = config.baseUrl || defaultBaseUrl || 'https://api.openai.com/v1';
   
   // Sanitization: Remove whitespace
@@ -385,7 +406,23 @@ export const generateExternalResponse = async (
         throw new Error("Empty response from model.");
     }
     
-    return { content, reasoning };
+    // Extract usage information if available
+    let usage = data.usage ? {
+      prompt_tokens: data.usage.prompt_tokens || 0,
+      completion_tokens: data.usage.completion_tokens || 0
+    } : undefined;
+    
+    // If usage wasn't provided, estimate it
+    if (!usage) {
+      const inputTokens = estimateMessageTokens(finalMessages);
+      const outputTokens = estimateTokens(content);
+      usage = {
+        prompt_tokens: inputTokens,
+        completion_tokens: outputTokens
+      };
+    }
+    
+    return { content, reasoning, usage };
   } catch (e: any) {
     if (e.message.includes("Empty response")) throw e;
     throw new Error(`Invalid JSON response from server.`);

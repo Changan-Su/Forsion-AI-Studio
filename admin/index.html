@@ -245,6 +245,7 @@
         </div>
         <form id="user-details-form" class="space-y-4">
           <input type="hidden" id="user-details-username" />
+          <input type="hidden" id="user-details-id" />
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Username</label>
@@ -276,6 +277,53 @@
             <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Max Requests Per Day</label>
             <input type="number" id="user-details-max-requests" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white" placeholder="1000" min="0" />
           </div>
+          
+          <!-- Credits (Admin Manual Management) -->
+          <div class="bg-admin-bg rounded-lg border border-admin-border p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-xs text-admin-muted uppercase mb-1">Credits Balance</p>
+                <p id="user-details-credits-balance" class="text-2xl font-bold text-white">-</p>
+              </div>
+              <button type="button" onclick="refreshUserCredits()" class="bg-admin-card hover:bg-admin-border text-white px-3 py-2 rounded-lg text-sm border border-admin-border">
+                Refresh
+              </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Amount</label>
+                <input type="number" id="user-details-credits-amount" class="w-full bg-admin-card border border-admin-border rounded-lg px-4 py-3 text-white" placeholder="Enter amount" step="0.01" />
+                <p class="text-xs text-admin-muted mt-1" id="credits-amount-hint">Adjustment: Set to this value | Bonus: Add this amount</p>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Type</label>
+                <select id="user-details-credits-type" class="w-full bg-admin-card border border-admin-border rounded-lg px-4 py-3 text-white" onchange="updateCreditsHint()">
+                  <option value="bonus">Bonus (Add/Subtract)</option>
+                  <option value="adjustment" selected>Adjustment (Set to value)</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Description</label>
+              <input type="text" id="user-details-credits-desc" class="w-full bg-admin-card border border-admin-border rounded-lg px-4 py-3 text-white" placeholder="Reason for adjustment..." />
+            </div>
+
+            <div class="flex gap-3">
+              <button type="button" onclick="adjustUserCredits()" class="flex-1 bg-green-600 hover:bg-green-500 text-white py-3 rounded-lg font-medium">
+                Apply Credit Change
+              </button>
+            </div>
+
+            <div>
+              <p class="text-xs text-admin-muted uppercase mb-2">Recent Credit Transactions</p>
+              <div id="user-details-credits-transactions" class="space-y-2 max-h-32 overflow-auto pr-1">
+                <p class="text-sm text-admin-muted">-</p>
+              </div>
+            </div>
+          </div>
+
           <div>
             <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Notes</label>
             <textarea id="user-details-notes" rows="3" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white resize-none" placeholder="Admin notes about this user..."></textarea>
@@ -597,8 +645,10 @@
       });
       
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ detail: 'Request failed' }));
-        throw new Error(error.detail || 'Request failed');
+        const error = await response.json().catch(() => ({ detail: `Request failed with status ${response.status}` }));
+        const errorMsg = error.detail || error.message || `Request failed with status ${response.status}`;
+        console.error(`API Error [${response.status}]:`, endpoint, errorMsg, error);
+        throw new Error(errorMsg);
       }
       
       return response.json();
@@ -672,16 +722,20 @@
         
         document.getElementById('stats-grid').innerHTML = `
           <div class="stat-card bg-gradient-to-br from-blue-600/20 to-blue-800/20 rounded-xl border border-blue-500/30 p-6">
-            <div class="text-3xl font-bold text-white mb-2">${users.length}</div>
+            <div class="text-3xl font-bold text-white mb-2">${users.length || 0}</div>
             <div class="text-blue-300">Total Users</div>
           </div>
           <div class="stat-card bg-gradient-to-br from-green-600/20 to-green-800/20 rounded-xl border border-green-500/30 p-6">
-            <div class="text-3xl font-bold text-white mb-2">${usage.total_requests || 0}</div>
+            <div class="text-3xl font-bold text-white mb-2">${usage.total_requests || usage.totalRequests || 0}</div>
             <div class="text-green-300">API Requests</div>
           </div>
           <div class="stat-card bg-gradient-to-br from-purple-600/20 to-purple-800/20 rounded-xl border border-purple-500/30 p-6">
-            <div class="text-3xl font-bold text-white mb-2">${((usage.total_tokens_input || 0) + (usage.total_tokens_output || 0)).toLocaleString()}</div>
+            <div class="text-3xl font-bold text-white mb-2">${((usage.total_tokens_input || usage.totalTokensInput || 0) + (usage.total_tokens_output || usage.totalTokensOutput || 0)).toLocaleString()}</div>
             <div class="text-purple-300">Total Tokens</div>
+            <div class="text-xs text-purple-400 mt-1">
+              In: ${(usage.total_tokens_input || usage.totalTokensInput || 0).toLocaleString()} | 
+              Out: ${(usage.total_tokens_output || usage.totalTokensOutput || 0).toLocaleString()}
+            </div>
           </div>
           <div class="stat-card bg-gradient-to-br from-orange-600/20 to-orange-800/20 rounded-xl border border-orange-500/30 p-6">
             <div class="text-3xl font-bold text-white mb-2">${usage.successful || 0}</div>
@@ -689,26 +743,58 @@
           </div>
         `;
         
-        // Usage by model
-        const modelUsage = usage.by_model || [];
-        document.getElementById('usage-by-model').innerHTML = modelUsage.length ? modelUsage.map(m => `
-          <div class="flex items-center justify-between p-3 bg-admin-bg rounded-lg">
-            <span class="text-white font-medium">${m.model_name || m.model_id}</span>
-            <span class="text-admin-muted">${m.count} calls</span>
-          </div>
-        `).join('') : '<p class="text-admin-muted">No usage data</p>';
+        // Usage by model - support both snake_case and camelCase
+        const modelUsage = usage.by_model || usage.byModel || [];
+        if (modelUsage.length > 0) {
+          document.getElementById('usage-by-model').innerHTML = modelUsage.map(m => {
+            const tokens = m.tokens || 0;
+            const tokensFormatted = tokens.toLocaleString();
+            return `
+            <div class="flex items-center justify-between p-3 bg-admin-bg rounded-lg">
+              <span class="text-white font-medium">${m.model_name || m.modelName || m.model_id || m.modelId || 'Unknown'}</span>
+              <span class="text-admin-muted">${m.count || 0} calls · ${tokensFormatted} tokens</span>
+            </div>
+          `;
+          }).join('');
+        } else {
+          document.getElementById('usage-by-model').innerHTML = '<p class="text-admin-muted">No usage data</p>';
+        }
         
-        // Usage by user
-        const userUsage = usage.by_user || [];
-        document.getElementById('usage-by-user').innerHTML = userUsage.length ? userUsage.map(u => `
-          <div class="flex items-center justify-between p-3 bg-admin-bg rounded-lg">
-            <span class="text-white font-medium">${u.username}</span>
-            <span class="text-admin-muted">${u.count} calls</span>
-          </div>
-        `).join('') : '<p class="text-admin-muted">No usage data</p>';
+        // Usage by user - support both snake_case and camelCase
+        const userUsage = usage.by_user || usage.byUser || [];
+        if (userUsage.length > 0) {
+          document.getElementById('usage-by-user').innerHTML = userUsage.map(u => {
+            const tokens = u.tokens || 0;
+            const tokensFormatted = tokens.toLocaleString();
+            return `
+            <div class="flex items-center justify-between p-3 bg-admin-bg rounded-lg">
+              <span class="text-white font-medium">${u.username || 'Unknown'}</span>
+              <span class="text-admin-muted">${u.count || 0} calls · ${tokensFormatted} tokens</span>
+            </div>
+          `;
+          }).join('');
+        } else {
+          document.getElementById('usage-by-user').innerHTML = '<p class="text-admin-muted">No usage data</p>';
+        }
         
       } catch (error) {
         console.error('Failed to load dashboard:', error);
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+        document.getElementById('stats-grid').innerHTML = `
+          <div class="col-span-full bg-red-500/20 border border-red-500/30 rounded-xl p-4 text-red-300">
+            <p>Failed to load dashboard data: ${error.message || 'Unknown error'}</p>
+            <p class="text-xs mt-2">Check console for details</p>
+            <p class="text-xs mt-1">Error: ${JSON.stringify(error)}</p>
+          </div>
+        `;
+        
+        // Still try to show empty state for usage sections
+        document.getElementById('usage-by-model').innerHTML = '<p class="text-admin-muted">Failed to load data</p>';
+        document.getElementById('usage-by-user').innerHTML = '<p class="text-admin-muted">Failed to load data</p>';
       }
     }
 
@@ -787,7 +873,13 @@
       try {
         const user = await api(`/api/admin/users/${username}`);
         
+        if (!user || !user.id) {
+          alert('Failed to load user: User ID is missing');
+          return;
+        }
+        
         document.getElementById('user-details-username').value = username;
+        document.getElementById('user-details-id').value = user.id;
         document.getElementById('user-details-username-display').value = username;
         document.getElementById('user-details-email').value = user.email || '';
         document.getElementById('user-details-role').value = user.role || 'USER';
@@ -802,8 +894,103 @@
         document.getElementById('user-details-status').disabled = username === 'admin';
         
         document.getElementById('user-details-modal').classList.remove('hidden');
+
+        // Load credits info
+        await refreshUserCredits();
       } catch (error) {
-        alert('Failed to load user details: ' + error.message);
+        console.error('Failed to load user details:', error);
+        alert('Failed to load user details: ' + (error.message || 'Unknown error'));
+      }
+    }
+
+    function formatCreditsTx(tx) {
+      const amt = Number(tx.amount || 0);
+      const sign = amt >= 0 ? '+' : '';
+      const type = tx.type || 'unknown';
+      const when = tx.createdAt ? new Date(tx.createdAt).toLocaleString() : '';
+      const desc = tx.description || '';
+      return `
+        <div class="flex items-center justify-between bg-admin-card border border-admin-border rounded-lg px-3 py-2">
+          <div class="min-w-0">
+            <div class="text-sm text-white truncate">${desc || type}</div>
+            <div class="text-xs text-admin-muted truncate">${when} • ${type}</div>
+          </div>
+          <div class="text-sm font-semibold ${amt >= 0 ? 'text-green-300' : 'text-red-300'} ml-3 whitespace-nowrap">
+            ${sign}${amt}
+          </div>
+        </div>
+      `;
+    }
+
+    async function refreshUserCredits() {
+      const userId = document.getElementById('user-details-id').value;
+      const balanceEl = document.getElementById('user-details-credits-balance');
+      const txEl = document.getElementById('user-details-credits-transactions');
+      
+      if (!userId) {
+        balanceEl.textContent = '-';
+        txEl.innerHTML = '<p class="text-sm text-red-400">User ID not found. Please refresh and try again.</p>';
+        return;
+      }
+
+      balanceEl.textContent = '...';
+      txEl.innerHTML = '<p class="text-sm text-admin-muted">Loading...</p>';
+      try {
+        const data = await api(`/api/admin/credits/${userId}`);
+        balanceEl.textContent = (data.balance ?? 0).toString();
+        const txs = data.recentTransactions || [];
+        txEl.innerHTML = txs.length ? txs.map(formatCreditsTx).join('') : '<p class="text-sm text-admin-muted">No transactions</p>';
+      } catch (error) {
+        console.error('Failed to load credits:', error);
+        balanceEl.textContent = '-';
+        txEl.innerHTML = `<p class="text-sm text-red-400">Failed to load credits: ${error.message || 'Unknown error'}</p>`;
+      }
+    }
+
+    function updateCreditsHint() {
+      const type = document.getElementById('user-details-credits-type').value;
+      const hint = document.getElementById('credits-amount-hint');
+      if (hint) {
+        if (type === 'adjustment') {
+          hint.textContent = 'Adjustment: Set balance to this value';
+        } else {
+          hint.textContent = 'Bonus: Add this amount (can be negative to subtract)';
+        }
+      }
+    }
+
+    async function adjustUserCredits() {
+      const userId = document.getElementById('user-details-id').value;
+      if (!userId) return;
+
+      const amountRaw = document.getElementById('user-details-credits-amount').value;
+      const amount = parseFloat(amountRaw);
+      const type = document.getElementById('user-details-credits-type').value;
+      const description = document.getElementById('user-details-credits-desc').value;
+
+      if (!amountRaw || Number.isNaN(amount)) {
+        alert(type === 'adjustment' 
+          ? 'Please enter the target balance amount.' 
+          : 'Please enter an amount (can be negative to subtract).');
+        return;
+      }
+
+      if (type === 'adjustment' && amount < 0) {
+        if (!confirm('Setting balance to a negative value. Continue?')) {
+          return;
+        }
+      }
+
+      try {
+        await api(`/api/admin/credits/${userId}/adjust`, {
+          method: 'POST',
+          body: JSON.stringify({ amount, type, description })
+        });
+        document.getElementById('user-details-credits-amount').value = '';
+        document.getElementById('user-details-credits-desc').value = '';
+        await refreshUserCredits();
+      } catch (error) {
+        alert('Failed to adjust credits: ' + error.message);
       }
     }
 
@@ -1068,26 +1255,102 @@
           <div class="bg-admin-bg rounded-lg p-4">
             <div class="text-2xl font-bold text-purple-400">${((usage.total_tokens_input || 0) + (usage.total_tokens_output || 0)).toLocaleString()}</div>
             <div class="text-admin-muted text-sm">Total Tokens</div>
+            <div class="text-xs text-admin-muted mt-1">
+              Input: ${(usage.total_tokens_input || 0).toLocaleString()} | 
+              Output: ${(usage.total_tokens_output || 0).toLocaleString()}
+            </div>
           </div>
         `;
         
+        // Use only recent_logs to avoid duplicates - ensure we don't use recentLogs
         const logs = usage.recent_logs || [];
-        document.getElementById('usage-logs-table').innerHTML = logs.length ? logs.map(log => `
+        
+        // Remove duplicates by id - use Map for better performance and to handle undefined/null ids
+        // Also check for content-based duplicates
+        const seenIds = new Map();
+        const seenContent = new Map();
+        const uniqueLogs = logs.filter(log => {
+          const id = log.id;
+          
+          // First check by ID
+          if (id !== undefined && id !== null) {
+            if (seenIds.has(id)) {
+              return false;
+            }
+            seenIds.set(id, true);
+          }
+          
+          // Also check by content (username + model + tokens + timestamp) to catch duplicates with different IDs
+          const contentKey = `${log.username}_${log.model_id}_${log.tokens_input}_${log.tokens_output}_${log.created_at}`;
+          if (seenContent.has(contentKey)) {
+            return false;
+          }
+          seenContent.set(contentKey, true);
+          
+          return true;
+        });
+        document.getElementById('usage-logs-table').innerHTML = uniqueLogs.length ? uniqueLogs.map(log => {
+          const tokensInput = log.tokens_input || 0;
+          const tokensOutput = log.tokens_output || 0;
+          const totalTokens = tokensInput + tokensOutput;
+          // Format date properly - backend now ensures ISO format
+          let dateStr = '-';
+          try {
+            if (log.created_at) {
+              const date = new Date(log.created_at);
+              
+              if (!isNaN(date.getTime())) {
+                // Format as YYYY-MM-DD HH:mm:ss (24-hour format, local time)
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                const seconds = String(date.getSeconds()).padStart(2, '0');
+                dateStr = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+              } else {
+                dateStr = String(log.created_at || '-');
+              }
+            }
+          } catch (e) {
+            dateStr = String(log.created_at || '-');
+          }
+          return `
           <tr>
-            <td class="px-6 py-4 text-admin-muted text-sm">${new Date(log.created_at).toLocaleString()}</td>
+            <td class="px-6 py-4 text-admin-muted text-sm">${dateStr}</td>
             <td class="px-6 py-4 text-white">${log.username}</td>
             <td class="px-6 py-4 text-white">${log.model_name || log.model_id}</td>
-            <td class="px-6 py-4 text-admin-muted">${log.tokens_input} / ${log.tokens_output}</td>
+            <td class="px-6 py-4 text-admin-muted">
+              <div class="flex flex-col">
+                <span>Input: ${tokensInput.toLocaleString()}</span>
+                <span>Output: ${tokensOutput.toLocaleString()}</span>
+                <span class="text-white font-medium mt-1">Total: ${totalTokens.toLocaleString()}</span>
+              </div>
+            </td>
             <td class="px-6 py-4">
               <span class="px-2 py-1 rounded text-xs font-medium ${log.success ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}">
                 ${log.success ? 'Success' : 'Failed'}
               </span>
             </td>
           </tr>
-        `).join('') : '<tr><td colspan="5" class="px-6 py-12 text-center text-admin-muted">No usage logs found</td></tr>';
+        `;
+        }).join('') : '<tr><td colspan="5" class="px-6 py-12 text-center text-admin-muted">No usage logs found</td></tr>';
         
       } catch (error) {
         console.error('Failed to load usage stats:', error);
+        document.getElementById('usage-stats-summary').innerHTML = `
+          <div class="col-span-full bg-red-500/20 border border-red-500/30 rounded-xl p-4 text-red-300">
+            <p>Failed to load usage stats: ${error.message || 'Unknown error'}</p>
+            <p class="text-xs mt-2">Check console for details</p>
+          </div>
+        `;
+        document.getElementById('usage-logs-table').innerHTML = `
+          <tr>
+            <td colspan="5" class="px-6 py-12 text-center text-red-400">
+              Failed to load logs: ${error.message || 'Unknown error'}
+            </td>
+          </tr>
+        `;
       }
     }
 
