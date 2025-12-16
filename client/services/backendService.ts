@@ -496,15 +496,17 @@ export const backendService = {
     }
   },
 
-  // 14. Proxy Chat Completions (for global models)
+  // 14. Proxy Chat Completions (for global models) with streaming support
   async proxyChatCompletions(
     modelId: string,
     messages: Array<{ role: string; content: string }>,
     temperature: number = 0.7,
     enableThinking: boolean = false,
     maxTokens?: number,
+    onChunk: (content: string, reasoning?: string) => void = () => {},
     signal?: AbortSignal
   ): Promise<{ content: string; reasoning?: string; usage?: { prompt_tokens: number; completion_tokens: number } }> {
+    console.log('[proxyChatCompletions] Starting request for model:', modelId);
     try {
       // Modify messages if thinking is enabled
       let finalMessages = [...messages];
@@ -519,6 +521,7 @@ export const backendService = {
         }
       }
 
+      console.log('[proxyChatCompletions] Sending request to:', `${API_URL}/chat/completions`);
       const res = await fetch(`${API_URL}/chat/completions`, {
         method: 'POST',
         headers: getHeaders(),
@@ -526,7 +529,8 @@ export const backendService = {
           model_id: modelId,
           messages: finalMessages,
           temperature,
-          max_tokens: maxTokens
+          max_tokens: maxTokens,
+          stream: true // Enable streaming
         }),
         signal: signal
       });
@@ -542,39 +546,147 @@ export const backendService = {
       }
 
       markOnline();
-      const data = await res.json();
-      
-      // Extract content from OpenAI-style response
-      const choice = data.choices?.[0];
-      let content = choice?.message?.content || '';
-      let reasoning = choice?.message?.reasoning_content || choice?.message?.reasoning;
-      
-      // Extract <think> tags from content if no explicit reasoning
-      if (!reasoning && content) {
-        const thinkRegex = /<think>([\s\S]*?)<\/think>/gi;
-        let matches = content.match(thinkRegex);
-        
-        // If no complete tags, try to match incomplete tags (content might be truncated)
-        if (!matches && content.includes('<think>')) {
-          const incompleteRegex = /<think>([\s\S]*)$/i;
-          const incompleteMatch = content.match(incompleteRegex);
-          if (incompleteMatch) {
-            reasoning = incompleteMatch[1].trim();
-            content = content.replace(incompleteRegex, '').trim();
+
+      // Check if response is streaming (SSE)
+      const contentType = res.headers.get('content-type') || '';
+      console.log('[proxyChatCompletions] Response content-type:', contentType);
+      const isStreaming = contentType.includes('text/event-stream') || 
+                          contentType.includes('text/plain');
+      console.log('[proxyChatCompletions] isStreaming:', isStreaming, 'has body:', !!res.body);
+
+      if (isStreaming && res.body) {
+        // Handle streaming response
+        console.log('[proxyChatCompletions] Starting to read stream...');
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let fullContent = '';
+        let fullReasoning = '';
+        let usage: { prompt_tokens: number; completion_tokens: number } | undefined;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed === 'data: [DONE]') continue;
+            if (!trimmed.startsWith('data: ')) continue;
+
+            try {
+              const json = JSON.parse(trimmed.slice(6));
+              const delta = json.choices?.[0]?.delta;
+
+              // Extract usage info (usually in the last chunk)
+              if (json.usage) {
+                usage = {
+                  prompt_tokens: json.usage.prompt_tokens || 0,
+                  completion_tokens: json.usage.completion_tokens || 0
+                };
+              }
+
+              if (delta?.content) {
+                fullContent += delta.content;
+                
+                // Check for <think> tags in progress
+                const thinkMatch = fullContent.match(/<think>([\s\S]*?)<\/think>/i);
+                if (thinkMatch) {
+                  const extractedReasoning = thinkMatch[1].trim();
+                  const cleanContent = fullContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                  onChunk(cleanContent, extractedReasoning || fullReasoning || undefined);
+                } else {
+                  // Check for incomplete <think> tag (still streaming)
+                  const incompleteMatch = fullContent.match(/<think>([\s\S]*)$/i);
+                  if (incompleteMatch) {
+                    const cleanContent = fullContent.replace(/<think>[\s\S]*$/i, '').trim();
+                    onChunk(cleanContent, incompleteMatch[1].trim() || fullReasoning || undefined);
+                  } else {
+                    onChunk(fullContent, fullReasoning || undefined);
+                  }
+                }
+              }
+
+              if (delta?.reasoning_content) {
+                fullReasoning += delta.reasoning_content;
+                onChunk(fullContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim(), fullReasoning);
+              }
+            } catch {
+              // Skip invalid JSON
+            }
           }
-        } else if (matches) {
-          reasoning = matches
-            .map((m: string) => m.replace(/<\/?think>/gi, '').trim())
-            .join('\n');
-          content = content.replace(thinkRegex, '').trim();
         }
+
+        // Final cleanup and extraction of <think> tags
+        const thinkRegex = /<think>([\s\S]*?)<\/think>/gi;
+        const allThinkMatches = fullContent.match(thinkRegex);
+        if (allThinkMatches) {
+          const extractedReasoning = allThinkMatches
+            .map(m => m.replace(/<\/?think>/gi, '').trim())
+            .join('\n');
+          if (extractedReasoning && !fullReasoning) {
+            fullReasoning = extractedReasoning;
+          }
+          fullContent = fullContent.replace(thinkRegex, '').trim();
+        }
+
+        // Final callback with cleaned content
+        onChunk(fullContent, fullReasoning || undefined);
+
+        // Estimate usage if not provided
+        if (!usage) {
+          usage = {
+            prompt_tokens: Math.ceil(JSON.stringify(messages).length / 4),
+            completion_tokens: Math.ceil(fullContent.length / 4)
+          };
+        }
+
+        return {
+          content: fullContent,
+          reasoning: fullReasoning || undefined,
+          usage
+        };
+      } else {
+        // Non-streaming response (fallback)
+        const data = await res.json();
+        
+        // Extract content from OpenAI-style response
+        const choice = data.choices?.[0];
+        let content = choice?.message?.content || '';
+        let reasoning = choice?.message?.reasoning_content || choice?.message?.reasoning;
+        
+        // Extract <think> tags from content if no explicit reasoning
+        if (!reasoning && content) {
+          const thinkRegex = /<think>([\s\S]*?)<\/think>/gi;
+          let matches = content.match(thinkRegex);
+          
+          if (!matches && content.includes('<think>')) {
+            const incompleteRegex = /<think>([\s\S]*)$/i;
+            const incompleteMatch = content.match(incompleteRegex);
+            if (incompleteMatch) {
+              reasoning = incompleteMatch[1].trim();
+              content = content.replace(incompleteRegex, '').trim();
+            }
+          } else if (matches) {
+            reasoning = matches
+              .map((m: string) => m.replace(/<\/?think>/gi, '').trim())
+              .join('\n');
+            content = content.replace(thinkRegex, '').trim();
+          }
+        }
+
+        // Call onChunk with final content
+        onChunk(content, reasoning);
+        
+        return {
+          content,
+          reasoning,
+          usage: data.usage
+        };
       }
-      
-      return {
-        content,
-        reasoning,
-        usage: data.usage
-      };
     } catch (error) {
       if (error instanceof AuthRequiredError) throw error;
       if (isNetworkError(error)) markOffline();

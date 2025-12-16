@@ -55,12 +55,6 @@ const CodeBlock: React.FC<{ language?: string; children: string }> = ({ language
 const ThinkingBlock: React.FC<{ reasoning: string; isNotion: boolean }> = ({ reasoning, isNotion }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   
-  // #region agent log
-  React.useEffect(() => {
-    fetch('http://127.0.0.1:7242/ingest/3fe5b122-b3de-446c-9d63-dc9b22fc763f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatArea.tsx:56',message:'ThinkingBlock: component rendered',data:{reasoningLength:reasoning?.length,isExpanded,reasoningPreview:reasoning?.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-  }, [reasoning, isExpanded]);
-  // #endregion
-  
   // Get last 1-2 lines for preview
   const previewLines = useMemo(() => {
     if (!reasoning || !reasoning.trim()) return '';
@@ -366,15 +360,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
 
               {/* Reasoning Block - Using new collapsible component */}
               {msg.reasoning && msg.reasoning.trim() && (
-                <>
-                  {/* #region agent log */}
-                  {(() => {
-                    fetch('http://127.0.0.1:7242/ingest/3fe5b122-b3de-446c-9d63-dc9b22fc763f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatArea.tsx:362',message:'Checking reasoning display condition',data:{hasReasoning:!!msg.reasoning,reasoningType:typeof msg.reasoning,reasoningLength:msg.reasoning?.length,reasoningTrimmed:msg.reasoning?.trim(),willRender:!!(msg.reasoning && msg.reasoning.trim()),reasoningPreview:msg.reasoning?.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-                    return null;
-                  })()}
-                  {/* #endregion */}
-                  <ThinkingBlock reasoning={msg.reasoning.trim()} isNotion={isNotion} />
-                </>
+                <ThinkingBlock reasoning={msg.reasoning.trim()} isNotion={isNotion} />
               )}
 
               {/* Main Content (Generated Image) */}

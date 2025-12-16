@@ -467,9 +467,6 @@ const App: React.FC = () => {
 
       // Update message callback for streaming
       const updateStreamingMessage = (content: string, reasoning?: string) => {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3fe5b122-b3de-446c-9d63-dc9b22fc763f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:469',message:'updateStreamingMessage: called',data:{hasContent:!!content,hasReasoning:!!reasoning,reasoningLength:reasoning?.length,reasoningType:typeof reasoning,reasoningPreview:reasoning?.substring(0,50),botMessageId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
         setSessions(prev => prev.map(s => {
           if (s.id === sessionId) {
             return {
@@ -490,6 +487,7 @@ const App: React.FC = () => {
 
       if (currentModel.provider === 'gemini') {
          // Gemini Logic with streaming
+         console.log('[handleSendMessage] Using Gemini provider for model:', currentModel.id);
          const history = currentModel.id === 'gemini-2.5-flash-image' ? [] : 
             (session?.messages || []).filter(m => m.id !== botMessageId).map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.content }] }));
          
@@ -503,6 +501,7 @@ const App: React.FC = () => {
            isDeepThinking,
            abortControllerRef.current?.signal
          );
+         console.log('[handleSendMessage] Gemini response received');
          responseImage = result.imageUrl;
          usage = result.usage;
 
@@ -531,21 +530,24 @@ const App: React.FC = () => {
         }));
         history.push({ role: 'user', content: userMessage.content });
 
-        // Check if this is a global model (uses backend proxy) - no streaming for now
+        // Check if this is a global model (uses backend proxy) - now with streaming support
+        console.log('[handleSendMessage] Model:', currentModel.id, 'isGlobal:', (currentModel as any).isGlobal);
         if ((currentModel as any).isGlobal) {
+           console.log('[handleSendMessage] Using proxyChatCompletions for global model');
            const result = await backendService.proxyChatCompletions(
              currentModel.id,
              history,
              0.7,
              isDeepThinking,
              undefined,
+             updateStreamingMessage,
              abortControllerRef.current?.signal
            );
-           updateStreamingMessage(result.content, result.reasoning);
            usage = result.usage;
         } else if (!config || !config.apiKey) {
            throw new Error(`API Key for ${currentModel.name} is missing. Please configure it in Settings.`);
         } else {
+           console.log('[handleSendMessage] Using generateExternalResponseStream for external model');
            const apiModelId = currentModel.apiModelId || currentModel.id;
            const result = await generateExternalResponseStream(
              config, 
@@ -775,9 +777,9 @@ const App: React.FC = () => {
             0.7,
             isDeepThinking,
             undefined,
+            updateStreamingMessage,
             abortControllerRef.current?.signal
           );
-          updateStreamingMessage(result.content, result.reasoning);
           usage = result.usage;
         } else if (!config || !config.apiKey) {
           throw new Error(`API Key for ${currentModel.name} is missing. Please configure it in Settings.`);
