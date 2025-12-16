@@ -430,6 +430,57 @@
               </button>
             </div>
           </div>
+          
+          <!-- Prompt Caching Configuration -->
+          <div class="border-t border-admin-border pt-4 mt-4">
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-2">
+                <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
+                <h4 class="text-sm font-semibold text-white">Prompt Caching (Token Optimization)</h4>
+              </div>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="model-prompt-caching-enabled" class="w-5 h-5 rounded bg-admin-bg border-admin-border text-blue-600 focus:ring-blue-500" />
+                <span class="text-sm text-white">Enable</span>
+              </label>
+            </div>
+            
+            <div id="prompt-caching-fields" class="space-y-4 hidden">
+              <div>
+                <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">
+                  System Prompt <span class="text-blue-400">*</span>
+                </label>
+                <textarea 
+                  id="model-system-prompt" 
+                  rows="4" 
+                  class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white resize-none font-mono text-sm" 
+                  placeholder="You are Forsion's AI assistant. Tone: gentle, supportive, concise.&#10;&#10;⚠️ Keep this text FIXED - do not include dynamic values (dates, user IDs, etc.) for optimal caching."
+                  disabled
+                ></textarea>
+                <p class="text-xs text-admin-muted mt-1">
+                  <span id="system-prompt-hint-external" class="hidden">OpenAI: Auto-cached if text is byte-identical. Use for persona + company identity only.</span>
+                  <span id="system-prompt-hint-gemini" class="hidden">Gemini: Will be cached via Context Cache. Use for fixed personality and brand guidelines.</span>
+                </p>
+              </div>
+              
+              <div>
+                <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">
+                  Cacheable Content <span class="text-green-400">(Optional)</span>
+                </label>
+                <textarea 
+                  id="model-cacheable-content" 
+                  rows="4" 
+                  class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white resize-none font-mono text-sm" 
+                  placeholder="Company FAQ, brand guidelines, compliance rules...&#10;&#10;For Claude/Gemini: This content will be explicitly cached and reused across conversations."
+                  disabled
+                ></textarea>
+                <p class="text-xs text-admin-muted mt-1">
+                  <span id="cacheable-hint-external" class="hidden">OpenAI: Not supported. Use System Prompt instead.</span>
+                  <span id="cacheable-hint-gemini" class="hidden">Gemini: Use Context Cache API to cache this content. Reduces token costs significantly.</span>
+                </p>
+              </div>
+            </div>
+          </div>
+          
           <!-- Test Connection -->
           <div id="add-model-test-result" class="hidden p-3 rounded-lg text-sm"></div>
           <div class="flex gap-3 pt-4">
@@ -535,6 +586,57 @@
             </div>
             <p id="edit-model-api-key-hint" class="text-xs text-admin-muted mt-1">Leave empty to keep current key.</p>
           </div>
+          
+          <!-- Prompt Caching Configuration -->
+          <div class="border-t border-admin-border pt-4 mt-4">
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-2">
+                <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
+                <h4 class="text-sm font-semibold text-white">Prompt Caching (Token Optimization)</h4>
+              </div>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="edit-model-prompt-caching-enabled" class="w-5 h-5 rounded bg-admin-bg border-admin-border text-blue-600 focus:ring-blue-500" />
+                <span class="text-sm text-white">Enable</span>
+              </label>
+            </div>
+            
+            <div id="edit-prompt-caching-fields" class="space-y-4 hidden">
+              <div>
+                <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">
+                  System Prompt <span class="text-blue-400">*</span>
+                </label>
+                <textarea 
+                  id="edit-model-system-prompt" 
+                  rows="4" 
+                  class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white resize-none font-mono text-sm" 
+                  placeholder="You are Forsion's AI assistant. Tone: gentle, supportive, concise.&#10;&#10;⚠️ Keep this text FIXED - do not include dynamic values (dates, user IDs, etc.) for optimal caching."
+                  disabled
+                ></textarea>
+                <p class="text-xs text-admin-muted mt-1">
+                  <span id="edit-system-prompt-hint-external" class="hidden">OpenAI: Auto-cached if text is byte-identical. Use for persona + company identity only.</span>
+                  <span id="edit-system-prompt-hint-gemini" class="hidden">Gemini: Will be cached via Context Cache. Use for fixed personality and brand guidelines.</span>
+                </p>
+              </div>
+              
+              <div>
+                <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">
+                  Cacheable Content <span class="text-green-400">(Optional)</span>
+                </label>
+                <textarea 
+                  id="edit-model-cacheable-content" 
+                  rows="4" 
+                  class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white resize-none font-mono text-sm" 
+                  placeholder="Company FAQ, brand guidelines, compliance rules...&#10;&#10;For Claude/Gemini: This content will be explicitly cached and reused across conversations."
+                  disabled
+                ></textarea>
+                <p class="text-xs text-admin-muted mt-1">
+                  <span id="edit-cacheable-hint-external" class="hidden">OpenAI: Not supported. Use System Prompt instead.</span>
+                  <span id="edit-cacheable-hint-gemini" class="hidden">Gemini: Use Context Cache API to cache this content. Reduces token costs significantly.</span>
+                </p>
+              </div>
+            </div>
+          </div>
+          
           <div class="flex items-center gap-3 pt-2">
             <label class="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" id="edit-model-enabled" class="w-5 h-5 rounded bg-admin-bg border-admin-border text-blue-600 focus:ring-blue-500" checked />
@@ -1193,6 +1295,11 @@
 
     function showAddModelModal() {
       document.getElementById('add-model-modal').classList.remove('hidden');
+      // Initialize prompt caching toggle
+      document.getElementById('model-prompt-caching-enabled').checked = false;
+      togglePromptCachingFields(false, false);
+      // Initialize hints based on default provider
+      updatePromptCachingHints('external', false);
     }
 
     function hideAddModelModal() {
@@ -1227,6 +1334,20 @@
         document.getElementById('edit-model-description').value = model.description || '';
         document.getElementById('edit-model-base-url').value = model.defaultBaseUrl || '';
         
+        // Load prompt caching fields
+        const promptCachingEnabled = model.promptCachingEnabled || false;
+        document.getElementById('edit-model-prompt-caching-enabled').checked = promptCachingEnabled;
+        document.getElementById('edit-model-system-prompt').value = model.systemPrompt || '';
+        document.getElementById('edit-model-cacheable-content').value = model.cacheableContent || '';
+        
+        // Toggle fields visibility
+        togglePromptCachingFields(promptCachingEnabled, true);
+        
+        // Update hints based on provider
+        if (promptCachingEnabled) {
+          updatePromptCachingHints(model.provider || 'external', true);
+        }
+        
         // Show existing API key status
         const apiKeyInput = document.getElementById('edit-model-api-key');
         const apiKeyHint = document.getElementById('edit-model-api-key-hint');
@@ -1259,6 +1380,7 @@
       e.preventDefault();
       const modelId = document.getElementById('edit-model-id').value;
       const apiKey = document.getElementById('edit-model-api-key').value;
+      const promptCachingEnabled = document.getElementById('edit-model-prompt-caching-enabled').checked;
       
       const updates = {
         name: document.getElementById('edit-model-name').value,
@@ -1266,7 +1388,10 @@
         apiModelId: document.getElementById('edit-model-api-id').value,
         description: document.getElementById('edit-model-description').value,
         defaultBaseUrl: document.getElementById('edit-model-base-url').value,
-        isEnabled: document.getElementById('edit-model-enabled').checked
+        isEnabled: document.getElementById('edit-model-enabled').checked,
+        promptCachingEnabled: promptCachingEnabled,
+        systemPrompt: promptCachingEnabled ? (document.getElementById('edit-model-system-prompt').value.trim() || null) : null,
+        cacheableContent: promptCachingEnabled ? (document.getElementById('edit-model-cacheable-content').value.trim() || null) : null
       };
       
       // Only include API key if user entered a new one
@@ -1286,8 +1411,83 @@
       }
     });
 
+    // Toggle prompt caching fields visibility
+    function togglePromptCachingFields(enabled, isEdit = false) {
+      const prefix = isEdit ? 'edit-' : '';
+      const fieldsContainer = document.getElementById(`${prefix}prompt-caching-fields`);
+      if (fieldsContainer) {
+        fieldsContainer.classList.toggle('hidden', !enabled);
+      }
+      
+      // Enable/disable fields
+      const systemPrompt = document.getElementById(`${prefix}model-system-prompt`);
+      const cacheableContent = document.getElementById(`${prefix}model-cacheable-content`);
+      
+      if (systemPrompt) {
+        systemPrompt.disabled = !enabled;
+        systemPrompt.required = enabled;
+      }
+      if (cacheableContent) {
+        cacheableContent.disabled = !enabled;
+      }
+    }
+    
+    // Update prompt caching hints based on provider
+    function updatePromptCachingHints(provider, isEdit = false) {
+      const prefix = isEdit ? 'edit-' : '';
+      const isExternal = provider === 'external';
+      const isGemini = provider === 'gemini';
+      
+      // System prompt hints
+      document.getElementById(`${prefix}system-prompt-hint-external`).classList.toggle('hidden', !isExternal);
+      document.getElementById(`${prefix}system-prompt-hint-gemini`).classList.toggle('hidden', !isGemini);
+      
+      // Cacheable content hints
+      document.getElementById(`${prefix}cacheable-hint-external`).classList.toggle('hidden', !isExternal);
+      document.getElementById(`${prefix}cacheable-hint-gemini`).classList.toggle('hidden', !isGemini);
+      
+      // Disable cacheable content for external providers
+      const cacheableTextarea = document.getElementById(`${prefix}model-cacheable-content`);
+      if (cacheableTextarea) {
+        const cachingEnabled = document.getElementById(`${prefix}model-prompt-caching-enabled`)?.checked || false;
+        cacheableTextarea.disabled = isExternal || !cachingEnabled;
+        if (isExternal) {
+          cacheableTextarea.placeholder = 'Not supported for External API providers. Use System Prompt instead.';
+        } else {
+          cacheableTextarea.placeholder = 'Company FAQ, brand guidelines, compliance rules...\n\nFor Claude/Gemini: This content will be explicitly cached and reused across conversations.';
+        }
+      }
+    }
+    
+    // Listen to prompt caching toggle
+    document.getElementById('model-prompt-caching-enabled').addEventListener('change', (e) => {
+      togglePromptCachingFields(e.target.checked, false);
+      updatePromptCachingHints(document.getElementById('model-provider').value, false);
+    });
+    
+    document.getElementById('edit-model-prompt-caching-enabled').addEventListener('change', (e) => {
+      togglePromptCachingFields(e.target.checked, true);
+      updatePromptCachingHints(document.getElementById('edit-model-provider').value, true);
+    });
+    
+    // Listen to provider changes
+    document.getElementById('model-provider').addEventListener('change', (e) => {
+      const cachingEnabled = document.getElementById('model-prompt-caching-enabled').checked;
+      if (cachingEnabled) {
+        updatePromptCachingHints(e.target.value, false);
+      }
+    });
+    
+    document.getElementById('edit-model-provider').addEventListener('change', (e) => {
+      const cachingEnabled = document.getElementById('edit-model-prompt-caching-enabled').checked;
+      if (cachingEnabled) {
+        updatePromptCachingHints(e.target.value, true);
+      }
+    });
+    
     document.getElementById('add-model-form').addEventListener('submit', async (e) => {
       e.preventDefault();
+      const promptCachingEnabled = document.getElementById('model-prompt-caching-enabled').checked;
       const model = {
         id: document.getElementById('model-id').value,
         name: document.getElementById('model-name').value,
@@ -1295,7 +1495,10 @@
         description: document.getElementById('model-description').value,
         apiModelId: document.getElementById('model-api-id').value,
         defaultBaseUrl: document.getElementById('model-base-url').value,
-        apiKey: document.getElementById('model-api-key').value
+        apiKey: document.getElementById('model-api-key').value,
+        promptCachingEnabled: promptCachingEnabled,
+        systemPrompt: promptCachingEnabled ? (document.getElementById('model-system-prompt').value.trim() || null) : null,
+        cacheableContent: promptCachingEnabled ? (document.getElementById('model-cacheable-content').value.trim() || null) : null
       };
       
       try {

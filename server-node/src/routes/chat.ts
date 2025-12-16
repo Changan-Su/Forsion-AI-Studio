@@ -61,10 +61,54 @@ router.post('/chat/completions', authMiddleware, async (req: AuthRequest, res) =
       });
     }
 
+    // Prepare messages with system prompt if enabled
+    let finalMessages = [...messages];
+    
+    // Add system prompt and cacheable content if prompt caching is enabled
+    if (model.promptCachingEnabled && model.systemPrompt) {
+      // Check if there's already a system message
+      const hasSystemMessage = messages.some((msg: any) => msg.role === 'system');
+      
+      if (!hasSystemMessage) {
+        // Build system message content
+        let systemContent = model.systemPrompt;
+        
+        // For Gemini provider, append cacheable content to system prompt
+        if (model.provider === 'gemini' && model.cacheableContent) {
+          systemContent += '\n\n' + model.cacheableContent;
+        }
+        
+        // Prepend system prompt as the first message
+        finalMessages = [
+          { role: 'system', content: systemContent },
+          ...messages
+        ];
+      } else {
+        // If system message exists, prepend the model's system prompt before it
+        const systemMsgIndex = messages.findIndex((msg: any) => msg.role === 'system');
+        
+        let systemContent = model.systemPrompt;
+        if (model.provider === 'gemini' && model.cacheableContent) {
+          systemContent += '\n\n' + model.cacheableContent;
+        }
+        
+        finalMessages = [
+          { role: 'system', content: systemContent },
+          ...messages.slice(0, systemMsgIndex),
+          ...messages.slice(systemMsgIndex)
+        ];
+      }
+      
+      console.log(`[Chat] Prompt Caching enabled for model ${model_id}, added system prompt (${model.systemPrompt.length} chars)`);
+      if (model.cacheableContent) {
+        console.log(`[Chat] Added cacheable content (${model.cacheableContent.length} chars)`);
+      }
+    }
+
     // Build request payload with streaming enabled
     const payload: any = {
       model: apiModelId,
-      messages,
+      messages: finalMessages,
       temperature,
       stream: stream, // Enable streaming
       stream_options: stream ? { include_usage: true } : undefined, // Request usage info in stream

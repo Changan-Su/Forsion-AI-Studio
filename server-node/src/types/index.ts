@@ -34,6 +34,9 @@ export interface GlobalModel {
   defaultBaseUrl?: string;
   apiKey?: string;
   isEnabled: boolean;
+  promptCachingEnabled?: boolean; // Whether to enable prompt caching
+  systemPrompt?: string; // System prompt for OpenAI automatic caching
+  cacheableContent?: string; // Cacheable content for Claude/Gemini explicit caching
   createdAt?: Date;
   updatedAt?: Date;
 }

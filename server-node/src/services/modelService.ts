@@ -24,6 +24,9 @@ export async function listGlobalModels(
       configKey: row.config_key,
       defaultBaseUrl: row.default_base_url,
       isEnabled: !!row.is_enabled,
+      promptCachingEnabled: !!row.prompt_caching_enabled,
+      systemPrompt: row.system_prompt || undefined,
+      cacheableContent: row.cacheable_content || undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -56,6 +59,9 @@ export async function getGlobalModel(modelId: string): Promise<GlobalModel | nul
     defaultBaseUrl: row.default_base_url,
     apiKey: row.api_key,
     isEnabled: !!row.is_enabled,
+    promptCachingEnabled: !!row.prompt_caching_enabled,
+    systemPrompt: row.system_prompt || undefined,
+    cacheableContent: row.cacheable_content || undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -67,8 +73,8 @@ export async function createGlobalModel(model: Partial<GlobalModel>): Promise<Gl
   }
 
   await query(
-    `INSERT INTO global_models (id, name, provider, description, icon, api_model_id, config_key, default_base_url, api_key, is_enabled)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO global_models (id, name, provider, description, icon, api_model_id, config_key, default_base_url, api_key, is_enabled, prompt_caching_enabled, system_prompt, cacheable_content)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       model.id,
       model.name,
@@ -80,6 +86,9 @@ export async function createGlobalModel(model: Partial<GlobalModel>): Promise<Gl
       model.defaultBaseUrl || null,
       model.apiKey || null,
       model.isEnabled !== false ? 1 : 0,
+      model.promptCachingEnabled ? 1 : 0,
+      model.systemPrompt || null,
+      model.cacheableContent || null,
     ]
   );
 
@@ -128,6 +137,18 @@ export async function updateGlobalModel(
   if (updates.isEnabled !== undefined) {
     setClauses.push('is_enabled = ?');
     values.push(updates.isEnabled ? 1 : 0);
+  }
+  if (updates.promptCachingEnabled !== undefined) {
+    setClauses.push('prompt_caching_enabled = ?');
+    values.push(updates.promptCachingEnabled ? 1 : 0);
+  }
+  if (updates.systemPrompt !== undefined) {
+    setClauses.push('system_prompt = ?');
+    values.push(updates.systemPrompt || null);
+  }
+  if (updates.cacheableContent !== undefined) {
+    setClauses.push('cacheable_content = ?');
+    values.push(updates.cacheableContent || null);
   }
 
   if (setClauses.length === 0) {

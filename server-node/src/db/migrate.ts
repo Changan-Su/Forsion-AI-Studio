@@ -49,6 +49,9 @@ const migrations = [
     default_base_url VARCHAR(500),
     api_key TEXT,
     is_enabled BOOLEAN DEFAULT TRUE,
+    prompt_caching_enabled BOOLEAN DEFAULT FALSE,
+    system_prompt TEXT,
+    cacheable_content TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
@@ -138,6 +141,9 @@ const migrations = [
     UNIQUE KEY unique_model (model_id),
     INDEX idx_model_id (model_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  
+  // Add prompt caching fields to global_models (migration for existing tables)
+  // Note: This will fail if columns already exist, which is fine - we catch the error
 ];
 
 async function runMigrations() {
@@ -154,11 +160,43 @@ async function runMigrations() {
       await query(migrations[i]);
       console.log(`✅ Migration ${i + 1}/${migrations.length} completed`);
     } catch (error: any) {
-      // Ignore "table already exists" errors
-      if (error.code !== 'ER_TABLE_EXISTS_ERROR') {
+      // Ignore "table already exists" and "duplicate column" errors
+      if (error.code !== 'ER_TABLE_EXISTS_ERROR' && 
+          error.code !== 'ER_DUP_FIELDNAME' &&
+          !error.message.includes('Duplicate column name')) {
         console.error(`❌ Migration ${i + 1} failed:`, error.message);
         throw error;
+      } else {
+        console.log(`⚠️  Migration ${i + 1} skipped (already exists)`);
       }
+    }
+  }
+  
+  // Add prompt caching columns if they don't exist (separate try-catch for each)
+  try {
+    await query(`ALTER TABLE global_models ADD COLUMN system_prompt TEXT AFTER is_enabled`);
+    console.log('✅ Added system_prompt column');
+  } catch (error: any) {
+    if (error.code !== 'ER_DUP_FIELDNAME' && !error.message.includes('Duplicate column name')) {
+      console.warn('⚠️  Could not add system_prompt column:', error.message);
+    }
+  }
+  
+  try {
+    await query(`ALTER TABLE global_models ADD COLUMN cacheable_content TEXT AFTER system_prompt`);
+    console.log('✅ Added cacheable_content column');
+  } catch (error: any) {
+    if (error.code !== 'ER_DUP_FIELDNAME' && !error.message.includes('Duplicate column name')) {
+      console.warn('⚠️  Could not add cacheable_content column:', error.message);
+    }
+  }
+  
+  try {
+    await query(`ALTER TABLE global_models ADD COLUMN prompt_caching_enabled BOOLEAN DEFAULT FALSE AFTER is_enabled`);
+    console.log('✅ Added prompt_caching_enabled column');
+  } catch (error: any) {
+    if (error.code !== 'ER_DUP_FIELDNAME' && !error.message.includes('Duplicate column name')) {
+      console.warn('⚠️  Could not add prompt_caching_enabled column:', error.message);
     }
   }
 
