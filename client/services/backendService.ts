@@ -502,7 +502,8 @@ export const backendService = {
     messages: Array<{ role: string; content: string }>,
     temperature: number = 0.7,
     enableThinking: boolean = false,
-    maxTokens?: number
+    maxTokens?: number,
+    signal?: AbortSignal
   ): Promise<{ content: string; reasoning?: string; usage?: { prompt_tokens: number; completion_tokens: number } }> {
     try {
       // Modify messages if thinking is enabled
@@ -526,7 +527,8 @@ export const backendService = {
           messages: finalMessages,
           temperature,
           max_tokens: maxTokens
-        })
+        }),
+        signal: signal
       });
 
       if (!res.ok) {
@@ -550,8 +552,17 @@ export const backendService = {
       // Extract <think> tags from content if no explicit reasoning
       if (!reasoning && content) {
         const thinkRegex = /<think>([\s\S]*?)<\/think>/gi;
-        const matches = content.match(thinkRegex);
-        if (matches) {
+        let matches = content.match(thinkRegex);
+        
+        // If no complete tags, try to match incomplete tags (content might be truncated)
+        if (!matches && content.includes('<think>')) {
+          const incompleteRegex = /<think>([\s\S]*)$/i;
+          const incompleteMatch = content.match(incompleteRegex);
+          if (incompleteMatch) {
+            reasoning = incompleteMatch[1].trim();
+            content = content.replace(incompleteRegex, '').trim();
+          }
+        } else if (matches) {
           reasoning = matches
             .map((m: string) => m.replace(/<\/?think>/gi, '').trim())
             .join('\n');

@@ -11,7 +11,8 @@ export const generateGeminiResponseStream = async (
   apiKey?: string,
   attachments: Attachment[] = [],
   onChunk: (text: string, reasoning?: string) => void = () => {},
-  enableThinking: boolean = false
+  enableThinking: boolean = false,
+  signal?: AbortSignal
 ): Promise<{ text: string; imageUrl?: string; reasoning?: string; usage?: { prompt_tokens: number; completion_tokens: number } }> => {
   const finalKey = apiKey || process.env.API_KEY;
 
@@ -24,10 +25,20 @@ export const generateGeminiResponseStream = async (
   try {
     // Handle Nano Banana (Image Generation) - no streaming for image gen
     if (modelId === 'gemini-2.5-flash-image' && attachments.length === 0) {
+      // Check if request was aborted before making the request
+      if (signal?.aborted) {
+        throw new DOMException('The operation was aborted.', 'AbortError');
+      }
+      
       const response = await aiClient.models.generateContent({
         model: modelId,
         contents: { parts: [{ text: prompt }] }
       });
+      
+      // Check again after request
+      if (signal?.aborted) {
+        throw new DOMException('The operation was aborted.', 'AbortError');
+      }
 
       let generatedText = "";
       let generatedImageUrl: string | undefined = undefined;
@@ -96,11 +107,16 @@ export const generateGeminiResponseStream = async (
       let reasoning: string | undefined = undefined;
 
       for await (const chunk of streamResult) {
+        // Check if request was aborted
+        if (signal?.aborted) {
+          throw new DOMException('The operation was aborted.', 'AbortError');
+        }
+        
         const chunkText = chunk.text || '';
         fullText += chunkText;
         
         // Check for think tags in progress
-        const thinkRegex = /<think>([\s\S]*?)<\/think>/i;
+        const thinkRegex = /<think>([\s\S]*?)<\/redacted_reasoning>/i;
         const match = fullText.match(thinkRegex);
         if (match) {
           reasoning = match[1].trim();
@@ -112,12 +128,12 @@ export const generateGeminiResponseStream = async (
       }
 
       // Final cleanup - handle all think tags
-      const thinkRegexGlobal = /<think>([\s\S]*?)<\/think>/gi;
+      const thinkRegexGlobal = /<think>([\s\S]*?)<\/redacted_reasoning>/gi;
       const allMatches = fullText.match(thinkRegexGlobal);
       if (allMatches) {
         // Extract all reasoning content
         const extractedReasoning = allMatches
-          .map(m => m.replace(/<\/?think>/gi, '').trim())
+          .map(m => m.replace(/<\/?redacted_reasoning>/gi, '').trim())
           .join('\n');
         if (extractedReasoning) {
           reasoning = extractedReasoning;
@@ -249,7 +265,7 @@ export const generateGeminiResponse = async (
       let reasoning: string | undefined = undefined;
 
       // Check for <think> tags in Gemini response
-      const thinkRegex = /<think>([\s\S]*?)<\/think>/i;
+      const thinkRegex = /<think>([\s\S]*?)<\/redacted_reasoning>/i;
       const match = rawText.match(thinkRegex);
       if (match) {
         reasoning = match[1].trim();

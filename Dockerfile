@@ -9,11 +9,11 @@ FROM node:18-alpine AS builder
 WORKDIR /app
 
 # Install dependencies first (for better caching)
-COPY package*.json ./
+COPY client/package*.json ./
 RUN npm ci
 
 # Copy source code
-COPY . .
+COPY client/ ./
 
 # Build the application
 # Note: VITE_API_URL is NOT set here - frontend will detect API URL at runtime

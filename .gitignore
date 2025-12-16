@@ -54,8 +54,16 @@ data.json.bak
 
 # Node
 node_modules/
-dist/
 .npm
+.npmrc
+package-lock.json.bak
+yarn.lock.bak
+
+# Build outputs
+build/
+dist/
+**/dist/
+*.tsbuildinfo
 
 # Docker
 .dockerignore
@@ -63,3 +71,20 @@ dist/
 # Deployment
 *.bak
 backup/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+*.env
+
+# Coverage reports
+coverage/
+*.lcov
+.nyc_output/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp

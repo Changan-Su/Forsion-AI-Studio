@@ -77,7 +77,8 @@ export const generateExternalResponseStream = async (
   defaultBaseUrl?: string,
   attachments: Attachment[] = [],
   onChunk: (chunk: string, reasoning?: string) => void = () => {},
-  enableThinking: boolean = false
+  enableThinking: boolean = false,
+  signal?: AbortSignal
 ): Promise<{ content: string; reasoning?: string; usage?: { prompt_tokens: number; completion_tokens: number } }> => {
   // Modify the last user message if thinking is enabled
   let finalMessages = [...messages];
@@ -108,7 +109,8 @@ export const generateExternalResponseStream = async (
         messages: processedMessages,
         temperature: 0.7,
         stream: true
-      })
+      }),
+      signal: signal
     });
   };
 
@@ -149,6 +151,12 @@ export const generateExternalResponseStream = async (
   let usage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | undefined;
 
   while (true) {
+    // Check if request was aborted
+    if (signal?.aborted) {
+      reader.cancel();
+      throw new DOMException('The operation was aborted.', 'AbortError');
+    }
+    
     const { done, value } = await reader.read();
     if (done) break;
 
@@ -176,14 +184,22 @@ export const generateExternalResponseStream = async (
           const thinkMatch = fullContent.match(/<think>([\s\S]*?)<\/think>/i);
           if (thinkMatch) {
             const extractedReasoning = thinkMatch[1].trim();
+            // Save extracted reasoning to fullReasoning
+            if (extractedReasoning) {
+              fullReasoning = fullReasoning 
+                ? `${fullReasoning}\n${extractedReasoning}` 
+                : extractedReasoning;
+            }
             const cleanContent = fullContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-            onChunk(cleanContent, extractedReasoning || fullReasoning || undefined);
+            onChunk(cleanContent, fullReasoning || undefined);
           } else {
             // Check for incomplete <think> tag (still streaming)
             const incompleteMatch = fullContent.match(/<think>([\s\S]*)$/i);
             if (incompleteMatch) {
+              const partialReasoning = incompleteMatch[1].trim();
               const cleanContent = fullContent.replace(/<think>[\s\S]*$/i, '').trim();
-              onChunk(cleanContent, incompleteMatch[1].trim() || fullReasoning || undefined);
+              // Don't save partial reasoning yet, wait for complete tag
+              onChunk(cleanContent, partialReasoning || fullReasoning || undefined);
             } else {
               onChunk(fullContent, fullReasoning || undefined);
             }
@@ -206,9 +222,11 @@ export const generateExternalResponseStream = async (
     // Extract all reasoning content from think tags
     const extractedReasoning = allThinkMatches
       .map(m => m.replace(/<\/?think>/gi, '').trim())
+      .filter(r => r.length > 0)
       .join('\n');
-    if (extractedReasoning && !fullReasoning) {
-      fullReasoning = extractedReasoning;
+    // Always update fullReasoning if we found reasoning in tags (in case it wasn't captured during streaming)
+    if (extractedReasoning) {
+      fullReasoning = fullReasoning ? `${fullReasoning}\n${extractedReasoning}` : extractedReasoning;
     }
     // Remove all think tags from content
     fullContent = fullContent.replace(thinkRegex, '').trim();

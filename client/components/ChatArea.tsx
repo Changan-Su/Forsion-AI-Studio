@@ -55,11 +55,23 @@ const CodeBlock: React.FC<{ language?: string; children: string }> = ({ language
 const ThinkingBlock: React.FC<{ reasoning: string; isNotion: boolean }> = ({ reasoning, isNotion }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   
+  // #region agent log
+  React.useEffect(() => {
+    fetch('http://127.0.0.1:7242/ingest/3fe5b122-b3de-446c-9d63-dc9b22fc763f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatArea.tsx:56',message:'ThinkingBlock: component rendered',data:{reasoningLength:reasoning?.length,isExpanded,reasoningPreview:reasoning?.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+  }, [reasoning, isExpanded]);
+  // #endregion
+  
   // Get last 1-2 lines for preview
   const previewLines = useMemo(() => {
-    const lines = reasoning.trim().split('\n').filter(l => l.trim());
+    if (!reasoning || !reasoning.trim()) return '';
+    const trimmed = reasoning.trim();
+    // If content is short, show it all
+    if (trimmed.length <= 150) return trimmed;
+    const lines = trimmed.split('\n').filter(l => l.trim());
+    if (lines.length === 0) return trimmed.substring(0, 150) + '...';
     const lastLines = lines.slice(-2);
-    return lastLines.join(' ').substring(0, 120) + (reasoning.length > 120 ? '...' : '');
+    const preview = lastLines.join(' ').substring(0, 120);
+    return preview + (trimmed.length > 120 ? '...' : '');
   }, [reasoning]);
   
   return (
@@ -69,8 +81,9 @@ const ThinkingBlock: React.FC<{ reasoning: string; isNotion: boolean }> = ({ rea
         : 'bg-slate-50/80 dark:bg-gray-900/50 border border-slate-200/50 dark:border-gray-700/50'
     }`}>
       <button
+        type="button"
         onClick={() => setIsExpanded(!isExpanded)}
-        className={`w-full flex items-center gap-2 px-4 py-3 text-left transition-colors ${
+        className={`w-full flex items-center gap-2 px-4 py-3 text-left transition-colors cursor-pointer ${
           isNotion 
             ? 'hover:bg-gray-100 dark:hover:bg-gray-800' 
             : 'hover:bg-slate-100/50 dark:hover:bg-gray-800/50'
@@ -92,13 +105,24 @@ const ThinkingBlock: React.FC<{ reasoning: string; isNotion: boolean }> = ({ rea
       </button>
       
       {/* Preview when collapsed */}
-      {!isExpanded && previewLines && (
-        <div className={`px-4 pb-3 -mt-1 text-sm italic truncate ${
+      {!isExpanded && (
+        <div className={`px-4 pb-3 -mt-1 text-sm italic ${
           isNotion 
             ? 'text-gray-500 dark:text-gray-400 font-serif' 
             : 'text-slate-500 dark:text-gray-400'
         }`}>
-          {previewLines}
+          {previewLines && previewLines.trim() ? (
+            <div className="overflow-hidden" style={{ 
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              maxHeight: '3em'
+            }}>
+              {previewLines}
+            </div>
+          ) : (
+            <div className="text-xs opacity-70">Click to view thinking process...</div>
+          )}
         </div>
       )}
       
@@ -341,8 +365,16 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
               )}
 
               {/* Reasoning Block - Using new collapsible component */}
-              {msg.reasoning && (
-                <ThinkingBlock reasoning={msg.reasoning} isNotion={isNotion} />
+              {msg.reasoning && msg.reasoning.trim() && (
+                <>
+                  {/* #region agent log */}
+                  {(() => {
+                    fetch('http://127.0.0.1:7242/ingest/3fe5b122-b3de-446c-9d63-dc9b22fc763f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ChatArea.tsx:362',message:'Checking reasoning display condition',data:{hasReasoning:!!msg.reasoning,reasoningType:typeof msg.reasoning,reasoningLength:msg.reasoning?.length,reasoningTrimmed:msg.reasoning?.trim(),willRender:!!(msg.reasoning && msg.reasoning.trim()),reasoningPreview:msg.reasoning?.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                    return null;
+                  })()}
+                  {/* #endregion */}
+                  <ThinkingBlock reasoning={msg.reasoning.trim()} isNotion={isNotion} />
+                </>
               )}
 
               {/* Main Content (Generated Image) */}

@@ -116,12 +116,17 @@ npm run dev
 #### 4. 启动前端服务
 
 ```bash
-# 在项目根目录
+# 进入前端目录
+cd client
+
+# 安装依赖
 npm install
+
+# 启动开发服务器
 npm run dev
 ```
 
-前端默认运行在 http://localhost:5173，后端在 http://localhost:3001
+前端默认运行在 http://localhost:50173，后端在 http://localhost:3001
 
 ## 📖 部署教程
 
@@ -183,27 +188,43 @@ VITE_API_URL=http://localhost:3001
 
 ```
 forsion-ai-studio/
-├── App.tsx                 # 主应用组件
-├── components/             # React 组件
-│   ├── ChatArea.tsx       # 聊天区域
-│   ├── Sidebar.tsx        # 侧边栏
-│   └── SettingsModal.tsx  # 设置弹窗
-├── services/               # 服务层
-│   ├── authService.ts     # 认证服务
-│   ├── backendService.ts  # 后端 API
-│   ├── geminiService.ts   # Gemini API
-│   └── externalApiService.ts # 外部 API
-├── server-node/            # Node.js 后端
+├── client/                 # 前端代码 (React + Vite)
+│   ├── App.tsx            # 主应用组件
+│   ├── index.tsx          # 入口文件
+│   ├── index.html         # HTML 模板
+│   ├── components/        # React 组件
+│   │   ├── ChatArea.tsx   # 聊天区域
+│   │   ├── Sidebar.tsx    # 侧边栏
+│   │   └── SettingsModal.tsx # 设置弹窗
+│   ├── services/          # 服务层
+│   │   ├── authService.ts # 认证服务
+│   │   ├── backendService.ts # 后端 API
+│   │   ├── geminiService.ts # Gemini API
+│   │   └── externalApiService.ts # 外部 API
+│   ├── types.ts           # 类型定义
+│   ├── constants.ts       # 常量配置
+│   ├── config.ts          # 运行时配置
+│   ├── vite.config.ts     # Vite 配置
+│   ├── tsconfig.json      # TypeScript 配置
+│   └── package.json       # 前端依赖
+├── server-node/           # 后端代码 (Node.js + Express)
 │   ├── src/
 │   │   ├── index.ts       # 入口文件
 │   │   ├── routes/        # API 路由
 │   │   ├── services/      # 业务逻辑
-│   │   └── middleware/    # 中间件
-│   └── package.json
-├── docker-compose.yml      # Docker 编排
+│   │   ├── middleware/    # 中间件
+│   │   ├── config/        # 配置文件
+│   │   ├── db/            # 数据库相关
+│   │   └── types/         # 类型定义
+│   ├── Dockerfile         # 后端 Docker
+│   ├── tsconfig.json      # TypeScript 配置
+│   └── package.json       # 后端依赖
+├── admin/                 # 管理面板 (静态 HTML)
+│   └── index.html         # 管理界面
+├── docker-compose.yml     # Docker 编排
 ├── Dockerfile             # 前端 Docker
 ├── nginx.conf             # Nginx 配置
-└── README.md
+└── README.md              # 项目文档
 ```
 
 ## 🤝 贡献
