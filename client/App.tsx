@@ -20,6 +20,12 @@ const App: React.FC = () => {
   const [authError, setAuthError] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  // Register form state
+  const [registerUsername, setRegisterUsername] = useState('');
+  const [registerPassword, setRegisterPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
 
   // App State
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -254,6 +260,44 @@ const App: React.FC = () => {
 
   const handleLogout = () => {
     clearAuthState();
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    
+    // Validation
+    if (!registerUsername || !registerPassword || !inviteCode) {
+      setAuthError('All fields are required');
+      return;
+    }
+
+    if (registerPassword.length < 4) {
+      setAuthError('Password must be at least 4 characters');
+      return;
+    }
+
+    if (registerPassword !== confirmPassword) {
+      setAuthError('Passwords do not match');
+      return;
+    }
+
+    setIsAuthLoading(true);
+    try {
+      const registeredUser = await backendService.register(registerUsername, registerPassword, inviteCode);
+      setUser(registeredUser);
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(registeredUser));
+      // Reset form
+      setRegisterUsername('');
+      setRegisterPassword('');
+      setConfirmPassword('');
+      setInviteCode('');
+      setAuthMode('login');
+    } catch (err: any) {
+      setAuthError(err.message || 'Registration failed');
+    } finally {
+      setIsAuthLoading(false);
+    }
   };
 
   const handleRegisterSuccess = (registeredUser: User) => {
@@ -918,57 +962,149 @@ const App: React.FC = () => {
             <p className="text-dark-muted text-sm">Enterprise Grade AI Platform</p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-dark-muted uppercase mb-1.5 ml-1">Username</label>
-              <input 
-                type="text" 
-                value={username} 
-                onChange={(e) => setUsername(e.target.value)} 
-                className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-forsion-500 focus:ring-1 focus:ring-forsion-500 transition-all" 
-                placeholder="Enter username"
-                required 
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-dark-muted uppercase mb-1.5 ml-1">Password</label>
-              <input 
-                type="password" 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)} 
-                className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-forsion-500 focus:ring-1 focus:ring-forsion-500 transition-all" 
-                placeholder="Enter password"
-                required 
-              />
-            </div>
-            
-            {authError && (
-              <div className="p-3 bg-red-900/20 border border-red-900/50 rounded-lg">
-                <p className="text-red-400 text-sm text-center font-medium">{authError}</p>
+          {authMode === 'login' ? (
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-dark-muted uppercase mb-1.5 ml-1">Username</label>
+                <input 
+                  type="text" 
+                  value={username} 
+                  onChange={(e) => setUsername(e.target.value)} 
+                  className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-forsion-500 focus:ring-1 focus:ring-forsion-500 transition-all" 
+                  placeholder="Enter username"
+                  required 
+                />
               </div>
-            )}
-            
-            <button 
-              type="submit" 
-              disabled={isAuthLoading}
-              className="w-full bg-white text-black hover:bg-gray-100 font-bold py-3.5 rounded-lg transition-all transform active:scale-[0.98] shadow-lg disabled:opacity-70 disabled:cursor-not-allowed mt-2"
-            >
-              {isAuthLoading ? 'Processing...' : 'Sign In'}
-            </button>
-            
-            <div className="mt-4 text-center">
-              <button
-                type="button"
-                onClick={() => setShowRegisterModal(true)}
-                className="text-dark-muted hover:text-white text-sm transition-colors"
+              <div>
+                <label className="block text-xs font-semibold text-dark-muted uppercase mb-1.5 ml-1">Password</label>
+                <input 
+                  type="password" 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)} 
+                  className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-forsion-500 focus:ring-1 focus:ring-forsion-500 transition-all" 
+                  placeholder="Enter password"
+                  required 
+                />
+              </div>
+              
+              {authError && (
+                <div className="p-3 bg-red-900/20 border border-red-900/50 rounded-lg">
+                  <p className="text-red-400 text-sm text-center font-medium">{authError}</p>
+                </div>
+              )}
+              
+              <button 
+                type="submit" 
+                disabled={isAuthLoading}
+                className="w-full bg-white text-black hover:bg-gray-100 font-bold py-3.5 rounded-lg transition-all transform active:scale-[0.98] shadow-lg disabled:opacity-70 disabled:cursor-not-allowed mt-2"
               >
-                Don't have an account? <span className="text-forsion-400 font-medium">Register</span>
+                {isAuthLoading ? 'Processing...' : 'Sign In'}
               </button>
-            </div>
-          </form>
+              
+              <div className="mt-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode('register');
+                    setAuthError('');
+                  }}
+                  className="text-dark-muted hover:text-white text-sm transition-colors"
+                >
+                  Don't have an account? <span className="text-forsion-400 font-medium">Register</span>
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form onSubmit={handleRegister} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-dark-muted uppercase mb-1.5 ml-1">Username</label>
+                <input 
+                  type="text" 
+                  value={registerUsername} 
+                  onChange={(e) => setRegisterUsername(e.target.value)} 
+                  className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-forsion-500 focus:ring-1 focus:ring-forsion-500 transition-all" 
+                  placeholder="Enter username"
+                  required 
+                  disabled={isAuthLoading}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-dark-muted uppercase mb-1.5 ml-1">Password</label>
+                <input 
+                  type="password" 
+                  value={registerPassword} 
+                  onChange={(e) => setRegisterPassword(e.target.value)} 
+                  className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-forsion-500 focus:ring-1 focus:ring-forsion-500 transition-all" 
+                  placeholder="Enter password (min 4 characters)"
+                  required 
+                  disabled={isAuthLoading}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-dark-muted uppercase mb-1.5 ml-1">Confirm Password</label>
+                <input 
+                  type="password" 
+                  value={confirmPassword} 
+                  onChange={(e) => setConfirmPassword(e.target.value)} 
+                  className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-forsion-500 focus:ring-1 focus:ring-forsion-500 transition-all" 
+                  placeholder="Confirm password"
+                  required 
+                  disabled={isAuthLoading}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-dark-muted uppercase mb-1.5 ml-1">
+                  Invite Code <span className="text-red-400">*</span>
+                </label>
+                <input 
+                  type="text" 
+                  value={inviteCode} 
+                  onChange={(e) => setInviteCode(e.target.value.toUpperCase())} 
+                  className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-forsion-500 focus:ring-1 focus:ring-forsion-500 transition-all" 
+                  placeholder="Enter invite code"
+                  required 
+                  disabled={isAuthLoading}
+                />
+                <p className="mt-1 text-xs text-dark-muted ml-1">
+                  An invite code is required to register
+                </p>
+              </div>
+              
+              {authError && (
+                <div className="p-3 bg-red-900/20 border border-red-900/50 rounded-lg">
+                  <p className="text-red-400 text-sm text-center font-medium">{authError}</p>
+                </div>
+              )}
+              
+              <button 
+                type="submit" 
+                disabled={isAuthLoading}
+                className="w-full bg-white text-black hover:bg-gray-100 font-bold py-3.5 rounded-lg transition-all transform active:scale-[0.98] shadow-lg disabled:opacity-70 disabled:cursor-not-allowed mt-2"
+              >
+                {isAuthLoading ? 'Registering...' : 'Register'}
+              </button>
+              
+              <div className="mt-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode('login');
+                    setAuthError('');
+                    setRegisterUsername('');
+                    setRegisterPassword('');
+                    setConfirmPassword('');
+                    setInviteCode('');
+                  }}
+                  className="text-dark-muted hover:text-white text-sm transition-colors"
+                >
+                  Already have an account? <span className="text-forsion-400 font-medium">Sign In</span>
+                </button>
+              </div>
+            </form>
+          )}
           
           <p className="mt-6 text-center text-xs text-dark-muted">
-            Contact an administrator to request access.
+            {authMode === 'login' ? 'Contact an administrator to request access.' : 'Need an invite code? Contact an administrator.'}
           </p>
         </div>
       </div>

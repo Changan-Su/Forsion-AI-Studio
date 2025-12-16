@@ -91,6 +91,10 @@
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
             API Usage
           </button>
+          <button onclick="showSection('invite-codes')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors hover:bg-admin-bg" data-section="invite-codes">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path></svg>
+            Invite Codes
+          </button>
         </nav>
 
         <button onclick="logout()" class="flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:bg-red-900/20 transition-colors mt-auto">
@@ -160,6 +164,40 @@
           </div>
           <div id="models-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <!-- Models will be loaded here -->
+          </div>
+        </section>
+
+        <!-- Invite Codes Section -->
+        <section id="section-invite-codes" class="section hidden">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-2xl font-bold text-white">Invite Codes</h2>
+            <button onclick="showAddInviteCodeModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+              Create Code
+            </button>
+          </div>
+          
+          <!-- Stats Cards -->
+          <div id="invite-codes-stats" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <!-- Stats will be loaded here -->
+          </div>
+          
+          <div class="bg-admin-card rounded-xl border border-admin-border overflow-hidden">
+            <table class="w-full">
+              <thead class="bg-admin-bg">
+                <tr>
+                  <th class="text-left px-6 py-4 text-xs font-semibold text-admin-muted uppercase">Code</th>
+                  <th class="text-left px-6 py-4 text-xs font-semibold text-admin-muted uppercase">Usage</th>
+                  <th class="text-left px-6 py-4 text-xs font-semibold text-admin-muted uppercase">Credits</th>
+                  <th class="text-left px-6 py-4 text-xs font-semibold text-admin-muted uppercase">Status</th>
+                  <th class="text-left px-6 py-4 text-xs font-semibold text-admin-muted uppercase">Expires</th>
+                  <th class="text-right px-6 py-4 text-xs font-semibold text-admin-muted uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="invite-codes-table-body" class="divide-y divide-admin-border">
+                <!-- Invite codes will be loaded here -->
+              </tbody>
+            </table>
           </div>
         </section>
 
@@ -400,6 +438,49 @@
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
               Test
             </button>
+            <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-medium">Create</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Add Invite Code Modal -->
+    <div id="add-invite-code-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div class="bg-admin-card w-full max-w-lg rounded-2xl border border-admin-border p-6">
+        <h3 class="text-xl font-bold text-white mb-6">Create Invite Code</h3>
+        <form id="add-invite-code-form" class="space-y-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Code</label>
+              <div class="flex gap-2">
+                <input type="text" id="invite-code-value" class="flex-1 bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white uppercase" placeholder="INVITE123" required />
+                <button type="button" onclick="generateRandomInviteCode()" class="bg-admin-bg border border-admin-border hover:bg-admin-border text-white px-3 py-3 rounded-lg transition-colors" title="Generate Random Code">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                </button>
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Max Uses</label>
+              <input type="number" id="invite-code-max-uses" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white" placeholder="1" min="1" step="1" required />
+              <p class="text-xs text-admin-muted mt-1">Maximum number of times this code can be used</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Initial Credits</label>
+              <input type="number" id="invite-code-credits" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white" value="0" min="0" step="0.01" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Expires At (optional)</label>
+              <input type="datetime-local" id="invite-code-expires" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-admin-muted uppercase mb-1.5">Notes (optional)</label>
+            <textarea id="invite-code-notes" rows="2" class="w-full bg-admin-bg border border-admin-border rounded-lg px-4 py-3 text-white resize-none" placeholder="Internal notes about this invite code..."></textarea>
+          </div>
+          <div class="flex gap-3 pt-4">
+            <button type="button" onclick="hideAddInviteCodeModal()" class="flex-1 bg-admin-bg border border-admin-border hover:bg-admin-border text-white py-3 rounded-lg font-medium">Cancel</button>
             <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-medium">Create</button>
           </div>
         </form>
@@ -710,6 +791,7 @@
       if (section === 'users') loadUsers();
       if (section === 'models') loadModels();
       if (section === 'usage') loadUsageStats();
+      if (section === 'invite-codes') loadInviteCodes();
     }
 
     // Dashboard
@@ -1351,6 +1433,175 @@
             </td>
           </tr>
         `;
+      }
+    }
+
+    // ========== INVITE CODES ==========
+    
+    // Generate random invite code
+    function generateRandomInviteCode() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let code = '';
+      for (let i = 0; i < 8; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      document.getElementById('invite-code-value').value = code;
+    }
+
+    // Load invite codes
+    async function loadInviteCodes() {
+      try {
+        const codes = await api('/api/admin/invite-codes');
+        
+        // Calculate stats
+        const totalCodes = codes.length;
+        const activeCodes = codes.filter(c => c.isActive).length;
+        const totalUses = codes.reduce((sum, c) => sum + (c.usedCount || 0), 0);
+        const totalCreditsGranted = codes.reduce((sum, c) => sum + ((c.usedCount || 0) * (c.initialCredits || 0)), 0);
+        
+        // Update stats
+        document.getElementById('invite-codes-stats').innerHTML = `
+          <div class="bg-gradient-to-br from-blue-600/20 to-blue-800/20 rounded-xl border border-blue-500/30 p-4">
+            <div class="text-2xl font-bold text-white mb-1">${totalCodes}</div>
+            <div class="text-blue-300 text-sm">Total Codes</div>
+          </div>
+          <div class="bg-gradient-to-br from-green-600/20 to-green-800/20 rounded-xl border border-green-500/30 p-4">
+            <div class="text-2xl font-bold text-white mb-1">${activeCodes}</div>
+            <div class="text-green-300 text-sm">Active Codes</div>
+          </div>
+          <div class="bg-gradient-to-br from-purple-600/20 to-purple-800/20 rounded-xl border border-purple-500/30 p-4">
+            <div class="text-2xl font-bold text-white mb-1">${totalUses}</div>
+            <div class="text-purple-300 text-sm">Total Uses</div>
+          </div>
+          <div class="bg-gradient-to-br from-orange-600/20 to-orange-800/20 rounded-xl border border-orange-500/30 p-4">
+            <div class="text-2xl font-bold text-white mb-1">${totalCreditsGranted}</div>
+            <div class="text-orange-300 text-sm">Credits Granted</div>
+          </div>
+        `;
+        
+        // Update table
+        document.getElementById('invite-codes-table-body').innerHTML = codes.length ? codes.map(code => {
+          const isExpired = code.expiresAt && new Date(code.expiresAt) < new Date();
+          const isUsedUp = code.usedCount >= code.maxUses;
+          const statusClass = !code.isActive ? 'bg-gray-500/20 text-gray-300' :
+                              isExpired ? 'bg-red-500/20 text-red-300' :
+                              isUsedUp ? 'bg-yellow-500/20 text-yellow-300' :
+                              'bg-green-500/20 text-green-300';
+          const statusText = !code.isActive ? 'Inactive' :
+                             isExpired ? 'Expired' :
+                             isUsedUp ? 'Used Up' :
+                             'Active';
+          
+          return `
+            <tr class="hover:bg-admin-bg/50 transition-colors">
+              <td class="px-6 py-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
+                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path></svg>
+                  </div>
+                  <div>
+                    <p class="text-white font-mono font-bold">${code.code}</p>
+                    ${code.notes ? `<p class="text-xs text-admin-muted truncate max-w-48">${code.notes}</p>` : ''}
+                  </div>
+                </div>
+              </td>
+              <td class="px-6 py-4">
+                <span class="text-white">${code.usedCount || 0}</span>
+                <span class="text-admin-muted">/ ${code.maxUses}</span>
+              </td>
+              <td class="px-6 py-4">
+                <span class="text-white">${code.initialCredits || 0}</span>
+              </td>
+              <td class="px-6 py-4">
+                <span class="px-2 py-1 rounded text-xs font-medium ${statusClass}">
+                  ${statusText}
+                </span>
+              </td>
+              <td class="px-6 py-4 text-admin-muted text-sm">
+                ${code.expiresAt ? new Date(code.expiresAt).toLocaleDateString() : 'Never'}
+              </td>
+              <td class="px-6 py-4 text-right">
+                <button onclick="deleteInviteCode('${code.id}')" class="text-red-400 hover:text-red-300 p-2" title="Delete">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('') : '<tr><td colspan="6" class="px-6 py-12 text-center text-admin-muted">No invite codes found. Create one using the button above.</td></tr>';
+        
+      } catch (error) {
+        console.error('Failed to load invite codes:', error);
+        document.getElementById('invite-codes-table-body').innerHTML = `
+          <tr>
+            <td colspan="6" class="px-6 py-12 text-center text-red-400">
+              Failed to load invite codes: ${error.message || 'Unknown error'}
+            </td>
+          </tr>
+        `;
+      }
+    }
+
+    // Show add invite code modal
+    function showAddInviteCodeModal() {
+      document.getElementById('add-invite-code-modal').classList.remove('hidden');
+      generateRandomInviteCode(); // Pre-generate a code
+    }
+
+    // Hide add invite code modal
+    function hideAddInviteCodeModal() {
+      document.getElementById('add-invite-code-modal').classList.add('hidden');
+      document.getElementById('add-invite-code-form').reset();
+    }
+
+    // Create invite code
+    document.getElementById('add-invite-code-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const code = document.getElementById('invite-code-value').value.trim().toUpperCase();
+      const maxUsesInput = document.getElementById('invite-code-max-uses').value.trim();
+      const maxUses = parseInt(maxUsesInput);
+      const initialCreditsInput = document.getElementById('invite-code-credits').value.trim();
+      const initialCredits = initialCreditsInput ? parseFloat(initialCreditsInput) : 0;
+      const expiresAt = document.getElementById('invite-code-expires').value || null;
+      const notes = document.getElementById('invite-code-notes').value.trim() || '';
+      
+      // Validate maxUses
+      if (!maxUsesInput || isNaN(maxUses) || maxUses < 1) {
+        alert('Max Uses must be at least 1');
+        return;
+      }
+      
+      if (!code) {
+        alert('Code is required');
+        return;
+      }
+      
+      try {
+        await api('/api/admin/invite-codes', {
+          method: 'POST',
+          body: JSON.stringify({
+            code,
+            max_uses: maxUses,
+            initial_credits: initialCredits,
+            expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+            notes
+          })
+        });
+        hideAddInviteCodeModal();
+        loadInviteCodes();
+      } catch (error) {
+        alert('Failed to create invite code: ' + error.message);
+      }
+    });
+
+    // Delete invite code
+    async function deleteInviteCode(id) {
+      if (!confirm('Delete this invite code?')) return;
+      try {
+        await api(`/api/admin/invite-codes/${id}`, { method: 'DELETE' });
+        loadInviteCodes();
+      } catch (error) {
+        alert('Failed to delete invite code: ' + error.message);
       }
     }
 
