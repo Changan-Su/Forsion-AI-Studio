@@ -29,6 +29,7 @@ export interface GlobalModel {
   provider: 'gemini' | 'external';
   description?: string;
   icon: string;
+  avatar?: string; // Base64 encoded image data or preset avatar name
   apiModelId?: string;
   configKey?: string;
   defaultBaseUrl?: string;

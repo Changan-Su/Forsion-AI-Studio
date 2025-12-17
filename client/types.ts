@@ -36,6 +36,7 @@ export interface AIModel {
   provider: 'gemini' | 'external';
   description: string;
   icon: string; // lucide icon name
+  avatar?: string; // Base64 encoded image data or preset avatar name
   requiresCustomKey?: boolean;
   apiModelId?: string; // The ID sent to the API (e.g., 'gpt-4o')
   defaultBaseUrl?: string; // Default API endpoint

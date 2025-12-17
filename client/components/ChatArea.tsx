@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
+import ModelAvatar from './ModelAvatar';
 
 // Code Block Component with Copy functionality
 const CodeBlock: React.FC<{ language?: string; children: string }> = ({ language, children }) => {
@@ -302,21 +303,39 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
           }`}
         >
           {/* Avatar */}
-          <div
-            className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center shadow-md ${
-              isNotion 
-                ? (msg.role === 'user' ? 'bg-gray-800 dark:bg-white text-white dark:text-black' : 'bg-transparent border border-gray-300 dark:border-gray-600')
-                : (msg.role === 'user' ? 'bg-forsion-600 text-white' : msg.isError ? 'bg-red-500 text-white' : 'bg-indigo-600 text-white border-2 border-white dark:border-gray-800')
-            }`}
-          >
-            {msg.role === 'user' ? (
+          {msg.role === 'user' ? (
+            <div
+              className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center shadow-md ${
+                isNotion 
+                  ? 'bg-gray-800 dark:bg-white text-white dark:text-black'
+                  : 'bg-forsion-600 text-white'
+              }`}
+            >
               <User size={18} />
-            ) : msg.isError ? (
+            </div>
+          ) : msg.isError ? (
+            <div
+              className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center shadow-md ${
+                isNotion 
+                  ? 'bg-transparent border border-gray-300 dark:border-gray-600'
+                  : 'bg-red-500 text-white'
+              }`}
+            >
               <AlertCircle size={18} />
-            ) : (
-              <Cpu size={18} className={isNotion ? "text-gray-800 dark:text-gray-200" : ""} />
-            )}
-          </div>
+            </div>
+          ) : (
+            <ModelAvatar
+              modelId={currentModel.id}
+              avatarData={currentModel.avatar}
+              size={36}
+              className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center shadow-md ${
+                isNotion 
+                  ? 'bg-transparent border border-gray-300 dark:border-gray-600'
+                  : 'bg-indigo-600 text-white border-2 border-white dark:border-gray-800'
+              }`}
+              fallbackIcon={<Cpu size={18} className={isNotion ? "text-gray-800 dark:text-gray-200" : ""} />}
+            />
+          )}
 
           <div
             className={`flex flex-col max-w-[85%] ${
@@ -469,13 +488,21 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
 
       {isProcessing && (
         <div className="flex gap-4 max-w-4xl mx-auto">
-          <div className={`w-9 h-9 rounded-full flex items-center justify-center ${
-             isNotion ? 'bg-white border border-gray-300 dark:border-gray-600' : 'bg-indigo-600 shadow-md'
-          }`}>
-             <div className={`w-5 h-5 border-2 border-t-transparent rounded-full animate-spin ${
+          <ModelAvatar
+            modelId={currentModel.id}
+            avatarData={currentModel.avatar}
+            size={36}
+            className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center shadow-md ${
+              isNotion 
+                ? 'bg-transparent border border-gray-300 dark:border-gray-600'
+                : 'bg-indigo-600 text-white border-2 border-white dark:border-gray-800'
+            }`}
+            fallbackIcon={
+              <div className={`w-5 h-5 border-2 border-t-transparent rounded-full animate-spin ${
                 isNotion ? 'border-gray-800 dark:border-white' : 'border-white'
-             }`}></div>
-          </div>
+              }`} />
+            }
+          />
           <div className="flex items-center">
             <span className={`text-sm animate-pulse font-medium px-4 py-2 rounded-full ${
                isNotion 

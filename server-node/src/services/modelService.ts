@@ -20,6 +20,7 @@ export async function listGlobalModels(
       provider: row.provider,
       description: row.description,
       icon: row.icon || 'Box',
+      avatar: row.avatar || undefined,
       apiModelId: row.api_model_id,
       configKey: row.config_key,
       defaultBaseUrl: row.default_base_url,
@@ -54,6 +55,7 @@ export async function getGlobalModel(modelId: string): Promise<GlobalModel | nul
     provider: row.provider,
     description: row.description,
     icon: row.icon || 'Box',
+    avatar: row.avatar || undefined,
     apiModelId: row.api_model_id,
     configKey: row.config_key,
     defaultBaseUrl: row.default_base_url,
@@ -73,14 +75,15 @@ export async function createGlobalModel(model: Partial<GlobalModel>): Promise<Gl
   }
 
   await query(
-    `INSERT INTO global_models (id, name, provider, description, icon, api_model_id, config_key, default_base_url, api_key, is_enabled, prompt_caching_enabled, system_prompt, cacheable_content)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO global_models (id, name, provider, description, icon, avatar, api_model_id, config_key, default_base_url, api_key, is_enabled, prompt_caching_enabled, system_prompt, cacheable_content)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       model.id,
       model.name,
       model.provider,
       model.description || null,
       model.icon || 'Box',
+      model.avatar || null,
       model.apiModelId || null,
       model.configKey || model.id,
       model.defaultBaseUrl || null,
@@ -117,6 +120,10 @@ export async function updateGlobalModel(
   if (updates.icon !== undefined) {
     setClauses.push('icon = ?');
     values.push(updates.icon);
+  }
+  if (updates.avatar !== undefined) {
+    setClauses.push('avatar = ?');
+    values.push(updates.avatar || null);
   }
   if (updates.apiModelId !== undefined) {
     setClauses.push('api_model_id = ?');

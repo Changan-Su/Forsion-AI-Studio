@@ -44,6 +44,7 @@ const migrations = [
     provider VARCHAR(50) NOT NULL,
     description TEXT,
     icon VARCHAR(50) DEFAULT 'Box',
+    avatar MEDIUMTEXT,
     api_model_id VARCHAR(200),
     config_key VARCHAR(100),
     default_base_url VARCHAR(500),
@@ -197,6 +198,15 @@ async function runMigrations() {
   } catch (error: any) {
     if (error.code !== 'ER_DUP_FIELDNAME' && !error.message.includes('Duplicate column name')) {
       console.warn('⚠️  Could not add prompt_caching_enabled column:', error.message);
+    }
+  }
+
+  try {
+    await query(`ALTER TABLE global_models ADD COLUMN avatar MEDIUMTEXT AFTER icon`);
+    console.log('✅ Added avatar column');
+  } catch (error: any) {
+    if (error.code !== 'ER_DUP_FIELDNAME' && !error.message.includes('Duplicate column name')) {
+      console.warn('⚠️  Could not add avatar column:', error.message);
     }
   }
 

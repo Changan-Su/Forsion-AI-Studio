@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { User, ChatSession, Message, AIModel, AppSettings, UserRole, Attachment } from './types';
 import { login } from './services/authService';
 import { backendService } from './services/backendService'; // New backend
@@ -11,6 +11,7 @@ import ChatArea from './components/ChatArea';
 import SettingsModal from './components/SettingsModal';
 import RegisterModal from './components/RegisterModal';
 import { Send, Zap, Menu, Sparkles, MessageSquare, Code, Brain, BrainCircuit, Image as ImageIcon, ChevronDown, Paperclip, X as XIcon, Box, Square } from 'lucide-react';
+import { getPresetAvatar, svgToDataUrl } from './src/utils/presetAvatars';
 
 const App: React.FC = () => {
   // Auth State
@@ -103,6 +104,7 @@ const App: React.FC = () => {
         provider: m.provider || 'external',
         description: m.description || '',
         icon: m.icon || 'Box',
+        avatar: m.avatar,
         apiModelId: m.apiModelId,
         configKey: m.configKey || m.id,
         defaultBaseUrl: m.defaultBaseUrl,
@@ -944,6 +946,32 @@ const App: React.FC = () => {
     }
   };
 
+  // Model Avatar Icon component for dropdown
+  const ModelAvatarIcon: React.FC<{ model: AIModel }> = ({ model }) => {
+    const avatarUrl = useMemo(() => {
+      if (!model.avatar) return null;
+      
+      if (model.avatar.startsWith('preset:')) {
+        const presetId = model.avatar.substring(7);
+        const preset = getPresetAvatar(presetId);
+        if (preset) return svgToDataUrl(preset.svg);
+      } else if (model.avatar.startsWith('data:image/')) {
+        return model.avatar;
+      }
+      return null;
+    }, [model.avatar]);
+    
+    if (avatarUrl) {
+      return (
+        <div className="w-5 h-5 rounded-full overflow-hidden flex-shrink-0">
+          <img src={avatarUrl} alt={model.name} className="w-full h-full object-cover" />
+        </div>
+      );
+    }
+    
+    return <div className="text-gray-500 dark:text-dark-muted">{getModelIcon(model.icon)}</div>;
+  };
+
   // Auth Screen
   if (!user) {
     return (
@@ -1190,7 +1218,9 @@ const App: React.FC = () => {
                            ? (isNotion ? 'bg-gray-100 dark:bg-black/30' : 'bg-slate-100 dark:bg-white/5')
                            : 'hover:bg-gray-50 dark:hover:bg-white/5'
                       }`}>
-                        <div className="mt-1 text-gray-500 dark:text-dark-muted">{getModelIcon(model.icon)}</div>
+                        <div className="mt-1">
+                          <ModelAvatarIcon model={model} />
+                        </div>
                         <div className="overflow-hidden">
                           <div className={`text-sm font-medium truncate ${
                              selectedModelId === model.id 

@@ -77,6 +77,43 @@ router.put('/admin/models/:modelId', authMiddleware, adminMiddleware, async (req
   }
 });
 
+// Upload model avatar (admin only)
+router.post('/admin/models/:modelId/avatar', authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const { avatar } = req.body;
+    
+    if (!avatar) {
+      return res.status(400).json({ detail: 'Avatar data is required' });
+    }
+
+    // Validate avatar is a valid data URL or preset ID
+    if (!avatar.startsWith('data:image/') && !avatar.startsWith('preset:')) {
+      return res.status(400).json({ detail: 'Invalid avatar format' });
+    }
+
+    // If it's a data URL, check size (max 1MB)
+    if (avatar.startsWith('data:image/')) {
+      const base64Data = avatar.split(',')[1];
+      const sizeInBytes = (base64Data.length * 3) / 4;
+      const sizeInMB = sizeInBytes / (1024 * 1024);
+      
+      if (sizeInMB > 1) {
+        return res.status(400).json({ detail: 'Avatar size must not exceed 1MB' });
+      }
+    }
+
+    const model = await updateGlobalModel(req.params.modelId, { avatar });
+    if (!model) {
+      return res.status(404).json({ detail: 'Model not found' });
+    }
+    
+    res.json({ success: true, avatar: model.avatar });
+  } catch (error: any) {
+    console.error('Upload avatar error:', error);
+    res.status(500).json({ detail: 'Failed to upload avatar' });
+  }
+});
+
 // Delete model (admin only)
 router.delete('/admin/models/:modelId', authMiddleware, adminMiddleware, async (req: AuthRequest, res) => {
   try {
