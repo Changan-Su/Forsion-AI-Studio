@@ -145,12 +145,13 @@ interface ChatAreaProps {
   messages: Message[];
   isProcessing: boolean;
   currentModel: AIModel;
+  allModels: AIModel[]; // All available models for looking up message-specific model
   themePreset: 'default' | 'notion';
   onFileUpload: (file: File) => void;
   onRegenerateMessage?: (messageId: string) => void;
 }
 
-const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentModel, themePreset, onFileUpload, onRegenerateMessage }) => {
+const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentModel, allModels, themePreset, onFileUpload, onRegenerateMessage }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
@@ -324,17 +325,26 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
               <AlertCircle size={18} />
             </div>
           ) : (
-            <ModelAvatar
-              modelId={currentModel.id}
-              avatarData={currentModel.avatar}
-              size={36}
-              className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center shadow-md ${
-                isNotion 
-                  ? 'bg-transparent border border-gray-300 dark:border-gray-600'
-                  : 'bg-indigo-600 text-white border-2 border-white dark:border-gray-800'
-              }`}
-              fallbackIcon={<Cpu size={18} className={isNotion ? "text-gray-800 dark:text-gray-200" : ""} />}
-            />
+            (() => {
+              // Find the model that was used for this message, fallback to current model
+              const messageModel = msg.modelId 
+                ? allModels.find(m => m.id === msg.modelId) || currentModel
+                : currentModel;
+              
+              return (
+                <ModelAvatar
+                  modelId={messageModel.id}
+                  avatarData={messageModel.avatar}
+                  size={36}
+                  className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center shadow-md ${
+                    isNotion 
+                      ? 'bg-transparent border border-gray-300 dark:border-gray-600'
+                      : 'bg-indigo-600 text-white border-2 border-white dark:border-gray-800'
+                  }`}
+                  fallbackIcon={<Cpu size={18} className={isNotion ? "text-gray-800 dark:text-gray-200" : ""} />}
+                />
+              );
+            })()
           )}
 
           <div

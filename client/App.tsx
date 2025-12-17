@@ -491,7 +491,8 @@ const App: React.FC = () => {
       id: botMessageId,
       role: 'model',
       content: '',
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      modelId: currentModel.id // Save the model ID used for this message
     };
 
     // Add empty bot message to start streaming into
@@ -738,7 +739,8 @@ const App: React.FC = () => {
       id: botMessageId,
       role: 'model',
       content: '',
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      modelId: currentModel.id // Save the model ID used for this message
     };
     
     // Add empty bot message to start streaming into
@@ -1246,6 +1248,7 @@ const App: React.FC = () => {
           messages={currentSession?.messages || []} 
           isProcessing={isProcessing} 
           currentModel={currentModel} 
+          allModels={allModels}
           themePreset={themePreset}
           onFileUpload={processFile}
           onRegenerateMessage={handleRegenerateMessage}

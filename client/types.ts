@@ -16,6 +16,7 @@ export interface Message {
   role: 'user' | 'model' | 'system';
   content: string;
   timestamp: number;
+  modelId?: string; // Model ID used when this message was sent
   imageUrl?: string; // For GENERATED images by the bot
   attachments?: Attachment[]; // For USER UPLOADED images
   reasoning?: string; // For deep thinking process
