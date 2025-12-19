@@ -695,7 +695,64 @@ export const backendService = {
     }
   },
 
-  // 15. Register
+  // 15. Proxy Image Generation (for global models) - uses backend stored API keys
+  async proxyImageGeneration(
+    modelId: string,
+    prompt: string,
+    size: string = '1024x1024',
+    quality: 'standard' | 'hd' = 'standard'
+  ): Promise<{ imageUrl: string; usage?: { prompt_tokens: number; completion_tokens: number } }> {
+    console.log('[proxyImageGeneration] Starting request for model:', modelId);
+    try {
+      console.log('[proxyImageGeneration] Sending request to:', `${API_URL}/images/generations`);
+      const res = await fetch(`${API_URL}/images/generations`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          model_id: modelId,
+          prompt: prompt,
+          size: size,
+          quality: quality,
+        }),
+      });
+
+      if (!res.ok) {
+        markOnline();
+        if (res.status === 401) {
+          clearAuth();
+          throw new AuthRequiredError();
+        }
+        const detail = await extractDetail(res);
+        throw new Error(detail || `API error: ${res.status}`);
+      }
+
+      markOnline();
+
+      const data = await res.json();
+      
+      if (!data.data || !data.data[0] || !data.data[0].url) {
+        throw new Error('No image URL returned from API');
+      }
+
+      // Estimate tokens for image generation
+      const estimatedTokens = Math.ceil(prompt.length / 4) + 1000;
+
+      return {
+        imageUrl: data.data[0].url,
+        usage: {
+          prompt_tokens: estimatedTokens,
+          completion_tokens: 0,
+        },
+      };
+    } catch (error: any) {
+      if (error instanceof AuthRequiredError) throw error;
+      if (isNetworkError(error)) markOffline();
+      else markOnline();
+      throw error;
+    }
+  },
+
+  // 16. Register
   async register(username: string, password: string, inviteCode: string): Promise<User> {
     try {
       const res = await fetch(`${API_URL}/auth/register`, {

@@ -29,6 +29,8 @@ export interface ChatSession {
   modelId: string;
   messages: Message[];
   updatedAt: number;
+  emoji?: string; // Emoji icon for the chat
+  archived?: boolean; // Whether the chat is archived
 }
 
 export interface AIModel {

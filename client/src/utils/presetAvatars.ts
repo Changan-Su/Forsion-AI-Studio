@@ -194,3 +194,4 @@ export function getPresetAvatarsByCategory(category: string): PresetAvatar[] {
   return presetAvatars.filter(avatar => avatar.category === category);
 }
 
+

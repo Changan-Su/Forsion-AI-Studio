@@ -306,6 +306,134 @@ router.post('/chat/completions', authMiddleware, async (req: AuthRequest, res) =
   }
 });
 
+// Proxy image generation to external AI APIs (OpenAI DALL-E, etc.)
+router.post('/images/generations', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const { model_id, prompt, size = '1024x1024', quality = 'standard' } = req.body;
+
+    if (!model_id || !prompt) {
+      return res.status(400).json({ detail: 'model_id and prompt are required' });
+    }
+
+    // Get model configuration
+    const model = await getGlobalModel(model_id);
+    if (!model) {
+      return res.status(404).json({ detail: `Model '${model_id}' not found` });
+    }
+
+    if (!model.isEnabled) {
+      return res.status(400).json({ detail: `Model '${model_id}' is disabled` });
+    }
+
+    if (!model.apiKey) {
+      return res.status(400).json({ 
+        detail: `API Key not configured for model '${model.name}'` 
+      });
+    }
+
+    const baseUrl = (model.defaultBaseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
+
+    // Get user for credit check
+    const user = await getUserById(req.user!.userId);
+    if (!user) {
+      return res.status(404).json({ detail: 'User not found' });
+    }
+
+    // Ensure credit account exists
+    await ensureCreditAccount(user.id);
+
+    // Estimate cost for image generation (typically higher than text)
+    const estimatedCost = 0.04; // DALL-E 3 standard quality costs ~$0.04 per image
+
+    // Check if user has sufficient credits
+    const hasCredits = await checkSufficientCredits(user.id, estimatedCost);
+    if (!hasCredits) {
+      return res.status(402).json({ 
+        detail: `Insufficient credits. Required: ${estimatedCost.toFixed(2)}, please recharge your account.` 
+      });
+    }
+
+    // Make request to OpenAI DALL-E API
+    console.log(`[Image Generation] Making request to ${baseUrl}/images/generations`);
+    const response = await fetch(`${baseUrl}/images/generations`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${model.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'dall-e-3',
+        prompt: prompt,
+        n: 1,
+        size: size,
+        quality: quality,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorDetail = errorText;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorDetail = errorJson.error?.message || errorJson.message || errorText;
+      } catch {}
+
+      // Log failed request
+      await logApiUsage(
+        req.user!.username,
+        model_id,
+        model.name,
+        model.provider,
+        0,
+        0,
+        false,
+        errorDetail
+      );
+
+      return res.status(response.status).json({ detail: errorDetail });
+    }
+
+    const result = await response.json() as any;
+
+    // Estimate tokens for image generation
+    const estimatedTokens = Math.ceil(prompt.length / 4) + 1000;
+
+    // Log successful request
+    await logApiUsage(
+      req.user!.username,
+      'dall-e-3',
+      'DALL-E 3',
+      'openai',
+      estimatedTokens,
+      0,
+      true
+    );
+
+    // Calculate actual cost and deduct credits
+    const actualCost = await calculateCost('dall-e-3', estimatedTokens, 0);
+    const deducted = await deductCredits(
+      user.id,
+      actualCost,
+      `Image generation: ${model.name}`,
+      undefined
+    );
+
+    if (!deducted) {
+      console.error(`Failed to deduct credits for user ${user.id}, cost: ${actualCost}`);
+    }
+
+    res.json(result);
+  } catch (error: any) {
+    console.error('Image generation error:', error);
+    
+    if (error.name === 'AbortError' || error.code === 'ETIMEDOUT') {
+      return res.status(504).json({ detail: 'Request to AI API timed out' });
+    }
+    
+    res.status(502).json({ detail: `Failed to connect to AI API: ${error.message}` });
+  }
+});
+
 export default router;
 
 

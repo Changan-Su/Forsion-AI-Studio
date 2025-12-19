@@ -12,6 +12,8 @@ import SettingsModal from './components/SettingsModal';
 import RegisterModal from './components/RegisterModal';
 import { Send, Zap, Menu, Sparkles, MessageSquare, Code, Brain, BrainCircuit, Image as ImageIcon, ChevronDown, Paperclip, X as XIcon, Box, Square } from 'lucide-react';
 import { getPresetAvatar, svgToDataUrl } from './src/utils/presetAvatars';
+import { detectImageGenerationIntent, generateImage } from './services/imageGenerationService';
+import CommandAutocomplete from './components/CommandAutocomplete';
 
 const App: React.FC = () => {
   // Auth State
@@ -56,6 +58,13 @@ const App: React.FC = () => {
   
   // Deep Thinking Toggle
   const [isDeepThinking, setIsDeepThinking] = useState<boolean>(false);
+  
+  // Force Image Generation Toggle
+  const [forceImageGeneration, setForceImageGeneration] = useState<boolean>(false);
+  
+  // Command Autocomplete State
+  const [showCommandAutocomplete, setShowCommandAutocomplete] = useState(false);
+  const [cursorPosition, setCursorPosition] = useState(0);
 
   // Media Upload State
   const [attachment, setAttachment] = useState<Attachment | null>(null);
@@ -452,10 +461,22 @@ const App: React.FC = () => {
     const currentModel = allModels.find(m => m.id === selectedModelId) || allModels[0];
     const currentAttachments = attachment ? [attachment] : [];
     
+    // 处理 /dt 命令（深度思考）
+    let finalInput = input;
+    let shouldUseDeepThinking = isDeepThinking;
+    
+    if (input.trim().startsWith('/dt ')) {
+      finalInput = input.trim().substring(4); // Remove '/dt ' prefix
+      shouldUseDeepThinking = true;
+    } else if (input.trim() === '/dt') {
+      finalInput = '';
+      shouldUseDeepThinking = true;
+    }
+    
     // If there's a document attachment with extracted text, include it in the message
-    let messageContent = input;
+    let messageContent = finalInput;
     if (attachment?.type === 'document' && attachment.extractedText) {
-      messageContent = `${input}\n\n---\n📄 Attached Document: ${attachment.name}\n\n${attachment.extractedText}`;
+      messageContent = `${finalInput}\n\n---\n📄 Attached Document: ${attachment.name}\n\n${attachment.extractedText}`;
     }
     
     const userMessage: Message = {
@@ -471,7 +492,7 @@ const App: React.FC = () => {
         return {
           ...s,
           messages: [...s.messages, userMessage],
-          title: s.messages.length === 0 ? input.substring(0, 30) || 'Chat' : s.title,
+          title: s.messages.length === 0 ? finalInput.substring(0, 30) || 'Chat' : s.title,
           updatedAt: Date.now()
         };
       }
@@ -484,6 +505,188 @@ const App: React.FC = () => {
     
     // Create new AbortController for this request
     abortControllerRef.current = new AbortController();
+    
+    // 检测是否为图像生成请求（包括强制画图开关）
+    const { isImageRequest, prompt: imagePrompt } = detectImageGenerationIntent(finalInput);
+    const shouldGenerateImage = isImageRequest || forceImageGeneration;
+    
+    if (shouldGenerateImage) {
+      const promptToUse = forceImageGeneration && !isImageRequest ? finalInput : imagePrompt;
+      // 处理图像生成请求
+      const botMessageId = (Date.now() + 1).toString();
+      const botMessage: Message = {
+        id: botMessageId,
+        role: 'model',
+        content: '正在生成图像...',
+        timestamp: Date.now(),
+        modelId: currentModel.id
+      };
+
+      setSessions(prev => prev.map(s => {
+        if (s.id === sessionId) {
+          return { ...s, messages: [...s.messages, botMessage], updatedAt: Date.now() };
+        }
+        return s;
+      }));
+
+      try {
+        let result: { imageUrl: string; usage?: { prompt_tokens: number; completion_tokens: number } };
+        
+        // 优先检查当前模型是否支持图像生成（如Gemini的图像模型）
+        if (currentModel.provider === 'gemini' && currentModel.id === 'gemini-2.5-flash-image') {
+          // 使用Gemini的图像生成能力
+          const configKey = currentModel.configKey || 'google';
+          const config = appSettings?.externalApiConfigs?.[configKey];
+          
+          if (!config || !config.apiKey) {
+            throw new Error('Gemini API密钥未配置。请在设置中配置Google API密钥以使用图像生成功能。');
+          }
+
+          const geminiResult = await generateGeminiResponseStream(
+            currentModel.id,
+            promptToUse || finalInput,
+            [],
+            config.apiKey,
+            [],
+            (content) => {
+              // Update streaming message if needed
+              setSessions(prev => prev.map(s => {
+                if (s.id === sessionId) {
+                  return {
+                    ...s,
+                    messages: s.messages.map(m =>
+                      m.id === botMessageId
+                        ? { ...m, content: content || '正在生成图像...' }
+                        : m
+                    ),
+                    updatedAt: Date.now()
+                  };
+                }
+                return s;
+              }));
+            },
+            false,
+            abortControllerRef.current?.signal
+          );
+
+          if (!geminiResult.imageUrl) {
+            throw new Error('Gemini模型未能生成图像。');
+          }
+
+          result = {
+            imageUrl: geminiResult.imageUrl,
+            usage: geminiResult.usage
+          };
+        } else {
+          // 使用外部图像生成API（OpenAI DALL-E等）
+          // 优先检查是否是全局模型（使用后端存储的API密钥）
+          if ((currentModel as any).isGlobal) {
+            // 对于全局模型，使用后端代理（后端存储的API密钥）
+            console.log('[handleSendMessage] Using backend proxy for image generation with global model');
+            result = await backendService.proxyImageGeneration(
+              currentModel.id,
+              promptToUse || finalInput,
+              '1024x1024',
+              'standard'
+            );
+          } else {
+            // 非全局模型，使用前端配置
+            let configKey = 'openai';
+            let config = appSettings?.externalApiConfigs?.[configKey];
+            
+            // 如果OpenAI未配置，尝试使用其他已配置的提供商
+            if (!config || !config.apiKey) {
+              // 尝试查找其他已配置的API
+              const availableConfigs = Object.entries(appSettings?.externalApiConfigs || {});
+              const configuredProvider = availableConfigs.find(([key, cfg]) => cfg.apiKey && cfg.apiKey.trim() !== '');
+              
+              if (configuredProvider) {
+                configKey = configuredProvider[0];
+                config = configuredProvider[1];
+              }
+            }
+            
+            if (!config || !config.apiKey) {
+              throw new Error('图像生成API密钥未配置。请在设置中配置OpenAI API密钥以使用图像生成功能。');
+            }
+
+            result = await generateImage(
+              {
+                apiKey: config.apiKey,
+                baseUrl: config.baseUrl,
+                provider: 'openai',
+              },
+              promptToUse || finalInput,
+              {
+                size: '1024x1024',
+                quality: 'standard',
+              }
+            );
+          }
+        }
+
+        // 更新消息显示生成的图像
+        setSessions(prev => prev.map(s => {
+          if (s.id === sessionId) {
+            return {
+              ...s,
+              messages: s.messages.map(m =>
+                m.id === botMessageId
+                  ? { ...m, content: `已生成图像：${promptToUse || finalInput}`, imageUrl: result.imageUrl }
+                  : m
+              ),
+              updatedAt: Date.now()
+            };
+          }
+          return s;
+        }));
+
+        // 记录API使用（如果用户已登录）
+        if (result.usage && user) {
+          try {
+            const modelName = currentModel.provider === 'gemini' && currentModel.id === 'gemini-2.5-flash-image'
+              ? 'Gemini Image Generation'
+              : 'DALL-E 3';
+            const provider = currentModel.provider === 'gemini' && currentModel.id === 'gemini-2.5-flash-image'
+              ? 'google'
+              : 'openai';
+            const modelId = currentModel.provider === 'gemini' && currentModel.id === 'gemini-2.5-flash-image'
+              ? 'gemini-2.5-flash-image'
+              : 'dall-e-3';
+            
+            await backendService.logApiUsage(
+              modelId,
+              modelName,
+              provider,
+              result.usage.prompt_tokens || 0,
+              result.usage.completion_tokens || 0,
+              true
+            );
+          } catch (logError) {
+            console.warn('Failed to log API usage:', logError);
+          }
+        }
+      } catch (error: any) {
+        setSessions(prev => prev.map(s => {
+          if (s.id === sessionId) {
+            return {
+              ...s,
+              messages: s.messages.map(m =>
+                m.id === botMessageId
+                  ? { ...m, content: `错误: ${error.message}`, isError: true }
+                  : m
+              )
+            };
+          }
+          return s;
+        }));
+      } finally {
+        setIsProcessing(false);
+        abortControllerRef.current = null;
+      }
+      
+      return; // 图像生成请求处理完毕，不继续执行聊天逻辑
+    }
 
     // Create placeholder bot message for streaming
     const botMessageId = (Date.now() + 1).toString();
@@ -545,7 +748,7 @@ const App: React.FC = () => {
            config?.apiKey, 
            currentAttachments,
            updateStreamingMessage,
-           isDeepThinking,
+           shouldUseDeepThinking,
            abortControllerRef.current?.signal
          );
          console.log('[handleSendMessage] Gemini response received');
@@ -578,14 +781,15 @@ const App: React.FC = () => {
         history.push({ role: 'user', content: userMessage.content });
 
         // Check if this is a global model (uses backend proxy) - now with streaming support
+        // Note: gemini-2.5-flash-image should always use direct Gemini API, not backend proxy
         console.log('[handleSendMessage] Model:', currentModel.id, 'isGlobal:', (currentModel as any).isGlobal);
-        if ((currentModel as any).isGlobal) {
+        if ((currentModel as any).isGlobal && currentModel.id !== 'gemini-2.5-flash-image') {
            console.log('[handleSendMessage] Using proxyChatCompletions for global model');
            const result = await backendService.proxyChatCompletions(
              currentModel.id,
              history,
              0.7,
-             isDeepThinking,
+             shouldUseDeepThinking,
              undefined,
              updateStreamingMessage,
              abortControllerRef.current?.signal
@@ -603,7 +807,7 @@ const App: React.FC = () => {
              currentModel.defaultBaseUrl, 
              currentAttachments,
              updateStreamingMessage,
-             isDeepThinking,
+             shouldUseDeepThinking,
              abortControllerRef.current?.signal
            );
            usage = result.usage;
@@ -934,6 +1138,24 @@ const App: React.FC = () => {
     if (currentSessionId === id) setCurrentSessionId(null);
   };
 
+  const renameSession = (id: string, newTitle: string) => {
+    setSessions(prev => prev.map(s => 
+      s.id === id ? { ...s, title: newTitle, updatedAt: Date.now() } : s
+    ));
+  };
+
+  const archiveSession = (id: string) => {
+    setSessions(prev => prev.map(s => 
+      s.id === id ? { ...s, archived: !s.archived, updatedAt: Date.now() } : s
+    ));
+  };
+
+  const updateSessionEmoji = (id: string, emoji: string) => {
+    setSessions(prev => prev.map(s => 
+      s.id === id ? { ...s, emoji: emoji || undefined, updatedAt: Date.now() } : s
+    ));
+  };
+
   const getModelIcon = (iconName: string) => {
     switch (iconName) {
       case 'Zap': return <Zap size={16} />;
@@ -1166,11 +1388,15 @@ const App: React.FC = () => {
         </>
       )}
       <Sidebar
-        sessions={sessions}
+        sessions={sessions.filter(s => !s.archived)}
+        archivedSessions={sessions.filter(s => s.archived)}
         currentSessionId={currentSessionId}
         onSelectSession={setCurrentSessionId}
         onNewChat={createNewSession}
         onDeleteSession={deleteSession}
+        onRenameSession={renameSession}
+        onArchiveSession={archiveSession}
+        onUpdateSessionEmoji={updateSessionEmoji}
         user={user}
         onLogout={handleLogout}
         onOpenSettings={() => setShowSettings(true)}
@@ -1261,8 +1487,8 @@ const App: React.FC = () => {
             : 'bg-white/5 dark:bg-[#030712]/60 backdrop-blur-xl border-white/40 dark:border-white/10'
         }`}>
           <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto relative group">
-             {/* Deep Thinking Toggle */}
-             <div className="flex items-center gap-2 mb-3 ml-2">
+             {/* Deep Thinking and Force Image Generation Toggles */}
+             <div className="flex items-center gap-4 mb-3 ml-2">
                <label className="flex items-center gap-2 cursor-pointer select-none">
                  <div className="relative">
                    <input
@@ -1308,6 +1534,55 @@ const App: React.FC = () => {
                      : 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300'
                  }`}>
                    Enhanced reasoning enabled
+                 </span>
+               )}
+               
+               {/* Force Image Generation Toggle */}
+               <label className="flex items-center gap-2 cursor-pointer select-none">
+                 <div className="relative">
+                   <input
+                     type="checkbox"
+                     checked={forceImageGeneration}
+                     onChange={(e) => setForceImageGeneration(e.target.checked)}
+                     className="sr-only peer"
+                   />
+                   <div className={`w-10 h-5 rounded-full transition-all ${
+                     forceImageGeneration
+                       ? 'bg-gradient-to-r from-pink-500 to-rose-500'
+                       : isNotion
+                         ? 'bg-gray-300 dark:bg-gray-600'
+                         : 'bg-gray-300 dark:bg-gray-700'
+                   }`}></div>
+                   <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                     forceImageGeneration ? 'translate-x-5' : 'translate-x-0'
+                   }`}></div>
+                 </div>
+                 <div className="flex items-center gap-1.5">
+                   <ImageIcon size={16} className={`${
+                     forceImageGeneration
+                       ? 'text-pink-500 dark:text-pink-400'
+                       : isNotion
+                         ? 'text-gray-400 dark:text-gray-500'
+                         : 'text-gray-400 dark:text-gray-500'
+                   }`} />
+                   <span className={`text-sm font-medium ${
+                     forceImageGeneration
+                       ? isNotion
+                         ? 'text-gray-900 dark:text-white'
+                         : 'text-pink-600 dark:text-pink-400'
+                       : 'text-gray-500 dark:text-gray-400'
+                   }`}>
+                     Force Image
+                   </span>
+                 </div>
+               </label>
+               {forceImageGeneration && (
+                 <span className={`text-xs px-2 py-0.5 rounded-full ${
+                   isNotion
+                     ? 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+                     : 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-300'
+                 }`}>
+                   Will generate image
                  </span>
                )}
              </div>
@@ -1367,31 +1642,87 @@ const App: React.FC = () => {
                  <Paperclip size={20} />
                </button>
 
-               <textarea
-                 ref={textareaRef}
-                 value={input}
-                 onChange={(e) => {
-                   setInput(e.target.value);
-                   // Auto-resize textarea
-                   if (textareaRef.current) {
-                     textareaRef.current.style.height = 'auto';
-                     textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + 'px';
-                   }
-                 }}
-                 onKeyDown={(e) => {
-                   if (e.key === 'Enter' && !e.shiftKey) {
-                     e.preventDefault();
-                     handleSendMessage();
-                   }
-                 }}
-                 placeholder={`Message ${currentModel.name}...`}
-                 disabled={isProcessing}
-                 rows={1}
-                 className={`w-full bg-transparent py-3 px-2 focus:outline-none placeholder-slate-400 dark:placeholder-gray-600 resize-none overflow-y-auto ${
-                    isNotion ? 'text-gray-900 dark:text-white font-serif' : 'text-slate-800 dark:text-gray-100'
-                 }`}
-                 style={{ maxHeight: '200px' }}
-               />
+               <div className="relative flex-1">
+                 <textarea
+                   ref={textareaRef}
+                   value={input}
+                   onChange={(e) => {
+                     setInput(e.target.value);
+                     // Update cursor position for command autocomplete
+                     const cursorPos = e.target.selectionStart || 0;
+                     setCursorPosition(cursorPos);
+                     
+                     // Show command autocomplete when '/' is typed
+                     const textBeforeCursor = e.target.value.substring(0, cursorPos);
+                     const lastSlashIndex = textBeforeCursor.lastIndexOf('/');
+                     const showAutocomplete = lastSlashIndex !== -1 && 
+                       (cursorPos === lastSlashIndex + 1 || 
+                        textBeforeCursor.substring(lastSlashIndex + 1).match(/^[a-z]*$/i));
+                     setShowCommandAutocomplete(showAutocomplete);
+                     
+                     // Auto-resize textarea
+                     if (textareaRef.current) {
+                       textareaRef.current.style.height = 'auto';
+                       textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + 'px';
+                     }
+                   }}
+                   onKeyDown={(e) => {
+                     if (e.key === 'Enter' && !e.shiftKey) {
+                       e.preventDefault();
+                       setShowCommandAutocomplete(false);
+                       handleSendMessage();
+                     } else if (e.key === 'Escape') {
+                       setShowCommandAutocomplete(false);
+                     } else if (showCommandAutocomplete && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Tab')) {
+                       // Let CommandAutocomplete handle these keys
+                       return;
+                     }
+                   }}
+                   onSelect={(e) => {
+                     const target = e.target as HTMLTextAreaElement;
+                     setCursorPosition(target.selectionStart || 0);
+                   }}
+                   onClick={(e) => {
+                     const target = e.target as HTMLTextAreaElement;
+                     setCursorPosition(target.selectionStart || 0);
+                   }}
+                   placeholder={`Message ${currentModel.name}...`}
+                   disabled={isProcessing}
+                   rows={1}
+                   className={`w-full bg-transparent py-3 px-2 focus:outline-none placeholder-slate-400 dark:placeholder-gray-600 resize-none overflow-y-auto ${
+                      isNotion ? 'text-gray-900 dark:text-white font-serif' : 'text-slate-800 dark:text-gray-100'
+                   }`}
+                   style={{ maxHeight: '200px' }}
+                 />
+                 
+                 {/* Command Autocomplete */}
+                 {showCommandAutocomplete && (
+                   <CommandAutocomplete
+                     input={input}
+                     cursorPosition={cursorPosition}
+                     onSelect={(command) => {
+                       const textBeforeCursor = input.substring(0, cursorPosition);
+                       const lastSlashIndex = textBeforeCursor.lastIndexOf('/');
+                       if (lastSlashIndex !== -1) {
+                         const newInput = input.substring(0, lastSlashIndex) + command + ' ' + input.substring(cursorPosition);
+                         setInput(newInput);
+                         setShowCommandAutocomplete(false);
+                         // Focus back to textarea
+                         setTimeout(() => {
+                           if (textareaRef.current) {
+                             const newCursorPos = lastSlashIndex + command.length + 1;
+                             textareaRef.current.focus();
+                             textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+                             setCursorPosition(newCursorPos);
+                           }
+                         }, 0);
+                       }
+                     }}
+                     onClose={() => setShowCommandAutocomplete(false)}
+                     isNotion={isNotion}
+                   />
+                 )}
+               </div>
                
                {/* Expand Button */}
                <button 

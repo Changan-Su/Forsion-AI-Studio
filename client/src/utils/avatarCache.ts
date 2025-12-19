@@ -6,14 +6,18 @@ const CACHE_VERSION = 'v1';
 const MAX_CACHE_SIZE = 50; // Maximum number of avatars to cache
 
 interface CachedAvatar {
-  data: string;
+  data: string; // Processed avatar URL (data URL)
+  avatarData: string; // Original avatar data (preset:xxx or data:image/...)
   timestamp: number;
   version: string;
 }
 
 // Get cached avatar
-export function getCachedAvatar(modelId: string): string | null {
+// Returns cached URL if avatarData matches, null otherwise
+export function getCachedAvatar(modelId: string, avatarData: string): string | null {
   try {
+    if (!avatarData) return null;
+    
     const cacheKey = `${CACHE_PREFIX}${modelId}`;
     const cached = localStorage.getItem(cacheKey);
     
@@ -23,6 +27,13 @@ export function getCachedAvatar(modelId: string): string | null {
     
     // Check version
     if (parsed.version !== CACHE_VERSION) {
+      localStorage.removeItem(cacheKey);
+      return null;
+    }
+    
+    // Check if avatar data has changed
+    if (parsed.avatarData !== avatarData) {
+      // Avatar data changed, clear cache
       localStorage.removeItem(cacheKey);
       return null;
     }
@@ -45,11 +56,14 @@ export function getCachedAvatar(modelId: string): string | null {
 }
 
 // Set cached avatar
-export function setCachedAvatar(modelId: string, avatarData: string): void {
+// avatarData: original avatar data (preset:xxx or data:image/...)
+// processedUrl: processed avatar URL (data URL)
+export function setCachedAvatar(modelId: string, avatarData: string, processedUrl: string): void {
   try {
     const cacheKey = `${CACHE_PREFIX}${modelId}`;
     const cached: CachedAvatar = {
-      data: avatarData,
+      data: processedUrl,
+      avatarData: avatarData,
       timestamp: Date.now(),
       version: CACHE_VERSION
     };
@@ -60,6 +74,16 @@ export function setCachedAvatar(modelId: string, avatarData: string): void {
     cleanupOldCaches();
   } catch (error) {
     console.warn('Failed to cache avatar:', error);
+  }
+}
+
+// Clear cache for a specific model
+export function clearAvatarCache(modelId: string): void {
+  try {
+    const cacheKey = `${CACHE_PREFIX}${modelId}`;
+    localStorage.removeItem(cacheKey);
+  } catch (error) {
+    console.warn('Failed to clear avatar cache:', error);
   }
 }
 

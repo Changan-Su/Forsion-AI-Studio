@@ -30,6 +30,24 @@ export const generateGeminiResponseStream = async (
         contents: { parts: [{ text: prompt }] }
       });
 
+      // Check for errors in the response
+      if (response.candidates && response.candidates.length > 0) {
+        const candidate = response.candidates[0];
+        if (candidate.finishReason && candidate.finishReason !== 'STOP' && candidate.finishReason !== 'MAX_TOKENS') {
+          const errorMessage = candidate.finishReason === 'SAFETY' 
+            ? '内容被安全过滤器阻止。请尝试使用不同的提示词。'
+            : candidate.finishReason === 'RECITATION'
+            ? '提示词可能包含受版权保护的内容。请尝试使用不同的提示词。'
+            : `生成失败：${candidate.finishReason}`;
+          throw new Error(errorMessage);
+        }
+        
+        // Check for blocking reason
+        if (candidate.safetyRatings && candidate.safetyRatings.some(r => r.blocked)) {
+          throw new Error('内容被安全过滤器阻止。请尝试使用不同的提示词。');
+        }
+      }
+
       let generatedText = "";
       let generatedImageUrl: string | undefined = undefined;
 
@@ -42,8 +60,17 @@ export const generateGeminiResponseStream = async (
         }
       }
 
+      // Check if we got an error message in the text
+      if (generatedText && (generatedText.includes('could not generate') || generatedText.includes('无法生成'))) {
+        throw new Error(generatedText || 'Gemini无法根据此提示词生成图像。请尝试使用更详细或不同的提示词。');
+      }
+
       if (!generatedText && !generatedImageUrl) {
-        return { text: "No content generated." };
+        // Check if there's an error in the response
+        if (response.promptFeedback?.blockReason) {
+          throw new Error(`提示词被阻止：${response.promptFeedback.blockReason}。请尝试使用不同的提示词。`);
+        }
+        throw new Error('未能生成图像。请尝试使用更详细或不同的提示词。');
       }
 
       onChunk(generatedText);
@@ -152,6 +179,16 @@ export const generateGeminiResponseStream = async (
 
   } catch (error: any) {
     console.error("Gemini API Error:", error);
+    // Provide more helpful error messages
+    if (error.message && (error.message.includes('could not generate') || error.message.includes('无法生成'))) {
+      throw new Error('Gemini无法根据此提示词生成图像。请尝试使用更详细或不同的提示词。');
+    }
+    if (error.message && error.message.includes('SAFETY')) {
+      throw new Error('内容被安全过滤器阻止。请尝试使用不同的提示词。');
+    }
+    if (error.message && error.message.includes('RECITATION')) {
+      throw new Error('提示词可能包含受版权保护的内容。请尝试使用不同的提示词。');
+    }
     throw new Error(error.message || "Failed to generate content");
   }
 };
@@ -279,6 +316,16 @@ export const generateGeminiResponse = async (
 
   } catch (error: any) {
     console.error("Gemini API Error:", error);
+    // Provide more helpful error messages
+    if (error.message && (error.message.includes('could not generate') || error.message.includes('无法生成'))) {
+      throw new Error('Gemini无法根据此提示词生成图像。请尝试使用更详细或不同的提示词。');
+    }
+    if (error.message && error.message.includes('SAFETY')) {
+      throw new Error('内容被安全过滤器阻止。请尝试使用不同的提示词。');
+    }
+    if (error.message && error.message.includes('RECITATION')) {
+      throw new Error('提示词可能包含受版权保护的内容。请尝试使用不同的提示词。');
+    }
     throw new Error(error.message || "Failed to generate content");
   }
 };

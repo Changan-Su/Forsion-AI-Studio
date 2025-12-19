@@ -1,33 +1,219 @@
-import React from 'react';
-import { MessageSquare, Plus, Trash2, LogOut, Settings, X, Moon, Sun } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { MessageSquare, Plus, Trash2, LogOut, Settings, X, MoreHorizontal, Edit2, Archive, ArchiveRestore, ChevronDown, ChevronRight } from 'lucide-react';
 import { ChatSession, User, UserRole } from '../types';
 import CreditBalance from './CreditBalance';
+import EmojiPicker from './EmojiPicker';
 
 interface SidebarProps {
   sessions: ChatSession[];
+  archivedSessions: ChatSession[];
   currentSessionId: string | null;
   onSelectSession: (id: string) => void;
   onNewChat: () => void;
   onDeleteSession: (id: string) => void;
+  onRenameSession: (id: string, newTitle: string) => void;
+  onArchiveSession: (id: string) => void;
+  onUpdateSessionEmoji: (id: string, emoji: string) => void;
   user: User;
   onLogout: () => void;
   onOpenSettings: () => void;
-  isOpen: boolean; // Mobile state
-  onClose: () => void; // Mobile closer
+  isOpen: boolean;
+  onClose: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
   sessions,
+  archivedSessions,
   currentSessionId,
   onSelectSession,
   onNewChat,
   onDeleteSession,
+  onRenameSession,
+  onArchiveSession,
+  onUpdateSessionEmoji,
   user,
   onLogout,
   onOpenSettings,
   isOpen,
   onClose
 }) => {
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [showMenuFor, setShowMenuFor] = useState<string | null>(null);
+  const [showEmojiPickerFor, setShowEmojiPickerFor] = useState<string | null>(null);
+  const [showArchivedSection, setShowArchivedSection] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenuFor(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Focus input when editing
+  useEffect(() => {
+    if (editingSessionId && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [editingSessionId]);
+
+  const handleStartRename = (session: ChatSession, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingSessionId(session.id);
+    setEditingTitle(session.title);
+    setShowMenuFor(null);
+  };
+
+  const handleSaveRename = () => {
+    if (editingSessionId && editingTitle.trim()) {
+      onRenameSession(editingSessionId, editingTitle.trim());
+    }
+    setEditingSessionId(null);
+    setEditingTitle('');
+  };
+
+  const handleCancelRename = () => {
+    setEditingSessionId(null);
+    setEditingTitle('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSaveRename();
+    } else if (e.key === 'Escape') {
+      handleCancelRename();
+    }
+  };
+
+  const handleEmojiSelect = (sessionId: string, emoji: string) => {
+    onUpdateSessionEmoji(sessionId, emoji);
+    setShowEmojiPickerFor(null);
+  };
+
+  const renderSessionItem = (session: ChatSession, isArchived: boolean = false) => (
+    <div
+      key={session.id}
+      className={`group relative flex items-center gap-2 px-3 py-3 rounded-2xl cursor-pointer transition-all border ${
+        currentSessionId === session.id
+          ? 'bg-white/90 border-white/80 text-gray-900 dark:bg-white/10 dark:border-white/20 dark:text-white font-semibold shadow-[0_12px_30px_rgba(15,23,42,0.08)]'
+          : 'bg-white/30 border-transparent text-gray-600 dark:bg-white/5 dark:text-gray-300 hover:bg-white/60 hover:border-white/70 dark:hover:bg-white/10 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white'
+      }`}
+      onClick={() => { onSelectSession(session.id); onClose(); }}
+    >
+      {/* Emoji/Icon - Clickable */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setShowEmojiPickerFor(showEmojiPickerFor === session.id ? null : session.id);
+          setShowMenuFor(null);
+        }}
+        className="relative flex-shrink-0 w-6 h-6 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+        title="Click to change emoji"
+      >
+        {session.emoji ? (
+          <span className="text-base leading-none">{session.emoji}</span>
+        ) : (
+          <MessageSquare size={16} className="text-gray-400" />
+        )}
+      </button>
+
+      {/* Emoji Picker */}
+      {showEmojiPickerFor === session.id && (
+        <EmojiPicker
+          onSelect={(emoji) => handleEmojiSelect(session.id, emoji)}
+          onClose={() => setShowEmojiPickerFor(null)}
+          position={{ top: 0, left: 32 }}
+        />
+      )}
+
+      {/* Title - Editable or Display */}
+      {editingSessionId === session.id ? (
+        <input
+          ref={editInputRef}
+          type="text"
+          value={editingTitle}
+          onChange={(e) => setEditingTitle(e.target.value)}
+          onBlur={handleSaveRename}
+          onKeyDown={handleKeyDown}
+          onClick={(e) => e.stopPropagation()}
+          className="flex-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-forsion-500"
+        />
+      ) : (
+        <span className="truncate text-sm flex-1">{session.title}</span>
+      )}
+
+      {/* Settings Menu Button */}
+      <div className="relative">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowMenuFor(showMenuFor === session.id ? null : session.id);
+            setShowEmojiPickerFor(null);
+          }}
+          className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-opacity rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"
+        >
+          <MoreHorizontal size={16} />
+        </button>
+
+        {/* Dropdown Menu */}
+        {showMenuFor === session.id && (
+          <div
+            ref={menuRef}
+            className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-1 min-w-[140px]"
+          >
+            <button
+              onClick={(e) => handleStartRename(session, e)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            >
+              <Edit2 size={14} />
+              Rename
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onArchiveSession(session.id);
+                setShowMenuFor(null);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            >
+              {isArchived ? (
+                <>
+                  <ArchiveRestore size={14} />
+                  Unarchive
+                </>
+              ) : (
+                <>
+                  <Archive size={14} />
+                  Archive
+                </>
+              )}
+            </button>
+            <div className="my-1 border-t border-gray-200 dark:border-gray-700" />
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeleteSession(session.id);
+                setShowMenuFor(null);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            >
+              <Trash2 size={14} />
+              Delete
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <>
       {/* Mobile Overlay */}
@@ -69,35 +255,32 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         <div className="flex-1 overflow-y-auto px-2 space-y-1">
+          {/* Active Chats */}
           <div className="px-2 pt-2 pb-1 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
             History
           </div>
           {sessions.length === 0 && (
             <div className="text-center text-gray-400 dark:text-gray-500 text-sm mt-10">No history yet.</div>
           )}
-          {sessions.map((session) => (
-            <div
-              key={session.id}
-              className={`group relative flex items-center gap-3 px-3 py-3 rounded-2xl cursor-pointer transition-all border ${
-                currentSessionId === session.id
-                  ? 'bg-white/90 border-white/80 text-gray-900 dark:bg-white/10 dark:border-white/20 dark:text-white font-semibold shadow-[0_12px_30px_rgba(15,23,42,0.08)]'
-                  : 'bg-white/30 border-transparent text-gray-600 dark:bg-white/5 dark:text-gray-300 hover:bg-white/60 hover:border-white/70 dark:hover:bg-white/10 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white'
-              }`}
-              onClick={() => { onSelectSession(session.id); onClose(); }}
-            >
-              <MessageSquare size={16} />
-              <span className="truncate text-sm flex-1">{session.title}</span>
+          {sessions.map((session) => renderSessionItem(session, false))}
+
+          {/* Archived Section */}
+          {archivedSessions.length > 0 && (
+            <div className="mt-4">
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDeleteSession(session.id);
-                }}
-                className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-opacity"
+                onClick={() => setShowArchivedSection(!showArchivedSection)}
+                className="w-full flex items-center gap-2 px-2 py-2 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
               >
-                <Trash2 size={14} />
+                {showArchivedSection ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                Archived ({archivedSessions.length})
               </button>
+              {showArchivedSection && (
+                <div className="space-y-1 mt-1">
+                  {archivedSessions.map((session) => renderSessionItem(session, true))}
+                </div>
+              )}
             </div>
-          ))}
+          )}
         </div>
 
         <div className="p-4 border-t border-white/40 dark:border-white/10 bg-white/70 dark:bg-white/5 backdrop-blur-xl">

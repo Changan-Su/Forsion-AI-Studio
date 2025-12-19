@@ -21,8 +21,8 @@ const ModelAvatar: React.FC<ModelAvatarProps> = ({
   const avatarUrl = useMemo(() => {
     if (!avatarData) return null;
     
-    // Check cache first
-    const cached = getCachedAvatar(modelId);
+    // Check cache first - pass avatarData to verify it hasn't changed
+    const cached = getCachedAvatar(modelId, avatarData);
     if (cached) return cached;
     
     let url: string;
@@ -45,8 +45,8 @@ const ModelAvatar: React.FC<ModelAvatarProps> = ({
       return null;
     }
     
-    // Cache the URL
-    setCachedAvatar(modelId, url);
+    // Cache the URL with original avatarData for comparison
+    setCachedAvatar(modelId, avatarData, url);
     return url;
   }, [modelId, avatarData]);
   
