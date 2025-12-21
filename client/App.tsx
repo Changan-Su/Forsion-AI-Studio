@@ -113,11 +113,12 @@ const App: React.FC = () => {
       setCustomModels(settings.customModels || []);
       
       // Update user profile if settings contain nickname or avatar
-      if (user && (settings.nickname || settings.avatar)) {
+      // Always update if nickname or avatar is in settings (even if null/empty)
+      if (user && (settings.nickname !== undefined || settings.avatar !== undefined)) {
         const updatedUser = {
           ...user,
-          nickname: settings.nickname,
-          avatar: settings.avatar
+          nickname: settings.nickname !== undefined ? settings.nickname : user.nickname,
+          avatar: settings.avatar !== undefined ? settings.avatar : user.avatar
         };
         setUser(updatedUser);
         localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updatedUser));
@@ -263,10 +264,26 @@ const App: React.FC = () => {
     if (newSettings.theme !== undefined) setTheme(newSettings.theme);
     if (newSettings.themePreset !== undefined) setThemePreset(newSettings.themePreset);
     if (newSettings.customModels !== undefined) setCustomModels(newSettings.customModels);
+    
+    // Update user profile immediately if nickname or avatar changed
+    if (user && (newSettings.nickname !== undefined || newSettings.avatar !== undefined)) {
+      const updatedUser = {
+        ...user,
+        nickname: newSettings.nickname !== undefined ? newSettings.nickname : user.nickname,
+        avatar: newSettings.avatar !== undefined ? newSettings.avatar : user.avatar
+      };
+      setUser(updatedUser);
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updatedUser));
+    }
 
     // Sync with backend (save to database)
     try {
-      console.log('Saving settings to database:', { theme: settingsToSave.theme, themePreset: settingsToSave.themePreset });
+      console.log('Saving settings to database:', { 
+        theme: settingsToSave.theme, 
+        themePreset: settingsToSave.themePreset,
+        nickname: settingsToSave.nickname,
+        avatar: settingsToSave.avatar ? `${settingsToSave.avatar.substring(0, 50)}...` : null
+      });
       const savedSettings = await backendService.updateSettings(settingsToSave);
       console.log('Settings saved successfully:', savedSettings);
       // Update appSettings with the response from server to ensure consistency
@@ -275,6 +292,17 @@ const App: React.FC = () => {
         // Also update theme and themePreset state from server response
         if (savedSettings.theme !== undefined) setTheme(savedSettings.theme);
         if (savedSettings.themePreset !== undefined) setThemePreset(savedSettings.themePreset);
+        
+        // Update user profile from server response
+        if (user && (savedSettings.nickname !== undefined || savedSettings.avatar !== undefined)) {
+          const updatedUser = {
+            ...user,
+            nickname: savedSettings.nickname !== undefined ? savedSettings.nickname : user.nickname,
+            avatar: savedSettings.avatar !== undefined ? savedSettings.avatar : user.avatar
+          };
+          setUser(updatedUser);
+          localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updatedUser));
+        }
       }
     } catch (e: any) {
       if (e?.code === 'AUTH_REQUIRED' || e?.name === 'AuthRequiredError') {
@@ -1858,12 +1886,13 @@ const App: React.FC = () => {
         <SettingsModal 
           onClose={() => setShowSettings(false)} 
           userRole={user!.role} 
-          username={user!.username} 
+          user={user!}
           currentTheme={theme} 
           onThemeChange={(t) => updateAppSettings({ theme: t })}
           currentPreset={themePreset}
           onPresetChange={(p) => updateAppSettings({ themePreset: p })}
           onModelsChange={syncSettingsFromBackend}
+          onUpdateSettings={updateAppSettings}
           isOffline={isOfflineMode}
           onReconnect={attemptReconnect}
         />

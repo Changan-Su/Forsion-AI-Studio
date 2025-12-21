@@ -558,6 +558,108 @@ ALTER TABLE global_models ADD COLUMN cacheable_content TEXT AFTER system_prompt;
 
 > **注意**：如果字段已存在，MySQL 会返回错误 `Duplicate column name`，这是正常的，可以忽略。建议使用迁移脚本自动处理。
 
+#### 详细故障排查步骤
+
+**1. 识别错误**
+
+常见错误信息：
+- `Unknown column 'nickname' in 'field list'`
+- `Unknown column 'avatar' in 'field list'`
+- `Unknown column 'developer_mode' in 'field list'`
+- `Unknown column 'theme_preset' in 'field list'`
+
+这些错误通常出现在：
+- 保存用户设置时（PUT `/api/settings`）
+- 保存个人资料时（昵称、头像）
+- 切换主题时
+
+**2. 完整解决流程**
+
+```bash
+# 步骤 1：停止服务（可选，建议在维护窗口进行）
+docker compose stop backend
+
+# 步骤 2：运行数据库迁移
+docker compose exec backend npm run migrate
+
+# 步骤 3：验证迁移结果
+docker compose exec mysql mysql -u root -p -e "USE forsion_ai_studio; DESCRIBE user_settings;"
+
+# 步骤 4：重启后端服务
+docker compose restart backend
+
+# 步骤 5：检查日志确认无错误
+docker compose logs backend --tail=50
+```
+
+**3. 验证修复**
+
+迁移成功后，验证字段是否存在：
+
+```bash
+# 方法一：使用 DESCRIBE 命令
+docker compose exec mysql mysql -u root -p -e "USE forsion_ai_studio; DESCRIBE user_settings;"
+
+# 方法二：查询字段信息
+docker compose exec mysql mysql -u root -p -e "USE forsion_ai_studio; SHOW COLUMNS FROM user_settings LIKE 'nickname';"
+```
+
+应该能看到以下字段：
+- `nickname` (VARCHAR(100))
+- `avatar` (MEDIUMTEXT)
+- `theme` (VARCHAR(20))
+- `theme_preset` (VARCHAR(50))
+- `developer_mode` (BOOLEAN)
+
+**4. 如果使用外部 MySQL**
+
+如果使用外部 MySQL 数据库（非 Docker 容器）：
+
+```bash
+# 直接连接 MySQL
+mysql -u your_username -p forsion_ai_studio
+
+# 然后执行上面的 SQL 语句
+```
+
+**5. 完整更新流程（首次部署或升级）**
+
+如果是首次部署或从旧版本升级：
+
+```bash
+# 1. 拉取最新代码
+git pull
+
+# 2. 重新构建并启动
+docker compose down
+docker compose build --no-cache
+docker compose up -d
+
+# 3. 等待服务启动（MySQL 需要约 30 秒）
+sleep 30
+
+# 4. 运行数据库迁移（关键步骤！）
+docker compose exec backend npm run migrate
+
+# 5. 验证服务状态
+docker compose ps
+docker compose logs backend --tail=50
+
+# 6. 测试功能
+# 访问前端，尝试保存个人资料、切换主题等操作
+```
+
+**6. 常见问题**
+
+- **问题**：迁移脚本报错 `npm: command not found`
+  - **解决**：使用 `node dist/db/migrate.js` 直接运行编译后的脚本
+
+- **问题**：迁移后仍然报错
+  - **解决**：检查后端服务是否重启，清除浏览器缓存，检查数据库连接配置
+
+- **问题**：字段已存在但仍报错
+  - **解决**：检查字段类型是否匹配，可能需要删除重建字段（谨慎操作，先备份数据）
+
 ---
 
 ## 部署脚本

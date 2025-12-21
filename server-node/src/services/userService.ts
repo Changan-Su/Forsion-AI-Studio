@@ -207,6 +207,13 @@ export async function updateUserSettings(userId: string, settings: any): Promise
   if (existing.length === 0) {
     const id = uuidv4();
     try {
+      // Log avatar data size for debugging
+      if (settings.avatar !== undefined) {
+        const avatarSize = settings.avatar ? settings.avatar.length : 0;
+        const avatarSizeKB = (avatarSize / 1024).toFixed(2);
+        console.log(`[updateUserSettings] Inserting new settings with avatar: size=${avatarSizeKB}KB`);
+      }
+      
       await query(
         `INSERT INTO user_settings (id, user_id, nickname, avatar, theme, theme_preset, custom_models, external_api_configs, developer_mode)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -222,8 +229,17 @@ export async function updateUserSettings(userId: string, settings: any): Promise
           settings.developerMode ? 1 : 0,
         ]
       );
+      
+      console.log(`[updateUserSettings] Successfully inserted settings for user ${userId}`);
     } catch (error: any) {
-      console.error('Error inserting user settings:', error);
+      console.error('[updateUserSettings] Error inserting user settings:', error);
+      if (settings.avatar !== undefined) {
+        const avatarSize = settings.avatar ? settings.avatar.length : 0;
+        console.error('[updateUserSettings] Avatar size:', avatarSize, 'bytes');
+        if (avatarSize > 16 * 1024 * 1024) {
+          console.error('[updateUserSettings] WARNING: Avatar exceeds MEDIUMTEXT limit (16MB)');
+        }
+      }
       throw error;
     }
   } else {
@@ -262,14 +278,31 @@ export async function updateUserSettings(userId: string, settings: any): Promise
     if (setClauses.length > 0) {
       values.push(userId);
       try {
+        // Log avatar data size for debugging (without logging the full data)
+        if (settings.avatar !== undefined) {
+          const avatarSize = settings.avatar ? settings.avatar.length : 0;
+          const avatarSizeKB = (avatarSize / 1024).toFixed(2);
+          console.log(`[updateUserSettings] Saving avatar: size=${avatarSizeKB}KB, type=${settings.avatar?.substring(0, 30)}...`);
+        }
+        
         await query(
           `UPDATE user_settings SET ${setClauses.join(', ')} WHERE user_id = ?`,
           values
         );
+        
+        console.log(`[updateUserSettings] Successfully updated settings for user ${userId}`);
       } catch (error: any) {
-        console.error('Error updating user settings:', error);
-        console.error('SQL:', `UPDATE user_settings SET ${setClauses.join(', ')} WHERE user_id = ?`);
-        console.error('Values:', values);
+        console.error('[updateUserSettings] Error updating user settings:', error);
+        console.error('[updateUserSettings] SQL:', `UPDATE user_settings SET ${setClauses.join(', ')} WHERE user_id = ?`);
+        console.error('[updateUserSettings] Values count:', values.length);
+        if (settings.avatar !== undefined) {
+          const avatarSize = settings.avatar ? settings.avatar.length : 0;
+          console.error('[updateUserSettings] Avatar size:', avatarSize, 'bytes');
+          // Check if avatar might be too large for MEDIUMTEXT (16MB limit)
+          if (avatarSize > 16 * 1024 * 1024) {
+            console.error('[updateUserSettings] WARNING: Avatar exceeds MEDIUMTEXT limit (16MB)');
+          }
+        }
         throw error;
       }
     }

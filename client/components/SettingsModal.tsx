@@ -8,12 +8,13 @@ import { backendService } from '../services/backendService';
 interface SettingsModalProps {
   onClose: () => void;
   userRole: UserRole;
-  username: string;
+  user: import('../types').User; // User object with nickname and avatar
   currentTheme: 'light' | 'dark';
   onThemeChange: (theme: 'light' | 'dark') => void;
   currentPreset: 'default' | 'notion' | 'monet';
   onPresetChange: (preset: 'default' | 'notion' | 'monet') => void;
   onModelsChange: () => void; // Callback to refresh app models
+  onUpdateSettings: (settings: Partial<import('../types').AppSettings>) => Promise<void>; // Update settings function
   isOffline: boolean;
   onReconnect: () => Promise<boolean>;
 }
@@ -23,12 +24,13 @@ type TabType = 'general' | 'account' | 'developer';
 const SettingsModal: React.FC<SettingsModalProps> = ({ 
   onClose, 
   userRole, 
-  username, 
+  user,
   currentTheme,
   onThemeChange,
   currentPreset,
   onPresetChange,
   onModelsChange,
+  onUpdateSettings,
   isOffline,
   onReconnect
 }) => {
@@ -64,8 +66,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         setConfigs(settings.externalApiConfigs || {});
         setCustomModels(loadedCustomModels);
         setDeveloperMode(settings.developerMode || false);
-        setNickname(settings.nickname || '');
-        setAvatarData(settings.avatar || null);
+        // Load nickname and avatar from user prop or settings
+        setNickname(user.nickname || settings.nickname || '');
+        setAvatarData(user.avatar || settings.avatar || null);
+        setProfileChanged(false);
       } catch (e) {
         console.error("Failed to load settings in modal", e);
       } finally {
@@ -73,7 +77,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       }
     };
     loadData();
-  }, [userRole]);
+  }, [userRole, user]);
 
   const saveToBackend = async (newConfigs = configs, newCustomModels = customModels) => {
     // We only send the partial updates we care about here
@@ -174,7 +178,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       return;
     }
     
-    const success = await changePassword(username, newPassword);
+    const success = await changePassword(user.username, newPassword);
     if (success) {
       setPasswordMsg({ text: 'Password updated successfully', type: 'success' });
       setNewPassword('');
@@ -243,9 +247,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleSaveProfile = async () => {
     try {
-      await backendService.updateSettings({
+      await onUpdateSettings({
         nickname: nickname.trim() || null,
-        avatar: avatarData
+        avatar: avatarData || null
       });
       alert('Profile saved successfully!');
       setProfileChanged(false);
@@ -386,7 +390,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             <img src={avatarData} alt="Avatar" className="w-full h-full object-cover" />
                           ) : (
                             <div className={`w-full h-full flex items-center justify-center font-bold text-2xl ${isMonet ? 'bg-white/20 text-[#4A4B6A]' : 'bg-gray-200 dark:bg-zinc-800 text-gray-600 dark:text-gray-400'}`}>
-                              {username.substring(0, 2).toUpperCase()}
+                              {(user.nickname || user.username).substring(0, 2).toUpperCase()}
                             </div>
                           )}
                         </div>
@@ -427,7 +431,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                           setNickname(e.target.value);
                           setProfileChanged(true);
                         }}
-                        placeholder={username}
+                        placeholder={user.username}
                         className={`w-full max-w-md px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-forsion-500 ${
                           isMonet
                             ? 'bg-white/30 border border-white/30 text-[#4A4B6A] placeholder-[#4A4B6A]/50'
