@@ -158,15 +158,25 @@ docker compose down -v
 # 重新构建镜像
 docker compose build --no-cache
 
-# 重启服务
+# 重启服务（⚠️ 注意：仅重启容器，不会重新构建镜像）
 docker compose restart
 
-# 更新代码后重新部署
+# 更新代码后重新部署（推荐流程）
 git pull
-docker compose down
+docker compose build backend    # 重新构建后端镜像（包含新代码）
+docker compose up -d backend     # 使用新镜像启动后端
+
+# 或者一次性重建所有服务
+git pull
 docker compose build
 docker compose up -d
 ```
+
+> **重要提示**：
+> - `docker compose restart` 仅重启容器，**不会重新构建镜像**，因此不会包含新的代码更改
+> - 如果修改了后端代码（如 TypeScript 文件），必须使用 `docker compose build backend` 重新构建镜像
+> - 修改前端代码也需要重新构建前端镜像：`docker compose build frontend`
+> - 修改数据库配置或环境变量通常只需要重启：`docker compose restart backend`
 
 ---
 
@@ -409,6 +419,10 @@ server {
     root /var/www/forsion-ai-studio/dist;
     index index.html;
 
+    # 增加请求体大小限制（用于头像上传等）
+    # Base64 编码的图片可能较大，需要设置更高的限制
+    client_max_body_size 50m;
+
     # Gzip 压缩
     gzip on;
     gzip_types text/plain text/css application/json application/javascript;
@@ -425,6 +439,9 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_read_timeout 300s;
         proxy_buffering off;
+        
+        # 确保 API 请求也有足够大的请求体限制
+        client_max_body_size 50m;
     }
 
     # 管理后台代理
@@ -630,7 +647,7 @@ mysql -u your_username -p forsion_ai_studio
 # 1. 拉取最新代码
 git pull
 
-# 2. 重新构建并启动
+# 2. 重新构建并启动（⚠️ 必须重新构建以包含新代码）
 docker compose down
 docker compose build --no-cache
 docker compose up -d
@@ -649,6 +666,48 @@ docker compose logs backend --tail=50
 # 访问前端，尝试保存个人资料、切换主题等操作
 ```
 
+**仅更新后端代码的快速流程**：
+
+如果只修改了后端代码（如 `server-node/src/` 下的文件），可以只重建后端：
+
+```bash
+# 1. 拉取最新代码
+git pull
+
+# 2. 重新构建后端镜像（包含新代码）
+docker compose build backend
+
+# 3. 重启后端服务（使用新镜像）
+docker compose up -d backend
+
+# 4. 查看日志确认启动成功
+docker compose logs -f backend
+```
+
+**仅更新前端代码的快速流程**：
+
+如果只修改了前端代码（如 `client/` 下的文件），可以只重建前端：
+
+```bash
+# 1. 拉取最新代码
+git pull
+
+# 2. 重新构建前端镜像
+docker compose build frontend
+
+# 3. 重启前端服务
+docker compose up -d frontend
+```
+
+**仅修改配置（无需重新构建）**：
+
+如果只修改了环境变量（`.env` 文件）或数据库配置，通常只需要重启：
+
+```bash
+# 修改 .env 文件后
+docker compose restart backend  # 重启后端以加载新环境变量
+```
+
 **6. 常见问题**
 
 - **问题**：迁移脚本报错 `npm: command not found`
@@ -659,6 +718,69 @@ docker compose logs backend --tail=50
 
 - **问题**：字段已存在但仍报错
   - **解决**：检查字段类型是否匹配，可能需要删除重建字段（谨慎操作，先备份数据）
+
+- **问题**：修改代码后重启服务，但更改没有生效
+  - **原因**：`docker compose restart` 只重启容器，不会重新构建镜像，新代码不会被打包进镜像
+  - **解决**：
+    ```bash
+    # 修改后端代码后，必须重新构建
+    docker compose build backend
+    docker compose up -d backend
+    
+    # 修改前端代码后，必须重新构建
+    docker compose build frontend
+    docker compose up -d frontend
+    ```
+  - **区别说明**：
+    | 命令 | 作用 | 是否包含新代码 |
+    |------|------|----------------|
+    | `docker compose restart backend` | 仅重启容器 | ❌ 使用旧镜像 |
+    | `docker compose build backend` | 重新构建镜像 | ✅ 包含新代码 |
+    | `docker compose up -d backend` | 构建+启动（如果镜像不存在） | ✅ 包含新代码 |
+
+- **问题**：如何判断是否需要重新构建？
+  - **需要重新构建的情况**：
+    - 修改了 `server-node/src/` 下的 TypeScript 源代码
+    - 修改了 `client/` 下的 React 源代码
+    - 修改了 `package.json` 依赖
+    - 修改了 `Dockerfile`
+    - 修改了 `nginx.conf`（需要重新构建前端镜像）
+  - **只需重启的情况**：
+    - 修改了 `.env` 环境变量
+    - 修改了数据库配置（但代码中读取配置的逻辑不变）
+    - 修改了外部 Nginx 配置（如果使用外部 Nginx，不通过 Docker）
+
+- **问题**：上传头像时出现 `413 Request Entity Too Large` 错误
+  - **原因**：Nginx 默认的请求体大小限制是 1MB，Base64 编码的 PNG 头像可能超过这个限制
+  - **解决**：
+    1. 如果使用 Docker 部署，确保 `nginx.conf` 中包含 `client_max_body_size 50m;`
+    2. 修改 `nginx.conf` 后需要重新构建前端镜像：
+       ```bash
+       docker compose build frontend
+       docker compose up -d frontend
+       ```
+    3. 如果使用外部 Nginx，在 Nginx 配置文件中添加：
+       ```nginx
+       server {
+           client_max_body_size 50m;  # 在 server 块中
+           
+           location /api/ {
+               client_max_body_size 50m;  # 在 location 块中（可选，但推荐）
+               # ... 其他配置
+           }
+       }
+       ```
+    4. 修改外部 Nginx 配置后，重新加载配置：
+       ```bash
+       sudo nginx -t  # 测试配置
+       sudo nginx -s reload  # 重新加载配置
+       ```
+  - **验证**：检查 Nginx 配置是否生效：
+     ```bash
+     # 查看 Nginx 配置
+     docker compose exec frontend nginx -T | grep client_max_body_size
+     # 应该显示：client_max_body_size 50m;
+     ```
 
 ---
 
