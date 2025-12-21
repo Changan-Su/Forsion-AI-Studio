@@ -146,7 +146,7 @@ interface ChatAreaProps {
   isProcessing: boolean;
   currentModel: AIModel;
   allModels: AIModel[]; // All available models for looking up message-specific model
-  themePreset: 'default' | 'notion';
+  themePreset: 'default' | 'notion' | 'monet';
   onFileUpload: (file: File) => void;
   onRegenerateMessage?: (messageId: string) => void;
 }
@@ -224,6 +224,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
 
   // Styling helpers based on themePreset
   const isNotion = themePreset === 'notion';
+  const isMonet = themePreset === 'monet';
 
   if (messages.length === 0) {
     return (
@@ -231,7 +232,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
         className={`flex-1 flex flex-col items-center justify-center p-8 relative overflow-hidden ${
           isNotion 
             ? 'bg-notion-bg dark:bg-notion-darkbg'
-            : 'bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.97),_rgba(228,238,255,0.92))] dark:bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.25),_#030712)]'
+            : isMonet
+              ? 'bg-transparent'
+              : 'bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.97),_rgba(228,238,255,0.92))] dark:bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.25),_#030712)]'
         }`}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
@@ -252,21 +255,25 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
         <div className={`relative w-20 h-20 rounded-3xl flex items-center justify-center mb-8 animate-fade-in-up ${
            isNotion 
              ? 'bg-gray-100 dark:bg-notion-darksidebar border border-notion-border dark:border-notion-darkborder shadow-sm' 
-             : 'bg-gradient-to-tr from-forsion-500 to-indigo-600 shadow-2xl shadow-forsion-500/20'
+             : isMonet
+               ? 'glass-dark shadow-xl text-[#4A4B6A]'
+               : 'bg-gradient-to-tr from-forsion-500 to-indigo-600 shadow-2xl shadow-forsion-500/20'
         }`}>
-          <Bot size={40} className={isNotion ? "text-gray-800 dark:text-gray-200" : "text-white"} />
+          <Bot size={40} className={isNotion ? "text-gray-800 dark:text-gray-200" : isMonet ? "text-[#4A4B6A]" : "text-white"} />
         </div>
         <h2 className={`text-3xl font-bold mb-3 tracking-tight ${
            isNotion 
              ? 'text-gray-900 dark:text-white font-serif' 
-             : 'text-transparent bg-clip-text bg-gradient-to-r from-forsion-600 to-indigo-600 dark:from-forsion-400 dark:to-indigo-400'
+             : isMonet
+               ? 'text-[#4A4B6A] font-cursive text-4xl drop-shadow-sm'
+               : 'text-transparent bg-clip-text bg-gradient-to-r from-forsion-600 to-indigo-600 dark:from-forsion-400 dark:to-indigo-400'
         }`}>
           Forsion AI Studio
         </h2>
         <p className={`text-center max-w-md text-lg ${
-           isNotion ? 'text-gray-500 dark:text-gray-400 font-serif italic' : 'text-slate-500 dark:text-gray-400'
+           isNotion ? 'text-gray-500 dark:text-gray-400 font-serif italic' : isMonet ? 'text-[#4A4B6A]/80 font-medium' : 'text-slate-500 dark:text-gray-400'
         }`}>
-          Start a conversation with <span className={`font-semibold ${isNotion ? 'text-gray-800 dark:text-gray-200 underline decoration-dotted' : 'text-forsion-600 dark:text-forsion-400'}`}>{currentModel.name}</span>.
+          Start a conversation with <span className={`font-semibold ${isNotion ? 'text-gray-800 dark:text-gray-200 underline decoration-dotted' : isMonet ? 'text-[#4A4B6A] underline decoration-[#4A4B6A]/30' : 'text-forsion-600 dark:text-forsion-400'}`}>{currentModel.name}</span>.
         </p>
       </div>
     );
@@ -277,7 +284,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
       className={`flex-1 overflow-y-auto p-4 md:p-6 space-y-8 scroll-smooth transition-colors duration-300 relative ${
         isNotion 
           ? 'bg-notion-bg dark:bg-notion-darkbg'
-          : 'bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.98),_rgba(227,238,255,0.9))] dark:bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.25),_#030712)]'
+          : isMonet
+            ? 'bg-transparent'
+            : 'bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.98),_rgba(227,238,255,0.9))] dark:bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.25),_#030712)]'
       }`}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
@@ -309,7 +318,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
               className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center shadow-md ${
                 isNotion 
                   ? 'bg-gray-800 dark:bg-white text-white dark:text-black'
-                  : 'bg-forsion-600 text-white'
+                  : isMonet
+                    ? 'bg-[#4A4B6A] text-white'
+                    : 'bg-forsion-600 text-white'
               }`}
             >
               <User size={18} />
@@ -339,7 +350,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
                   className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center shadow-md ${
                     isNotion 
                       ? 'bg-transparent border border-gray-300 dark:border-gray-600'
-                      : 'bg-indigo-600 text-white border-2 border-white dark:border-gray-800'
+                      : isMonet
+                        ? 'glass-dark text-[#4A4B6A] border border-white/20'
+                        : 'bg-indigo-600 text-white border-2 border-white dark:border-gray-800'
                   }`}
                   fallbackIcon={<Cpu size={18} className={isNotion ? "text-gray-800 dark:text-gray-200" : ""} />}
                 />
@@ -357,10 +370,14 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
                 isNotion
                   ? 'rounded-md border border-transparent hover:border-gray-200 dark:hover:border-gray-700 ' + (msg.role === 'user' ? 'bg-gray-100 dark:bg-notion-darksidebar text-gray-900 dark:text-white' : 'bg-transparent text-gray-900 dark:text-white pl-0')
                       : `rounded-2xl shadow-sm ${msg.role === 'user' 
-                        ? 'bg-gradient-to-br from-forsion-500 via-indigo-500 to-indigo-600 text-white rounded-[26px] rounded-tr-2xl border border-white/30 shadow-[0_20px_45px_rgba(79,70,229,0.35)]'
+                        ? isMonet
+                          ? 'bg-gradient-to-br from-[#3E406F] to-[#5a5c8a] text-white rounded-[26px] rounded-tr-2xl shadow-md border border-white/10'
+                          : 'bg-gradient-to-br from-forsion-500 via-indigo-500 to-indigo-600 text-white rounded-[26px] rounded-tr-2xl border border-white/30 shadow-[0_20px_45px_rgba(79,70,229,0.35)]'
                       : msg.isError
                         ? 'bg-red-50 border border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200'
-                        : 'bg-white/80 text-slate-800 border border-white/70 backdrop-blur-md dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-tl-sm shadow-[0_15px_45px_rgba(15,23,42,0.08)] dark:shadow-none'}`
+                        : isMonet
+                          ? 'glass text-gray-900 dark:text-white rounded-[26px] rounded-tl-sm shadow-sm'
+                          : 'bg-white/80 text-slate-800 border border-white/70 backdrop-blur-md dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-tl-sm shadow-[0_15px_45px_rgba(15,23,42,0.08)] dark:shadow-none'}`
               }`}
             >
               {/* User Attachments */}
@@ -406,7 +423,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
                         ? 'prose-headings:font-serif prose-headings:font-bold prose-p:font-serif prose-p:leading-7 dark:prose-invert prose-blockquote:border-l-black dark:prose-blockquote:border-l-white' 
                         : (msg.role === 'user' 
                           ? 'prose-headings:text-white prose-p:text-white prose-strong:text-white prose-a:text-white/90' 
-                          : 'dark:prose-invert prose-p:text-slate-700 dark:prose-p:text-gray-200 prose-headings:text-slate-900 dark:prose-headings:text-white prose-strong:text-slate-900 dark:prose-strong:text-white prose-a:text-forsion-600')
+                          : isMonet
+                            ? 'prose-headings:text-[#4A4B6A] dark:prose-headings:text-white prose-p:text-[#4A4B6A] dark:prose-p:text-gray-100 prose-strong:text-[#4A4B6A] dark:prose-strong:text-white'
+                            : 'dark:prose-invert prose-p:text-slate-700 dark:prose-p:text-gray-200 prose-headings:text-slate-900 dark:prose-headings:text-white prose-strong:text-slate-900 dark:prose-strong:text-white prose-a:text-forsion-600')
                     }`}>
                    <ReactMarkdown
                      remarkPlugins={[remarkMath]}

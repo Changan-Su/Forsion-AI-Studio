@@ -50,7 +50,7 @@ export interface AIModel {
 
 export interface AppSettings {
   theme?: 'light' | 'dark';
-  themePreset?: 'default' | 'notion'; // New: Theme Style
+  themePreset?: 'default' | 'notion' | 'monet'; // New: Theme Style
   customModels?: AIModel[]; // New: List of user-added models
   defaultModelId?: string;
   developerMode?: boolean; // Developer mode allows users to add custom models

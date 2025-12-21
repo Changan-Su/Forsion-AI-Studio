@@ -19,6 +19,7 @@ interface SidebarProps {
   onOpenSettings: () => void;
   isOpen: boolean;
   onClose: () => void;
+  themePreset: 'default' | 'notion' | 'monet';
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -35,15 +36,16 @@ const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
   onOpenSettings,
   isOpen,
-  onClose
+  onClose,
+  themePreset
 }) => {
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [showMenuFor, setShowMenuFor] = useState<string | null>(null);
   const [showEmojiPickerFor, setShowEmojiPickerFor] = useState<string | null>(null);
   const [showArchivedSection, setShowArchivedSection] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const editInputRef = useRef<HTMLInputElement>(null);
+  const isNotion = themePreset === 'notion';
+  const isMonet = themePreset === 'monet';
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -103,8 +105,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       key={session.id}
       className={`group relative flex items-center gap-2 px-3 py-3 rounded-2xl cursor-pointer transition-all border ${
         currentSessionId === session.id
-          ? 'bg-white/90 border-white/80 text-gray-900 dark:bg-white/10 dark:border-white/20 dark:text-white font-semibold shadow-[0_12px_30px_rgba(15,23,42,0.08)]'
-          : 'bg-white/30 border-transparent text-gray-600 dark:bg-white/5 dark:text-gray-300 hover:bg-white/60 hover:border-white/70 dark:hover:bg-white/10 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white'
+          ? isMonet 
+            ? 'bg-white/50 border-white/30 text-[#4A4B6A] font-bold shadow-sm backdrop-blur-md' 
+            : 'bg-white/90 border-white/80 text-gray-900 dark:bg-white/10 dark:border-white/20 dark:text-white font-semibold shadow-[0_12px_30px_rgba(15,23,42,0.08)]'
+          : isMonet
+            ? 'border-transparent hover:bg-white/30 text-[#4A4B6A]/80 hover:text-[#4A4B6A] font-medium'
+            : 'bg-white/30 border-transparent text-gray-600 dark:bg-white/5 dark:text-gray-300 hover:bg-white/60 hover:border-white/70 dark:hover:bg-white/10 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white'
       }`}
       onClick={() => { onSelectSession(session.id); onClose(); }}
     >
@@ -226,15 +232,21 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Sidebar Container */}
       <div className={`
-        fixed inset-y-0 left-0 z-40 w-72 bg-gradient-to-b from-white/90 via-slate-50/80 to-slate-100/70 dark:from-[#0e1325]/90 dark:via-[#070b18]/85 dark:to-[#020409]/90 border-r border-white/30 dark:border-slate-800/80 backdrop-blur-2xl shadow-[0_25px_60px_rgba(15,23,42,0.12)] dark:shadow-[0_15px_40px_rgba(2,6,23,0.7)]
+        fixed inset-y-0 left-0 z-40 w-72 
+        ${isMonet 
+          ? 'bg-white/30 backdrop-blur-xl border-r border-white/20 shadow-[4px_0_24px_rgba(0,0,0,0.02)]' 
+          : 'bg-gradient-to-b from-white/90 via-slate-50/80 to-slate-100/70 dark:from-[#0e1325]/90 dark:via-[#070b18]/85 dark:to-[#020409]/90 border-r border-white/30 dark:border-slate-800/80 backdrop-blur-2xl shadow-[0_25px_60px_rgba(15,23,42,0.12)] dark:shadow-[0_15px_40px_rgba(2,6,23,0.7)]'
+        }
         transform transition-transform duration-300 ease-in-out flex flex-col text-gray-700 dark:text-gray-200
         md:relative md:translate-x-0 md:w-64
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="p-4">
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2 text-forsion-600 dark:text-forsion-400 font-bold text-xl tracking-wider">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-forsion-500 to-purple-600 flex items-center justify-center shadow-lg">
+            <div className={`flex items-center gap-2 font-bold text-xl tracking-wider ${isMonet ? 'text-[#4A4B6A] font-cursive text-2xl drop-shadow-sm' : 'text-forsion-600 dark:text-forsion-400'}`}>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shadow-lg ${
+                isMonet ? 'bg-[#4A4B6A] backdrop-blur-md border border-white/20' : 'bg-gradient-to-tr from-forsion-500 to-purple-600'
+              }`}>
                 <span className="text-white">F</span>
               </div>
               Forsion AI
@@ -247,7 +259,11 @@ const Sidebar: React.FC<SidebarProps> = ({
           
           <button
             onClick={() => { onNewChat(); onClose(); }}
-            className="w-full flex items-center gap-2 bg-gradient-to-r from-forsion-500 to-indigo-500 hover:from-forsion-400 hover:to-indigo-400 text-white border border-white/40 px-4 py-3 rounded-2xl transition-transform duration-300 ease-out shadow-xl shadow-forsion-500/30 hover:-translate-y-0.5 active:scale-95 backdrop-blur"
+            className={`w-full flex items-center gap-2 text-white border border-white/40 px-4 py-3 rounded-2xl transition-transform duration-300 ease-out shadow-xl hover:-translate-y-0.5 active:scale-95 backdrop-blur ${
+              isMonet 
+                ? 'bg-[#4A4B6A] hover:bg-[#3E406F] border-white/20 text-white font-medium' 
+                : 'bg-gradient-to-r from-forsion-500 to-indigo-500 hover:from-forsion-400 hover:to-indigo-400 shadow-forsion-500/30'
+            }`}
           >
             <Plus size={18} />
             <span>New Chat</span>
@@ -283,14 +299,20 @@ const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        <div className="p-4 border-t border-white/40 dark:border-white/10 bg-white/70 dark:bg-white/5 backdrop-blur-xl">
+        <div className={`p-4 border-t ${
+          isMonet 
+            ? 'border-white/10 bg-white/5' 
+            : 'border-white/40 dark:border-white/10 bg-white/70 dark:bg-white/5 backdrop-blur-xl'
+        }`}>
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-xs font-bold text-white shadow-sm">
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm ${
+              isMonet ? 'bg-[#4A4B6A] border border-white/20' : 'bg-gradient-to-br from-indigo-500 to-purple-500'
+            }`}>
               {user.username.substring(0, 2).toUpperCase()}
             </div>
             <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{user.username}</p>
-              <p className="text-xs text-gray-500 truncate">{user.role}</p>
+              <p className={`text-sm font-medium truncate ${isMonet ? 'text-[#4A4B6A] font-bold' : 'text-gray-900 dark:text-gray-100'}`}>{user.username}</p>
+              <p className={`text-xs truncate ${isMonet ? 'text-[#4A4B6A]/70' : 'text-gray-500'}`}>{user.role}</p>
             </div>
           </div>
 
@@ -301,14 +323,22 @@ const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-1">
             <button
               onClick={() => { onOpenSettings(); onClose(); }}
-              className="w-full flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-forsion-300 px-3 py-2 rounded-xl hover:bg-white/70 dark:hover:bg-white/10 transition-colors"
+              className={`w-full flex items-center gap-2 text-sm px-3 py-2 rounded-xl transition-colors ${
+                isMonet
+                  ? 'text-[#4A4B6A] hover:bg-white/40 font-medium'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-forsion-300 hover:bg-white/70 dark:hover:bg-white/10'
+              }`}
             >
               <Settings size={16} />
               Settings
             </button>
             <button
               onClick={onLogout}
-              className="w-full flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 px-3 py-2 rounded-xl hover:bg-white/70 dark:hover:bg-white/10 transition-colors"
+              className={`w-full flex items-center gap-2 text-sm px-3 py-2 rounded-xl transition-colors ${
+                isMonet
+                  ? 'text-[#4A4B6A]/90 hover:bg-red-500/10 hover:text-red-600 font-medium'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-white/70 dark:hover:bg-white/10'
+              }`}
             >
               <LogOut size={16} />
               Log Out

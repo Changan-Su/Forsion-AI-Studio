@@ -181,82 +181,16 @@ export async function deleteGlobalModel(modelId: string): Promise<boolean> {
 
 export async function ensureBuiltinModels(): Promise<void> {
   const builtinModels: Partial<GlobalModel>[] = [
-    // Google Models
-    {
-      id: 'gemini-2.5-flash',
-      name: 'Gemini Flash',
-      provider: 'gemini',
-      description: 'Fast and versatile model for everyday tasks.',
-      icon: 'Zap',
-      configKey: 'google',
-    },
-    {
-      id: 'gemini-3-pro-preview',
-      name: 'Gemini Pro',
-      provider: 'gemini',
-      description: 'Advanced reasoning and complex tasks.',
-      icon: 'Brain',
-      configKey: 'google',
-    },
-    {
-      id: 'gemini-2.5-flash-image',
-      name: 'Nano Banana (Image)',
-      provider: 'gemini',
-      description: 'Generate and edit images.',
-      icon: 'Image',
-      configKey: 'google',
-    },
-    // OpenAI Models
+    // Only ChatGPT 5.1
     {
       id: 'gpt-5',
-      name: 'GPT 5 (Preview)',
+      name: 'ChatGPT 5.1',
       provider: 'external',
       description: 'Next-gen reasoning model.',
       icon: 'Sparkles',
       apiModelId: 'gpt-5',
       defaultBaseUrl: 'https://api.openai.com/v1',
       configKey: 'openai',
-    },
-    {
-      id: 'chatgpt-4o',
-      name: 'GPT-4o',
-      provider: 'external',
-      description: 'High-intelligence flagship model.',
-      icon: 'MessageSquare',
-      apiModelId: 'gpt-4o',
-      defaultBaseUrl: 'https://api.openai.com/v1',
-      configKey: 'openai',
-    },
-    {
-      id: 'chatgpt-4o-mini',
-      name: 'GPT-4o Mini',
-      provider: 'external',
-      description: 'Cost-efficient small model.',
-      icon: 'Zap',
-      apiModelId: 'gpt-4o-mini',
-      defaultBaseUrl: 'https://api.openai.com/v1',
-      configKey: 'openai',
-    },
-    // DeepSeek Models
-    {
-      id: 'deepseek-chat',
-      name: 'DeepSeek V3',
-      provider: 'external',
-      description: 'DeepSeek chat model.',
-      icon: 'Code',
-      apiModelId: 'deepseek-chat',
-      defaultBaseUrl: 'https://api.deepseek.com',
-      configKey: 'deepseek',
-    },
-    {
-      id: 'deepseek-reasoner',
-      name: 'DeepSeek R1',
-      provider: 'external',
-      description: 'Advanced reasoning model (CoT).',
-      icon: 'BrainCircuit',
-      apiModelId: 'deepseek-reasoner',
-      defaultBaseUrl: 'https://api.deepseek.com',
-      configKey: 'deepseek',
     },
   ];
 

@@ -11,8 +11,8 @@ interface SettingsModalProps {
   username: string;
   currentTheme: 'light' | 'dark';
   onThemeChange: (theme: 'light' | 'dark') => void;
-  currentPreset: 'default' | 'notion';
-  onPresetChange: (preset: 'default' | 'notion') => void;
+  currentPreset: 'default' | 'notion' | 'monet';
+  onPresetChange: (preset: 'default' | 'notion' | 'monet') => void;
   onModelsChange: () => void; // Callback to refresh app models
   isOffline: boolean;
   onReconnect: () => Promise<boolean>;
@@ -199,8 +199,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  // Built-in Providers
-  const builtinProviders = Array.from(new Set(BUILTIN_MODELS.map(m => m.configKey || m.id)));
+  const isMonet = currentPreset === 'monet';
 
   if (isLoading) {
     return (
@@ -212,10 +211,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col h-[90vh] overflow-hidden">
+      <div className={`w-full max-w-4xl shadow-2xl flex flex-col h-[90vh] overflow-hidden rounded-[32px] ${
+        isMonet 
+          ? 'glass-dark' 
+          : 'bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border'
+      }`}>
         
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-zinc-900/50">
+        <div className={`flex items-center justify-between p-6 border-b ${
+          isMonet
+            ? 'border-white/10 bg-transparent'
+            : 'border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-zinc-900/50'
+        }`}>
           <div className="flex items-center gap-3">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Settings</h2>
           </div>
@@ -226,12 +233,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
         <div className="flex flex-1 overflow-hidden">
           {/* Sidebar Tabs */}
-          <div className="w-56 bg-gray-50 dark:bg-zinc-900/30 border-r border-gray-200 dark:border-dark-border p-4 space-y-2 flex-shrink-0">
+          <div className={`w-56 p-4 space-y-2 flex-shrink-0 border-r ${
+            isMonet
+              ? 'border-white/10 bg-white/5'
+              : 'bg-gray-50 dark:bg-zinc-900/30 border-gray-200 dark:border-dark-border'
+          }`}>
             <button
               onClick={() => setActiveTab('general')}
               className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 activeTab === 'general' 
-                  ? 'bg-forsion-100 text-forsion-700 dark:bg-forsion-900/20 dark:text-forsion-400' 
+                  ? isMonet ? 'bg-white/20 text-white shadow-sm' : 'bg-forsion-100 text-forsion-700 dark:bg-forsion-900/20 dark:text-forsion-400' 
                   : 'text-gray-600 dark:text-dark-muted hover:bg-gray-100 dark:hover:bg-zinc-800'
               }`}
             >
@@ -242,7 +253,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               onClick={() => setActiveTab('account')}
               className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 activeTab === 'account' 
-                  ? 'bg-forsion-100 text-forsion-700 dark:bg-forsion-900/20 dark:text-forsion-400' 
+                  ? isMonet ? 'bg-white/20 text-white shadow-sm' : 'bg-forsion-100 text-forsion-700 dark:bg-forsion-900/20 dark:text-forsion-400' 
                   : 'text-gray-600 dark:text-dark-muted hover:bg-gray-100 dark:hover:bg-zinc-800'
               }`}
             >
@@ -253,7 +264,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               onClick={() => setActiveTab('developer')}
               className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 activeTab === 'developer' 
-                  ? 'bg-forsion-100 text-forsion-700 dark:bg-forsion-900/20 dark:text-forsion-400' 
+                  ? isMonet ? 'bg-white/20 text-white shadow-sm' : 'bg-forsion-100 text-forsion-700 dark:bg-forsion-900/20 dark:text-forsion-400' 
                   : 'text-gray-600 dark:text-dark-muted hover:bg-gray-100 dark:hover:bg-zinc-800'
               }`}
             >
@@ -263,7 +274,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           {/* Content Area */}
-          <div className="flex-1 overflow-y-auto p-6 bg-white dark:bg-dark-bg">
+          <div className={`flex-1 overflow-y-auto p-6 ${
+            isMonet ? 'bg-transparent' : 'bg-white dark:bg-dark-bg'
+          }`}>
             <div className={`mb-6 rounded-xl border p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-sm font-medium ${
               isOffline
                 ? 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-500/10 dark:border-amber-400/30 dark:text-amber-100'
@@ -334,7 +347,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 {/* Theme Preset */}
                 <div>
                   <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Theme Style</h3>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <button
                       onClick={() => onPresetChange('default')}
                       className={`p-4 border rounded-xl text-left transition-all ${
@@ -357,6 +370,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     >
                       <div className="font-bold font-serif text-gray-900 dark:text-white mb-1">Notion Style</div>
                       <div className="text-xs text-gray-500 dark:text-dark-muted">Minimalist, monochrome, serif fonts.</div>
+                    </button>
+
+                    <button
+                      onClick={() => onPresetChange('monet')}
+                      className={`p-4 border rounded-xl text-left transition-all ${
+                        currentPreset === 'monet'
+                          ? 'border-purple-400 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 ring-2 ring-purple-400/30'
+                          : 'border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-zinc-800'
+                      }`}
+                    >
+                      <div className="font-bold font-cursive text-purple-700 dark:text-purple-300 mb-1 text-lg">Monet Cliffs</div>
+                      <div className="text-xs text-gray-500 dark:text-dark-muted">Impressionist colors, glassmorphism, soft gradients.</div>
                     </button>
                   </div>
                 </div>

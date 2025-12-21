@@ -50,7 +50,7 @@ const App: React.FC = () => {
 
   // Theme & Settings
   const [theme, setTheme] = useState<'light' | 'dark'>('dark'); // Default to Dark
-  const [themePreset, setThemePreset] = useState<'default' | 'notion'>('default');
+  const [themePreset, setThemePreset] = useState<'default' | 'notion' | 'monet'>('default');
   const [customModels, setCustomModels] = useState<AIModel[]>([]);
   const [globalModels, setGlobalModels] = useState<AIModel[]>([]); // Models from backend admin
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
@@ -207,9 +207,11 @@ const App: React.FC = () => {
     }
 
     // Update body class for seamless backgrounds (dragging areas etc)
-    const bodyClass = theme === 'dark' 
-      ? (themePreset === 'notion' ? 'bg-notion-darkbg' : 'bg-dark-bg')
-      : (themePreset === 'notion' ? 'bg-notion-bg' : 'bg-white');
+    const bodyClass = themePreset === 'monet'
+      ? 'bg-desktop-surface'
+      : theme === 'dark' 
+        ? (themePreset === 'notion' ? 'bg-notion-darkbg' : 'bg-dark-bg')
+        : (themePreset === 'notion' ? 'bg-notion-bg' : 'bg-white');
       
     document.body.className = `${bodyClass} transition-colors duration-300`;
 
@@ -1372,15 +1374,18 @@ const App: React.FC = () => {
     icon: 'Box'
   };
   const isNotion = themePreset === 'notion';
+  const isMonet = themePreset === 'monet';
   const appBackground = isNotion
     ? 'bg-notion-bg dark:bg-notion-darkbg'
-    : theme === 'dark'
-      ? 'bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.25),_rgba(2,6,23,0.95))]'
-      : 'bg-[radial-gradient(140%_140%_at_50%_-10%,_rgba(255,255,255,0.98),_rgba(231,238,255,0.9)_45%,_rgba(214,234,255,0.92)_65%,_rgba(247,250,255,0.95))]';
+    : isMonet
+      ? 'bg-desktop-surface'
+      : theme === 'dark'
+        ? 'bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.25),_rgba(2,6,23,0.95))]'
+        : 'bg-[radial-gradient(140%_140%_at_50%_-10%,_rgba(255,255,255,0.98),_rgba(231,238,255,0.9)_45%,_rgba(214,234,255,0.92)_65%,_rgba(247,250,255,0.95))]';
 
   return (
     <div className={`relative flex h-screen overflow-hidden font-sans transition-colors duration-500 ${appBackground}`}>
-      {!isNotion && theme === 'light' && (
+      {!isNotion && !isMonet && theme === 'light' && (
         <>
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.95),_transparent)] opacity-80 blur-3xl z-0" />
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,_rgba(255,182,193,0.25),_transparent)_0_0/50%_50%,_radial-gradient(circle_at_80%_0%,_rgba(147,197,253,0.3),_transparent)_0_0/60%_60%] opacity-70 blur-2xl z-0" />
@@ -1402,6 +1407,7 @@ const App: React.FC = () => {
         onOpenSettings={() => setShowSettings(true)}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
+        themePreset={themePreset}
       />
 
       <div className={`relative z-10 flex-1 flex flex-col w-full transition-colors duration-300 ${isNotion ? 'bg-notion-bg dark:bg-notion-darkbg' : 'bg-transparent'}`}>
@@ -1409,7 +1415,9 @@ const App: React.FC = () => {
         <header className={`h-16 border-b flex items-center justify-between px-4 md:px-6 z-10 gap-3 backdrop-blur ${
            isNotion 
              ? 'bg-notion-bg/80 dark:bg-notion-darkbg/95 border-notion-border dark:border-notion-darkborder'
-             : 'bg-gradient-to-r from-white/80 via-slate-50/70 to-white/80 dark:from-[#0f172a]/70 dark:via-[#0b1120]/70 dark:to-[#020617]/70 border-white/10 dark:border-slate-800'
+             : isMonet
+               ? 'bg-white/10 border-b border-white/10 shadow-sm'
+               : 'bg-gradient-to-r from-white/80 via-slate-50/70 to-white/80 dark:from-[#0f172a]/70 dark:via-[#0b1120]/70 dark:to-[#020617]/70 border-white/10 dark:border-slate-800'
         }`}>
           <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 text-gray-500 dark:text-dark-muted hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-dark-card rounded-lg">
              <Menu size={20} />
@@ -1419,17 +1427,21 @@ const App: React.FC = () => {
              <button onClick={() => setModelDropdownOpen(!modelDropdownOpen)} className={`flex items-center gap-2 font-medium px-3 py-2 rounded-lg transition-colors w-full md:w-auto ${
                isNotion 
                  ? 'hover:bg-gray-100 dark:hover:bg-notion-darksidebar text-gray-900 dark:text-white'
-                 : 'hover:bg-slate-100 dark:hover:bg-dark-card text-gray-900 dark:text-white'
+                 : isMonet
+                   ? 'hover:bg-white/40 text-[#4A4B6A]'
+                   : 'hover:bg-slate-100 dark:hover:bg-dark-card text-gray-900 dark:text-white'
              }`}>
-                <span className={`truncate font-semibold ${isNotion ? 'font-serif' : 'text-forsion-600 dark:text-forsion-400'}`}>{currentModel.name}</span>
-                <ChevronDown size={14} className={`transition-transform flex-shrink-0 text-gray-500 ${modelDropdownOpen ? 'rotate-180' : ''}`} />
+                <span className={`truncate font-semibold ${isNotion ? 'font-serif' : isMonet ? 'font-cursive text-xl' : 'text-forsion-600 dark:text-forsion-400'}`}>{currentModel.name}</span>
+                <ChevronDown size={14} className={`transition-transform flex-shrink-0 text-[#4A4B6A]/80 ${modelDropdownOpen ? 'rotate-180' : ''}`} />
              </button>
 
              {modelDropdownOpen && (
                <div className={`absolute top-full left-0 mt-2 w-72 rounded-xl shadow-xl py-2 z-50 max-h-[80vh] overflow-y-auto ring-1 ring-black/5 ${
                  isNotion
                    ? 'bg-white dark:bg-notion-darksidebar border border-notion-border dark:border-notion-darkborder'
-                   : 'bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border'
+                   : isMonet
+                     ? 'glass-dark backdrop-blur-xl'
+                     : 'bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border'
                }`}>
                   <div className="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-dark-muted uppercase tracking-wider">Select Model</div>
                    {allModels.length === 0 ? (
@@ -1464,7 +1476,7 @@ const App: React.FC = () => {
              )}
           </div>
           <div className={`text-xs md:text-sm hidden md:block font-medium tracking-wide ${
-             isNotion ? 'text-gray-400 font-serif' : 'text-slate-400 dark:text-dark-muted'
+             isNotion ? 'text-gray-400 font-serif' : isMonet ? 'text-[#4A4B6A]/80 font-bold' : 'text-slate-400 dark:text-dark-muted'
           }`}>
             Forsion AI Studio
           </div>
@@ -1484,7 +1496,9 @@ const App: React.FC = () => {
         <div className={`p-4 border-t ${
           isNotion 
             ? 'bg-notion-bg dark:bg-notion-darkbg border-notion-border dark:border-notion-darkborder'
-            : 'bg-white/5 dark:bg-[#030712]/60 backdrop-blur-xl border-white/40 dark:border-white/10'
+            : isMonet
+              ? 'glass border-t border-white/10'
+              : 'bg-white/5 dark:bg-[#030712]/60 backdrop-blur-xl border-white/40 dark:border-white/10'
         }`}>
           <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto relative group">
              {/* Deep Thinking and Force Image Generation Toggles */}
@@ -1626,7 +1640,9 @@ const App: React.FC = () => {
              <div className={`relative flex items-end gap-2 p-2 transition-all ${
                isNotion
                  ? 'bg-transparent border-t-0 border-b-2 border-gray-200 dark:border-gray-700 rounded-none focus-within:border-black dark:focus-within:border-white'
-                 : 'bg-white/80 dark:bg-white/10 backdrop-blur-2xl rounded-[2rem] shadow-[0_20px_60px_rgba(15,23,42,0.12)] dark:shadow-[0_25px_80px_rgba(2,6,23,0.75)] border border-white/60 dark:border-white/15 focus-within:ring-2 focus-within:ring-forsion-400/40 dark:focus-within:ring-cyan-400/20'
+                 : isMonet
+                   ? 'bg-white/40 border border-white/30 rounded-[2rem] shadow-sm focus-within:ring-2 focus-within:ring-white/30 backdrop-blur-md'
+                   : 'bg-white/80 dark:bg-white/10 backdrop-blur-2xl rounded-[2rem] shadow-[0_20px_60px_rgba(15,23,42,0.12)] dark:shadow-[0_25px_80px_rgba(2,6,23,0.75)] border border-white/60 dark:border-white/15 focus-within:ring-2 focus-within:ring-forsion-400/40 dark:focus-within:ring-cyan-400/20'
              }`}>
                <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*,.pdf,.doc,.docx,.txt,.md" className="hidden" />
                <button 
@@ -1635,7 +1651,9 @@ const App: React.FC = () => {
                  className={`p-3 rounded-full transition-all duration-300 flex-shrink-0 self-end ${
                     isNotion 
                       ? 'text-gray-400 hover:text-gray-800 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
-                      : 'text-slate-500 hover:text-forsion-400 dark:text-slate-300 dark:hover:text-cyan-200 hover:bg-white/60 dark:hover:bg-white/10 border border-transparent dark:border-white/10 shadow-sm'
+                      : isMonet
+                        ? 'text-[#4A4B6A]/70 hover:text-[#4A4B6A] hover:bg-white/50'
+                        : 'text-slate-500 hover:text-forsion-400 dark:text-slate-300 dark:hover:text-cyan-200 hover:bg-white/60 dark:hover:bg-white/10 border border-transparent dark:border-white/10 shadow-sm'
                  } hover:-translate-y-0.5 active:scale-95 shadow-sm`}
                  title="Attach File"
                >
@@ -1690,7 +1708,11 @@ const App: React.FC = () => {
                    disabled={isProcessing}
                    rows={1}
                    className={`w-full bg-transparent py-3 px-2 focus:outline-none placeholder-slate-400 dark:placeholder-gray-600 resize-none overflow-y-auto ${
-                      isNotion ? 'text-gray-900 dark:text-white font-serif' : 'text-slate-800 dark:text-gray-100'
+                      isNotion 
+                        ? 'text-gray-900 dark:text-white font-serif' 
+                        : isMonet
+                          ? 'text-[#4A4B6A] dark:text-white placeholder-slate-500'
+                          : 'text-slate-800 dark:text-gray-100'
                    }`}
                    style={{ maxHeight: '200px' }}
                  />
@@ -1731,7 +1753,9 @@ const App: React.FC = () => {
                  className={`p-2 rounded-full transition-all duration-300 flex-shrink-0 self-end ${
                     isNotion 
                       ? 'text-gray-400 hover:text-gray-800 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
-                      : 'text-slate-500 hover:text-forsion-400 dark:text-slate-300 dark:hover:text-cyan-200 hover:bg-white/60 dark:hover:bg-white/10'
+                      : isMonet
+                        ? 'text-[#4A4B6A]/70 hover:text-[#4A4B6A] hover:bg-white/50'
+                        : 'text-slate-500 hover:text-forsion-400 dark:text-slate-300 dark:hover:text-cyan-200 hover:bg-white/60 dark:hover:bg-white/10'
                  }`}
                  title="Expand Input"
                >
@@ -1745,7 +1769,9 @@ const App: React.FC = () => {
                    className={`p-3 transition-all ${
                       isNotion 
                         ? 'text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300'
-                        : 'bg-gradient-to-r from-red-500 to-red-600 dark:from-red-500/80 dark:to-red-600/80 rounded-2xl text-white hover:from-red-400 hover:to-red-500 dark:hover:from-red-400/80 dark:hover:to-red-500/80 shadow-lg shadow-red-500/30 dark:shadow-[0_15px_40px_rgba(239,68,68,0.4)] border border-white/30 dark:border-white/10'
+                        : isMonet
+                          ? 'bg-red-500/80 hover:bg-red-600/80 text-white rounded-2xl shadow-sm'
+                          : 'bg-gradient-to-r from-red-500 to-red-600 dark:from-red-500/80 dark:to-red-600/80 rounded-2xl text-white hover:from-red-400 hover:to-red-500 dark:hover:from-red-400/80 dark:hover:to-red-500/80 shadow-lg shadow-red-500/30 dark:shadow-[0_15px_40px_rgba(239,68,68,0.4)] border border-white/30 dark:border-white/10'
                    } hover:-translate-y-0.5 active:scale-95`}
                    title="Stop generation"
                  >
@@ -1758,7 +1784,9 @@ const App: React.FC = () => {
                    className={`p-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                       isNotion 
                         ? 'text-gray-500 hover:text-black dark:text-gray-400 dark:hover:text-white'
-                        : 'bg-gradient-to-r from-forsion-500 to-indigo-500 dark:from-sky-500/80 dark:to-indigo-500/80 rounded-2xl text-white hover:from-forsion-400 hover:to-indigo-400 dark:hover:from-sky-400/80 dark:hover:to-indigo-400/80 shadow-lg shadow-forsion-500/30 dark:shadow-[0_15px_40px_rgba(15,23,42,0.65)] border border-white/30 dark:border-white/10'
+                        : isMonet
+                          ? 'bg-[#3E406F] hover:bg-[#5A5C8A] text-white rounded-2xl shadow-md'
+                          : 'bg-gradient-to-r from-forsion-500 to-indigo-500 dark:from-sky-500/80 dark:to-indigo-500/80 rounded-2xl text-white hover:from-forsion-400 hover:to-indigo-400 dark:hover:from-sky-400/80 dark:hover:to-indigo-400/80 shadow-lg shadow-forsion-500/30 dark:shadow-[0_15px_40px_rgba(15,23,42,0.65)] border border-white/30 dark:border-white/10'
                    } hover:-translate-y-0.5 active:scale-95`}
                  >
                    <Send size={20} />
@@ -1766,7 +1794,7 @@ const App: React.FC = () => {
                )}
              </div>
           </form>
-          <div className="text-center text-xs text-slate-400 dark:text-dark-muted mt-3 font-medium">
+          <div className={`text-center text-xs mt-3 font-medium ${isMonet ? 'text-[#4A4B6A]/60' : 'text-slate-400 dark:text-dark-muted'}`}>
             AI can make mistakes. Please verify important information.
           </div>
         </div>

@@ -48,6 +48,7 @@
             fontFamily: {
               sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
               serif: ['Merriweather', 'ui-serif', 'Georgia', 'serif'],
+              cursive: ['"Dancing Script"', 'cursive'],
             },
             animation: {
               'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
@@ -64,8 +65,16 @@
       }
     </script>
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:wght@300;400;700&family=JetBrains+Mono:wght@400&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:wght@300;400;700&family=JetBrains+Mono:wght@400&family=Dancing+Script&display=swap');
       
+      :root {
+        --color-primary: #3E406F;
+        --color-secondary: #C1A3B5;
+        --color-text: #4A4B6A;
+        --glass-surface: rgba(255, 255, 255, 0.65);
+        --bg-desktop: linear-gradient(135deg, #A8C5D0 0%, #D4B5C8 50%, #5A5C8A 100%);
+      }
+
       body {
         font-family: 'Inter', sans-serif;
       }
@@ -75,7 +84,36 @@
         --font-serif: 'Merriweather', serif;
       }
 
-      /* Custom scrollbar */
+      /* Monet Theme Glassmorphism - Softer & More Natural */
+      .glass {
+        background: rgba(255, 255, 255, 0.45);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+      }
+
+      .glass-dark {
+        background: rgba(255, 255, 255, 0.65);
+        backdrop-filter: blur(40px);
+        -webkit-backdrop-filter: blur(40px);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.15);
+      }
+
+      .bg-desktop-surface {
+        background: var(--bg-desktop);
+        background-size: cover;
+        background-position: center;
+      }
+
+      /* Shadow for white text on light backgrounds */
+      .text-shadow-sm {
+        text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+      }
+      .text-shadow-md {
+        text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      }
       ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
