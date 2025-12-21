@@ -614,9 +614,13 @@ router.post('/images/edits', authMiddleware, async (req: AuthRequest, res) => {
     }
 
     const baseUrl = (model.defaultBaseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
-    const provider = model.provider || 'openai';
     const apiModel = model.apiModelId || 'dall-e-3';
     const isGptImageModel = ['chatgpt-image-latest', 'gpt-image-1.5', 'gpt-image-1'].includes(apiModel);
+    const isDalleModel = ['dall-e-2', 'dall-e-3'].includes(apiModel);
+    const isStabilityModel = baseUrl.includes('stability.ai') || apiModel.includes('stable-diffusion');
+    
+    // Determine provider type based on model and base URL
+    const isOpenAIStyle = isGptImageModel || isDalleModel || baseUrl.includes('openai.com') || baseUrl.includes('api.gpt.ge');
     
     // Validate n parameter (gpt-image supports 1-10, DALL-E edit supports 1)
     const validN = isGptImageModel 
@@ -646,8 +650,8 @@ router.post('/images/edits', authMiddleware, async (req: AuthRequest, res) => {
     let response: Response;
     let result: any;
 
-    // Handle different providers
-    if (provider === 'openai' || provider === 'external') {
+    // Handle different providers based on API model and base URL
+    if (isOpenAIStyle) {
       if (mode === 'edit') {
         // OpenAI/gpt-image image editing endpoint
         console.log(`[Image Edit] Making request to ${baseUrl}/images/edits with ${imageArray.length} image(s)`);
@@ -701,7 +705,7 @@ router.post('/images/edits', authMiddleware, async (req: AuthRequest, res) => {
           detail: 'OpenAI does not support image-to-image generation. Please use Stability AI or another provider.' 
         });
       }
-    } else if (provider === 'stability') {
+    } else if (isStabilityModel) {
       // Stability AI image-to-image endpoint
       console.log(`[Image ${mode}] Making request to Stability AI`);
       
@@ -734,7 +738,7 @@ router.post('/images/edits', authMiddleware, async (req: AuthRequest, res) => {
       });
     } else {
       return res.status(400).json({ 
-        detail: `Provider '${provider}' is not supported for image editing. Supported: openai, stability` 
+        detail: `Provider for model '${apiModel}' is not supported for image editing. Supported: OpenAI, gpt-image, Stability AI` 
       });
     }
 
@@ -751,7 +755,7 @@ router.post('/images/edits', authMiddleware, async (req: AuthRequest, res) => {
         req.user!.username,
         model_id,
         model.name,
-        provider,
+        model.provider || 'external',
         0,
         0,
         false,
@@ -764,7 +768,7 @@ router.post('/images/edits', authMiddleware, async (req: AuthRequest, res) => {
     result = await response.json() as any;
 
     // Transform Stability AI response to match OpenAI format
-    if (provider === 'stability') {
+    if (isStabilityModel) {
       if (result.artifacts && result.artifacts[0] && result.artifacts[0].base64) {
         result = {
           data: [{
@@ -795,7 +799,7 @@ router.post('/images/edits', authMiddleware, async (req: AuthRequest, res) => {
       req.user!.username,
       model_id,
       model.name,
-      provider,
+      model.provider || 'external',
       tokensInput,
       tokensOutput,
       true
