@@ -27,6 +27,8 @@ const migrations = [
   `CREATE TABLE IF NOT EXISTS user_settings (
     id VARCHAR(36) PRIMARY KEY,
     user_id VARCHAR(36) UNIQUE NOT NULL,
+    nickname VARCHAR(100),
+    avatar MEDIUMTEXT,
     theme VARCHAR(20) DEFAULT 'light',
     theme_preset VARCHAR(50) DEFAULT 'default',
     custom_models TEXT,
@@ -207,6 +209,35 @@ async function runMigrations() {
   } catch (error: any) {
     if (error.code !== 'ER_DUP_FIELDNAME' && !error.message.includes('Duplicate column name')) {
       console.warn('⚠️  Could not add avatar column:', error.message);
+    }
+  }
+
+  // Add nickname and avatar to user_settings
+  try {
+    await query(`ALTER TABLE user_settings ADD COLUMN nickname VARCHAR(100) AFTER user_id`);
+    console.log('✅ Added nickname column to user_settings');
+  } catch (error: any) {
+    if (error.code !== 'ER_DUP_FIELDNAME' && !error.message.includes('Duplicate column name')) {
+      console.warn('⚠️  Could not add nickname column:', error.message);
+    }
+  }
+
+  try {
+    await query(`ALTER TABLE user_settings ADD COLUMN avatar MEDIUMTEXT AFTER nickname`);
+    console.log('✅ Added avatar column to user_settings');
+  } catch (error: any) {
+    if (error.code !== 'ER_DUP_FIELDNAME' && !error.message.includes('Duplicate column name')) {
+      console.warn('⚠️  Could not add avatar column:', error.message);
+    }
+  }
+
+  // Add developer_mode column if it doesn't exist
+  try {
+    await query(`ALTER TABLE user_settings ADD COLUMN developer_mode BOOLEAN DEFAULT FALSE AFTER external_api_configs`);
+    console.log('✅ Added developer_mode column to user_settings');
+  } catch (error: any) {
+    if (error.code !== 'ER_DUP_FIELDNAME' && !error.message.includes('Duplicate column name')) {
+      console.warn('⚠️  Could not add developer_mode column:', error.message);
     }
   }
 

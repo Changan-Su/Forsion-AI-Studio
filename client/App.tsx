@@ -100,11 +100,28 @@ const App: React.FC = () => {
       ]);
       
       setAppSettings(settings);
-      // Only update theme if backend has a non-default saved theme
-      // Don't override user's current dark theme with backend's default 'light'
-      if (settings.theme && settings.theme !== 'light') setTheme(settings.theme);
-      if (settings.themePreset) setThemePreset(settings.themePreset);
+      // Load theme and themePreset from database
+      // Always respect saved theme (including 'light' if that's what user saved)
+      if (settings.theme !== undefined && settings.theme !== null) {
+        console.log('Loading theme from database:', settings.theme);
+        setTheme(settings.theme);
+      }
+      if (settings.themePreset !== undefined && settings.themePreset !== null) {
+        console.log('Loading themePreset from database:', settings.themePreset);
+        setThemePreset(settings.themePreset);
+      }
       setCustomModels(settings.customModels || []);
+      
+      // Update user profile if settings contain nickname or avatar
+      if (user && (settings.nickname || settings.avatar)) {
+        const updatedUser = {
+          ...user,
+          nickname: settings.nickname,
+          avatar: settings.avatar
+        };
+        setUser(updatedUser);
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updatedUser));
+      }
       
       // Convert backend models to AIModel format
       const convertedGlobalModels: AIModel[] = (backendModels || []).map((m: any) => ({
@@ -224,24 +241,53 @@ const App: React.FC = () => {
 
   // Handle Settings Updates
   const updateAppSettings = async (newSettings: Partial<AppSettings>) => {
-    if (!appSettings) return;
-    const updated = { ...appSettings, ...newSettings };
-    setAppSettings(updated);
+    // Ensure we have appSettings initialized, if not, create a minimal one
+    const baseSettings = appSettings || {
+      externalApiConfigs: {},
+      customModels: [],
+    };
     
-    // Optimistic UI updates
-    if (newSettings.theme) setTheme(newSettings.theme);
-    if (newSettings.themePreset) setThemePreset(newSettings.themePreset);
-    if (newSettings.customModels) setCustomModels(newSettings.customModels);
+    // Always include current theme and themePreset in the settings to save
+    // This ensures both values are always persisted together
+    const settingsToSave: Partial<AppSettings> = {
+      ...baseSettings,
+      theme: theme, // Always include current theme state
+      themePreset: themePreset, // Always include current themePreset state
+      ...newSettings, // Override with new values if provided
+    };
+    
+    // Update local state optimistically
+    setAppSettings(settingsToSave as AppSettings);
+    
+    // Update UI state immediately
+    if (newSettings.theme !== undefined) setTheme(newSettings.theme);
+    if (newSettings.themePreset !== undefined) setThemePreset(newSettings.themePreset);
+    if (newSettings.customModels !== undefined) setCustomModels(newSettings.customModels);
 
-    // Sync with backend
+    // Sync with backend (save to database)
     try {
-      await backendService.updateSettings(updated);
+      console.log('Saving settings to database:', { theme: settingsToSave.theme, themePreset: settingsToSave.themePreset });
+      const savedSettings = await backendService.updateSettings(settingsToSave);
+      console.log('Settings saved successfully:', savedSettings);
+      // Update appSettings with the response from server to ensure consistency
+      if (savedSettings) {
+        setAppSettings(savedSettings);
+        // Also update theme and themePreset state from server response
+        if (savedSettings.theme !== undefined) setTheme(savedSettings.theme);
+        if (savedSettings.themePreset !== undefined) setThemePreset(savedSettings.themePreset);
+      }
     } catch (e: any) {
       if (e?.code === 'AUTH_REQUIRED' || e?.name === 'AuthRequiredError') {
         clearAuthState('Session expired. Please sign in again.');
         return;
       }
-      throw e;
+      // For theme changes, show error but don't revert (user already sees the change)
+      if (newSettings.theme !== undefined || newSettings.themePreset !== undefined) {
+        console.error('Failed to save theme settings to database:', e);
+        alert('Failed to save theme settings. Please try again.');
+      } else {
+        throw e;
+      }
     }
   };
 
@@ -1490,6 +1536,7 @@ const App: React.FC = () => {
           themePreset={themePreset}
           onFileUpload={processFile}
           onRegenerateMessage={handleRegenerateMessage}
+          user={user ? { username: user.username, nickname: user.nickname, avatar: user.avatar } : undefined}
         />
 
         {/* Input Area */}

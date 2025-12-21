@@ -36,11 +36,21 @@ router.put('/settings', authMiddleware, async (req: AuthRequest, res) => {
       return res.status(404).json({ detail: 'User not found' });
     }
 
+    console.log('Updating settings for user:', user.username, 'Settings:', {
+      theme: req.body.theme,
+      themePreset: req.body.themePreset,
+      hasNickname: !!req.body.nickname,
+      hasAvatar: !!req.body.avatar,
+      avatarSize: req.body.avatar ? req.body.avatar.length : 0
+    });
+
     const settings = await updateUserSettings(user.id, req.body);
+    console.log('Settings updated successfully');
     res.json(settings);
   } catch (error: any) {
     console.error('Update settings error:', error);
-    res.status(500).json({ detail: 'Failed to update settings' });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ detail: error.message || 'Failed to update settings' });
   }
 });
 

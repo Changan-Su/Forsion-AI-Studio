@@ -8,6 +8,8 @@ export interface User {
   id: string;
   username: string;
   role: UserRole;
+  nickname?: string;
+  avatar?: string;
 }
 
 
@@ -49,6 +51,8 @@ export interface AIModel {
 }
 
 export interface AppSettings {
+  nickname?: string;
+  avatar?: string;
   theme?: 'light' | 'dark';
   themePreset?: 'default' | 'notion' | 'monet'; // New: Theme Style
   customModels?: AIModel[]; // New: List of user-added models

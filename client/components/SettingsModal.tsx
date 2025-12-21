@@ -38,6 +38,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [developerMode, setDeveloperMode] = useState(false);
   
+  // User Profile State
+  const [nickname, setNickname] = useState('');
+  const [avatarData, setAvatarData] = useState<string | null>(null);
+  const [profileChanged, setProfileChanged] = useState(false);
+  
   // New Model Form State
   const [newModelName, setNewModelName] = useState('');
   const [newApiModelId, setNewApiModelId] = useState('');
@@ -59,6 +64,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         setConfigs(settings.externalApiConfigs || {});
         setCustomModels(loadedCustomModels);
         setDeveloperMode(settings.developerMode || false);
+        setNickname(settings.nickname || '');
+        setAvatarData(settings.avatar || null);
       } catch (e) {
         console.error("Failed to load settings in modal", e);
       } finally {
@@ -199,6 +206,56 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Check file size (2MB limit)
+      const maxSize = 2 * 1024 * 1024; // 2MB in bytes
+      if (file.size > maxSize) {
+        const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+        alert(`Avatar image is too large (${fileSizeMB}MB). Maximum size is 2MB.`);
+        // Reset file input
+        e.target.value = '';
+        return;
+      }
+      
+      // Check file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file (JPG, PNG, GIF, etc.)');
+        e.target.value = '';
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setAvatarData(event.target.result as string);
+          setProfileChanged(true);
+        }
+      };
+      reader.onerror = () => {
+        alert('Failed to read image file. Please try again.');
+        e.target.value = '';
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    try {
+      await backendService.updateSettings({
+        nickname: nickname.trim() || null,
+        avatar: avatarData
+      });
+      alert('Profile saved successfully!');
+      setProfileChanged(false);
+      onModelsChange(); // Trigger app state refresh
+    } catch (error) {
+      console.error('Failed to save profile:', error);
+      alert('Failed to save profile. Please try again.');
+    }
+  };
+
   const isMonet = currentPreset === 'monet';
 
   if (isLoading) {
@@ -314,6 +371,93 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             {/* --- GENERAL TAB --- */}
             {activeTab === 'general' && (
               <div className="space-y-8">
+                {/* User Profile */}
+                <div>
+                  <h3 className={`text-lg font-medium mb-4 flex items-center gap-2 ${isMonet ? 'text-[#4A4B6A]' : 'text-gray-900 dark:text-white'}`}>
+                    <User size={20} className={isMonet ? 'text-[#4A4B6A]' : 'text-gray-500'} />
+                    User Profile
+                  </h3>
+                  <div className="space-y-4">
+                    {/* Avatar Upload */}
+                    <div className="flex items-center gap-4">
+                      <div className="relative">
+                        <div className={`w-20 h-20 rounded-full overflow-hidden border-2 ${isMonet ? 'border-white/30' : 'border-gray-300 dark:border-dark-border'}`}>
+                          {avatarData ? (
+                            <img src={avatarData} alt="Avatar" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className={`w-full h-full flex items-center justify-center font-bold text-2xl ${isMonet ? 'bg-white/20 text-[#4A4B6A]' : 'bg-gray-200 dark:bg-zinc-800 text-gray-600 dark:text-gray-400'}`}>
+                              {username.substring(0, 2).toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        <input
+                          type="file"
+                          id="avatar-upload"
+                          accept="image/*"
+                          onChange={handleAvatarUpload}
+                          className="hidden"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label
+                          htmlFor="avatar-upload"
+                          className={`inline-block px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${
+                            isMonet
+                              ? 'bg-white/30 hover:bg-white/40 text-[#4A4B6A] border border-white/30'
+                              : 'bg-forsion-100 hover:bg-forsion-200 text-forsion-700 dark:bg-forsion-900/20 dark:hover:bg-forsion-900/30 dark:text-forsion-400'
+                          }`}
+                        >
+                          Upload Avatar
+                        </label>
+                        <p className={`text-xs mt-1 ${isMonet ? 'text-[#4A4B6A]/70' : 'text-gray-500 dark:text-dark-muted'}`}>
+                          Max size: 2MB, formats: JPG, PNG, GIF
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Nickname */}
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${isMonet ? 'text-[#4A4B6A]' : 'text-gray-700 dark:text-gray-300'}`}>
+                        Nickname (optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={nickname}
+                        onChange={(e) => {
+                          setNickname(e.target.value);
+                          setProfileChanged(true);
+                        }}
+                        placeholder={username}
+                        className={`w-full max-w-md px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-forsion-500 ${
+                          isMonet
+                            ? 'bg-white/30 border border-white/30 text-[#4A4B6A] placeholder-[#4A4B6A]/50'
+                            : 'bg-gray-50 dark:bg-zinc-900 border border-gray-300 dark:border-dark-border text-gray-900 dark:text-white'
+                        }`}
+                      />
+                      <p className={`text-xs mt-1 ${isMonet ? 'text-[#4A4B6A]/70' : 'text-gray-500 dark:text-dark-muted'}`}>
+                        Will be displayed instead of username if set
+                      </p>
+                    </div>
+
+                    {/* Save Button */}
+                    {profileChanged && (
+                      <div>
+                        <button
+                          onClick={handleSaveProfile}
+                          className={`px-6 py-2.5 rounded-lg font-medium transition-all hover:shadow-lg ${
+                            isMonet
+                              ? 'bg-[#4A4B6A] hover:bg-[#3E406F] text-white'
+                              : 'bg-forsion-600 hover:bg-forsion-500 text-white'
+                          }`}
+                        >
+                          <Save size={16} className="inline mr-2" />
+                          Save Profile
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* Theme Mode */}
                 <div>
                   <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Appearance</h3>

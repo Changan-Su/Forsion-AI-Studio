@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { Message, AIModel } from '../types';
-import { Bot, User, Cpu, AlertCircle, BrainCircuit, ChevronDown, ChevronRight, UploadCloud, Copy, Check, RefreshCw } from 'lucide-react';
+import { Bot, Cpu, AlertCircle, BrainCircuit, ChevronDown, ChevronRight, UploadCloud, Copy, Check, RefreshCw } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -149,9 +149,10 @@ interface ChatAreaProps {
   themePreset: 'default' | 'notion' | 'monet';
   onFileUpload: (file: File) => void;
   onRegenerateMessage?: (messageId: string) => void;
+  user?: { username: string; nickname?: string; avatar?: string }; // User info for avatar display
 }
 
-const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentModel, allModels, themePreset, onFileUpload, onRegenerateMessage }) => {
+const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentModel, allModels, themePreset, onFileUpload, onRegenerateMessage, user }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
@@ -315,7 +316,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
           {/* Avatar */}
           {msg.role === 'user' ? (
             <div
-              className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center shadow-md ${
+              className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center shadow-md overflow-hidden ${
                 isNotion 
                   ? 'bg-gray-800 dark:bg-white text-white dark:text-black'
                   : isMonet
@@ -323,7 +324,13 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
                     : 'bg-forsion-600 text-white'
               }`}
             >
-              <User size={18} />
+              {user?.avatar ? (
+                <img src={user.avatar} alt={user.nickname || user.username} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-xs font-bold">
+                  {(user?.nickname || user?.username || 'U').substring(0, 2).toUpperCase()}
+                </span>
+              )}
             </div>
           ) : msg.isError ? (
             <div

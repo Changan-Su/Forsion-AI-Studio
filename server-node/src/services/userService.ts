@@ -174,6 +174,8 @@ export async function getUserSettings(userId: string): Promise<any> {
 
   if (rows.length === 0) {
     return {
+      nickname: null,
+      avatar: null,
       theme: 'dark',  // Default to dark theme
       themePreset: 'default',
       customModels: [],
@@ -185,6 +187,8 @@ export async function getUserSettings(userId: string): Promise<any> {
 
   const row = rows[0];
   return {
+    nickname: row.nickname,
+    avatar: row.avatar,
     theme: row.theme,
     themePreset: row.theme_preset,
     customModels: JSON.parse(row.custom_models || '[]'),
@@ -202,23 +206,38 @@ export async function updateUserSettings(userId: string, settings: any): Promise
 
   if (existing.length === 0) {
     const id = uuidv4();
-    await query(
-      `INSERT INTO user_settings (id, user_id, theme, theme_preset, custom_models, external_api_configs, developer_mode)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id,
-        userId,
-        settings.theme || 'light',
-        settings.themePreset || 'default',
-        JSON.stringify(settings.customModels || []),
-        JSON.stringify(settings.externalApiConfigs || {}),
-        settings.developerMode ? 1 : 0,
-      ]
-    );
+    try {
+      await query(
+        `INSERT INTO user_settings (id, user_id, nickname, avatar, theme, theme_preset, custom_models, external_api_configs, developer_mode)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          userId,
+          settings.nickname || null,
+          settings.avatar || null,
+          settings.theme || 'light',
+          settings.themePreset || 'default',
+          JSON.stringify(settings.customModels || []),
+          JSON.stringify(settings.externalApiConfigs || {}),
+          settings.developerMode ? 1 : 0,
+        ]
+      );
+    } catch (error: any) {
+      console.error('Error inserting user settings:', error);
+      throw error;
+    }
   } else {
     const setClauses: string[] = [];
     const values: any[] = [];
 
+    if (settings.nickname !== undefined) {
+      setClauses.push('nickname = ?');
+      values.push(settings.nickname);
+    }
+    if (settings.avatar !== undefined) {
+      setClauses.push('avatar = ?');
+      values.push(settings.avatar);
+    }
     if (settings.theme !== undefined) {
       setClauses.push('theme = ?');
       values.push(settings.theme);
@@ -242,10 +261,17 @@ export async function updateUserSettings(userId: string, settings: any): Promise
 
     if (setClauses.length > 0) {
       values.push(userId);
-      await query(
-        `UPDATE user_settings SET ${setClauses.join(', ')} WHERE user_id = ?`,
-        values
-      );
+      try {
+        await query(
+          `UPDATE user_settings SET ${setClauses.join(', ')} WHERE user_id = ?`,
+          values
+        );
+      } catch (error: any) {
+        console.error('Error updating user settings:', error);
+        console.error('SQL:', `UPDATE user_settings SET ${setClauses.join(', ')} WHERE user_id = ?`);
+        console.error('Values:', values);
+        throw error;
+      }
     }
   }
 

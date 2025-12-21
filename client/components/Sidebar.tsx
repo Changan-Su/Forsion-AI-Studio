@@ -46,6 +46,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [showArchivedSection, setShowArchivedSection] = useState(false);
   const isNotion = themePreset === 'notion';
   const isMonet = themePreset === 'monet';
+  
+  // Refs
+  const menuRef = useRef<HTMLDivElement>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -305,13 +309,19 @@ const Sidebar: React.FC<SidebarProps> = ({
             : 'border-white/40 dark:border-white/10 bg-white/70 dark:bg-white/5 backdrop-blur-xl'
         }`}>
           <div className="flex items-center gap-3 mb-4">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm ${
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm overflow-hidden ${
               isMonet ? 'bg-[#4A4B6A] border border-white/20' : 'bg-gradient-to-br from-indigo-500 to-purple-500'
             }`}>
-              {user.username.substring(0, 2).toUpperCase()}
+              {user.avatar ? (
+                <img src={user.avatar} alt={user.nickname || user.username} className="w-full h-full object-cover" />
+              ) : (
+                <span>{(user.nickname || user.username).substring(0, 2).toUpperCase()}</span>
+              )}
             </div>
             <div className="flex-1 overflow-hidden">
-              <p className={`text-sm font-medium truncate ${isMonet ? 'text-[#4A4B6A] font-bold' : 'text-gray-900 dark:text-gray-100'}`}>{user.username}</p>
+              <p className={`text-sm font-medium truncate ${isMonet ? 'text-[#4A4B6A] font-bold' : 'text-gray-900 dark:text-gray-100'}`}>
+                {user.nickname || user.username}
+              </p>
               <p className={`text-xs truncate ${isMonet ? 'text-[#4A4B6A]/70' : 'text-gray-500'}`}>{user.role}</p>
             </div>
           </div>
