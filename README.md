@@ -16,12 +16,17 @@
 ## ✨ 主要特性
 
 - 🤖 **多模型支持**：支持 Gemini、OpenAI GPT、DeepSeek、Claude 等多种 AI 模型
-- 🎨 **精美界面**：现代化 UI 设计，支持亮色/暗色主题和 Notion 风格预设
+- 🎨 **精美界面**：现代化 UI 设计，支持三种主题风格：
+  - **Cyber Tech**：充满活力的渐变和现代无衬线字体
+  - **Notion Style**：极简主义、单色调、衬线字体
+  - **Monet Cliffs**：印象派色彩、毛玻璃效果、柔和渐变
+- 🌓 **主题切换**：支持亮色/暗色模式，所有主题配置自动保存到数据库
 - 💭 **深度思考**：支持 AI 思考过程折叠显示，一键展开查看推理过程
 - 📝 **流式输出**：类似 ChatGPT 的实时逐字显示效果
 - 🔢 **数学公式**：支持 LaTeX/KaTeX 数学公式渲染
 - 💻 **代码高亮**：带语言标签和一键复制功能的代码块
 - 👥 **用户管理**：完整的用户认证系统，支持管理员和普通用户角色
+- 👤 **个人资料**：支持自定义昵称和头像上传（最大 2MB），优先显示昵称
 - 💬 **会话管理**：多会话支持，本地存储聊天历史
 - 🖼️ **文件处理**：支持图片、PDF、Word 文档上传和处理
 - ⚙️ **自定义配置**：管理员面板配置 API 和添加自定义模型
@@ -206,6 +211,15 @@ FRONTEND_PORT=8080
 - **模型管理**：添加自定义 AI 模型，配置 API 密钥
 - **使用统计**：查看 API 调用统计
 
+### 用户个人设置
+
+在 Settings → General 标签页中，用户可以：
+
+- **上传头像**：支持 JPG、PNG、GIF 格式，最大 2MB
+- **设置昵称**：自定义昵称，优先于用户名显示
+- **主题配置**：选择 Appearance（亮色/暗色）和 Theme Style（Cyber Tech/Notion Style/Monet Cliffs）
+- 所有设置自动保存到数据库，跨设备同步
+
 ## 🔍 常见问题与故障排查
 
 ### 数据库初始化
@@ -214,6 +228,8 @@ FRONTEND_PORT=8080
 
 **症状**：后端日志中出现类似错误：
 - `Unknown column 'avatar' in 'field list'`
+- `Unknown column 'developer_mode' in 'field list'`
+- `Unknown column 'nickname' in 'field list'`
 - `Table 'forsion_ai_studio.user_credits' doesn't exist`
 - `Table 'forsion_ai_studio.invite_codes' doesn't exist`
 
@@ -227,7 +243,15 @@ docker compose exec backend node dist/db/migrate.js
 docker compose exec backend node dist/db/seed.js
 
 # 方法二：手动执行 SQL 修复
-# 添加缺失的字段
+# 添加缺失的字段到 user_settings 表
+docker compose exec mysql mysql -u root -prootpassword forsion_ai_studio -e "
+ALTER TABLE user_settings 
+  ADD COLUMN nickname VARCHAR(100) AFTER user_id,
+  ADD COLUMN avatar MEDIUMTEXT AFTER nickname,
+  ADD COLUMN developer_mode BOOLEAN DEFAULT FALSE AFTER external_api_configs;
+" 2>/dev/null || echo "字段可能已存在"
+
+# 添加缺失的字段到 global_models 表
 docker compose exec mysql mysql -u root -prootpassword forsion_ai_studio -e "
 ALTER TABLE global_models 
   ADD COLUMN avatar MEDIUMTEXT AFTER icon,
@@ -407,7 +431,15 @@ MYSQL_PASS="${MYSQL_ROOT_PASSWORD:-rootpassword}"
 
 echo "🔧 修复数据库结构..."
 
-# 添加缺失字段
+# 添加缺失字段到 user_settings 表
+docker compose exec mysql mysql -u root -p"$MYSQL_PASS" forsion_ai_studio -e "
+ALTER TABLE user_settings 
+  ADD COLUMN nickname VARCHAR(100) AFTER user_id,
+  ADD COLUMN avatar MEDIUMTEXT AFTER nickname,
+  ADD COLUMN developer_mode BOOLEAN DEFAULT FALSE AFTER external_api_configs;
+" 2>/dev/null || echo "字段可能已存在"
+
+# 添加缺失字段到 global_models 表
 docker compose exec mysql mysql -u root -p"$MYSQL_PASS" forsion_ai_studio -e "
 ALTER TABLE global_models 
   ADD COLUMN avatar MEDIUMTEXT AFTER icon,

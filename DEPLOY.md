@@ -116,7 +116,9 @@ docker compose logs -f backend
 # 进入后端容器
 docker compose exec backend sh
 
-# 运行数据库迁移
+# 运行数据库迁移（创建所有表和字段，包括用户设置、模型等）
+npm run migrate
+# 或使用完整命令
 npm run db:migrate
 
 # 运行数据库种子（创建管理员账号）
@@ -125,6 +127,12 @@ npm run db:seed
 # 退出容器
 exit
 ```
+
+> **注意**：数据库迁移会自动创建以下字段：
+> - `user_settings` 表：`nickname`、`avatar`、`theme`、`theme_preset`、`developer_mode` 等
+> - `global_models` 表：`avatar`、`prompt_caching_enabled`、`system_prompt` 等
+> 
+> 如果遇到字段已存在的警告，可以忽略（迁移脚本会自动跳过已存在的字段）。
 
 ### 6. 访问服务
 
@@ -225,6 +233,25 @@ GRANT SELECT ON forsion_ai_studio.* TO 'readonly'@'%';
 FLUSH PRIVILEGES;
 ```
 
+### 数据库表结构说明
+
+主要数据表包括：
+
+- **users**：用户基本信息（用户名、密码、角色等）
+- **user_settings**：用户设置表，包含：
+  - `nickname`：用户昵称（可选）
+  - `avatar`：用户头像（Base64 编码，MEDIUMTEXT 类型）
+  - `theme`：主题模式（light/dark）
+  - `theme_preset`：主题样式（default/notion/monet）
+  - `custom_models`：用户自定义模型列表（JSON）
+  - `external_api_configs`：外部 API 配置（JSON）
+  - `developer_mode`：开发者模式开关
+- **global_models**：全局模型配置（管理员管理）
+- **user_credits**：用户积分余额
+- **api_usage_logs**：API 使用日志
+
+> **注意**：所有用户设置（包括主题配置、昵称、头像）都会自动保存到 `user_settings` 表中，支持跨设备同步。
+
 ---
 
 ## 手动部署
@@ -306,6 +333,8 @@ EOF
 npm run build
 
 # 初始化数据库
+npm run migrate
+# 或使用完整命令
 npm run db:migrate
 npm run db:seed
 
@@ -487,6 +516,48 @@ SET GLOBAL wait_timeout = 28800;
 SET GLOBAL interactive_timeout = 28800;
 ```
 
+### Q: 数据库字段缺失错误（如 `Unknown column 'developer_mode'`）？
+
+A: 这通常发生在升级现有数据库时。运行数据库迁移来添加缺失的字段：
+
+```bash
+# 方法一：使用迁移脚本（推荐）
+docker compose exec backend npm run migrate
+
+# 方法二：如果容器中没有 npm，直接运行编译后的脚本
+docker compose exec backend node dist/db/migrate.js
+```
+
+迁移脚本会自动检测并添加缺失的字段：
+- `user_settings` 表：`nickname`、`avatar`、`developer_mode`
+- `global_models` 表：`avatar`、`prompt_caching_enabled`、`system_prompt`、`cacheable_content`
+
+如果迁移脚本无法运行，可以手动执行 SQL：
+
+```bash
+# 进入 MySQL 容器
+docker compose exec mysql mysql -u root -p
+
+# 执行以下 SQL（替换密码）
+```
+
+```sql
+USE forsion_ai_studio;
+
+-- 添加 user_settings 表缺失字段（如果字段已存在会报错，可以忽略）
+ALTER TABLE user_settings ADD COLUMN nickname VARCHAR(100) AFTER user_id;
+ALTER TABLE user_settings ADD COLUMN avatar MEDIUMTEXT AFTER nickname;
+ALTER TABLE user_settings ADD COLUMN developer_mode BOOLEAN DEFAULT FALSE AFTER external_api_configs;
+
+-- 添加 global_models 表缺失字段（如果字段已存在会报错，可以忽略）
+ALTER TABLE global_models ADD COLUMN avatar MEDIUMTEXT AFTER icon;
+ALTER TABLE global_models ADD COLUMN prompt_caching_enabled BOOLEAN DEFAULT FALSE AFTER is_enabled;
+ALTER TABLE global_models ADD COLUMN system_prompt TEXT AFTER prompt_caching_enabled;
+ALTER TABLE global_models ADD COLUMN cacheable_content TEXT AFTER system_prompt;
+```
+
+> **注意**：如果字段已存在，MySQL 会返回错误 `Duplicate column name`，这是正常的，可以忽略。建议使用迁移脚本自动处理。
+
 ---
 
 ## 部署脚本
@@ -507,7 +578,14 @@ chmod +x deploy.sh
 2. 克隆/更新代码
 3. 配置环境变量
 4. 启动 Docker 服务
-5. 初始化数据库
+5. 初始化数据库（运行迁移脚本，创建所有表和字段）
+
+> **重要**：首次部署或升级后，确保数据库迁移已成功运行。迁移脚本会创建：
+> - 所有必需的数据表
+> - 用户设置字段（nickname、avatar、theme、theme_preset、developer_mode 等）
+> - 模型相关字段（avatar、prompt_caching_enabled 等）
+> 
+> 如果遇到字段缺失错误，请参考上面的"数据库字段缺失错误"解决方案。
 
 ---
 
