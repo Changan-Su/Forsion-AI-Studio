@@ -66,12 +66,21 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface Attachment {
+  type: 'image' | 'document';
+  url: string; // Base64 data string
+  mimeType: string;
+  name?: string;
+  extractedText?: string;
+}
+
 export interface ChatCompletionRequest {
   model_id: string;
   messages: ChatMessage[];
   temperature?: number;
   max_tokens?: number;
   stream?: boolean;
+  attachments?: Attachment[];
 }
 
 export interface InviteCode {

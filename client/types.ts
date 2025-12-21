@@ -23,6 +23,8 @@ export interface Message {
   attachments?: Attachment[]; // For USER UPLOADED images
   reasoning?: string; // For deep thinking process
   isError?: boolean;
+  editMode?: 'edit' | 'img2img' | 'generate'; // Image generation mode
+  sourceImageUrl?: string; // Original image URL for editing
 }
 
 export interface ChatSession {

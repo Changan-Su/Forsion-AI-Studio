@@ -12,7 +12,7 @@ import SettingsModal from './components/SettingsModal';
 import RegisterModal from './components/RegisterModal';
 import { Send, Zap, Menu, Sparkles, MessageSquare, Code, Brain, BrainCircuit, Image as ImageIcon, ChevronDown, Paperclip, X as XIcon, Box, Square } from 'lucide-react';
 import { getPresetAvatar, svgToDataUrl } from './src/utils/presetAvatars';
-import { detectImageGenerationIntent, generateImage } from './services/imageGenerationService';
+import { detectImageGenerationIntent, generateImage, detectImageEditIntent, editImage, imageToImage } from './services/imageGenerationService';
 import CommandAutocomplete from './components/CommandAutocomplete';
 
 const App: React.FC = () => {
@@ -582,6 +582,149 @@ const App: React.FC = () => {
     // Create new AbortController for this request
     abortControllerRef.current = new AbortController();
     
+    // 检测是否为图像编辑或以图生图请求
+    const hasImageAttachment = currentAttachments.length > 0 && currentAttachments[0].type === 'image';
+    const { isEditRequest, isImg2ImgRequest, prompt: editPrompt, mode: editMode } = hasImageAttachment 
+      ? detectImageEditIntent(finalInput, true)
+      : { isEditRequest: false, isImg2ImgRequest: false, prompt: finalInput, mode: 'none' as const };
+    
+    if ((isEditRequest || isImg2ImgRequest) && hasImageAttachment) {
+      // 处理图像编辑或以图生图请求
+      const botMessageId = (Date.now() + 1).toString();
+      const modeText = isEditRequest ? '编辑图像' : '以图生图';
+      const botMessage: Message = {
+        id: botMessageId,
+        role: 'model',
+        content: `正在${modeText}...`,
+        timestamp: Date.now(),
+        modelId: currentModel.id,
+        editMode: editMode,
+        sourceImageUrl: currentAttachments[0].url
+      };
+
+      setSessions(prev => prev.map(s => {
+        if (s.id === sessionId) {
+          return { ...s, messages: [...s.messages, botMessage], updatedAt: Date.now() };
+        }
+        return s;
+      }));
+
+      try {
+        let result: { imageUrl: string; usage?: { prompt_tokens: number; completion_tokens: number } };
+        const imageBase64 = currentAttachments[0].url;
+        
+        // 使用全局模型（后端代理）
+        if ((currentModel as any).isGlobal) {
+          console.log('[handleSendMessage] Using backend proxy for image editing/img2img with global model');
+          result = await backendService.proxyImageEdit(
+            currentModel.id,
+            editPrompt,
+            imageBase64,
+            editMode,
+            '1024x1024',
+            'standard',
+            isImg2ImgRequest ? 0.7 : 0.5 // Higher strength for img2img
+          );
+        } else {
+          // 使用前端配置的API
+          let configKey = currentModel.configKey || 'openai';
+          let config = appSettings?.externalApiConfigs?.[configKey];
+          
+          if (!config || !config.apiKey) {
+            // 尝试使用Stability AI（如果配置了）
+            const stabilityConfig = appSettings?.externalApiConfigs?.['stability'];
+            if (stabilityConfig && stabilityConfig.apiKey) {
+              config = stabilityConfig;
+              configKey = 'stability';
+            }
+          }
+          
+          if (!config || !config.apiKey) {
+            throw new Error(`图像${modeText}API密钥未配置。请在设置中配置API密钥以使用此功能。`);
+          }
+
+          const imageGenConfig = {
+            apiKey: config.apiKey,
+            baseUrl: config.baseUrl,
+            provider: (configKey === 'stability' ? 'stability' : 'openai') as 'openai' | 'stability'
+          };
+
+          if (isEditRequest) {
+            result = await editImage(imageGenConfig, editPrompt, imageBase64, {
+              size: '1024x1024',
+              quality: 'standard',
+              provider: imageGenConfig.provider
+            });
+          } else {
+            result = await imageToImage(imageGenConfig, editPrompt, imageBase64, {
+              size: '1024x1024',
+              strength: 0.7,
+              provider: imageGenConfig.provider
+            });
+          }
+        }
+
+        // 更新消息显示结果图像
+        setSessions(prev => prev.map(s => {
+          if (s.id === sessionId) {
+            return {
+              ...s,
+              messages: s.messages.map(m =>
+                m.id === botMessageId
+                  ? { ...m, content: `已${modeText}：${editPrompt}`, imageUrl: result.imageUrl }
+                  : m
+              ),
+              updatedAt: Date.now()
+            };
+          }
+          return s;
+        }));
+
+        // 记录API使用
+        if (result.usage && user) {
+          try {
+            await backendService.logApiUsage(
+              currentModel.id,
+              currentModel.name,
+              currentModel.provider || 'external',
+              result.usage.prompt_tokens || 0,
+              result.usage.completion_tokens || 0,
+              true
+            );
+          } catch (logError) {
+            console.error('Failed to log API usage:', logError);
+          }
+        }
+      } catch (error: any) {
+        console.error(`Image ${modeText} error:`, error);
+        
+        // 更新消息显示错误
+        setSessions(prev => prev.map(s => {
+          if (s.id === sessionId) {
+            return {
+              ...s,
+              messages: s.messages.map(m =>
+                m.id === botMessageId
+                  ? { 
+                      ...m, 
+                      content: error.message || `图像${modeText}失败`,
+                      isError: true,
+                      imageUrl: undefined
+                    }
+                  : m
+              ),
+              updatedAt: Date.now()
+            };
+          }
+          return s;
+        }));
+      } finally {
+        setIsProcessing(false);
+        setStreamingMessageId(null);
+      }
+      return;
+    }
+    
     // 检测是否为图像生成请求（包括强制画图开关）
     const { isImageRequest, prompt: imagePrompt } = detectImageGenerationIntent(finalInput);
     const shouldGenerateImage = isImageRequest || forceImageGeneration;
@@ -868,7 +1011,8 @@ const App: React.FC = () => {
              shouldUseDeepThinking,
              undefined,
              updateStreamingMessage,
-             abortControllerRef.current?.signal
+             abortControllerRef.current?.signal,
+             currentAttachments // Pass attachments to backend
            );
            usage = result.usage;
         } else if (!config || !config.apiKey) {
@@ -1681,11 +1825,21 @@ const App: React.FC = () => {
                <div className="absolute bottom-full left-0 mb-3 ml-2">
                  <div className="relative group/preview inline-block">
                     {attachment.type === 'image' ? (
-                      <img 
-                        src={attachment.url} 
-                        alt="Preview" 
-                        className={`h-20 w-auto rounded-lg shadow-lg object-cover ${isNotion ? 'border border-gray-300' : 'border border-gray-200 dark:border-dark-border bg-gray-100'}`} 
-                      />
+                      <>
+                        <img 
+                          src={attachment.url} 
+                          alt="Preview" 
+                          className={`h-20 w-auto rounded-lg shadow-lg object-cover ${isNotion ? 'border border-gray-300' : 'border border-gray-200 dark:border-dark-border bg-gray-100'}`} 
+                        />
+                        {/* Image editing hint */}
+                        <div className={`absolute top-full left-0 mt-2 px-3 py-1.5 rounded-md text-xs whitespace-nowrap ${
+                          isNotion 
+                            ? 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700' 
+                            : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                        }`}>
+                          💡 Try: /edit or /img2img commands
+                        </div>
+                      </>
                     ) : (
                       <div className={`h-20 px-4 rounded-lg shadow-lg flex items-center gap-3 ${isNotion ? 'border border-gray-300 bg-gray-100' : 'border border-gray-200 dark:border-dark-border bg-gray-100 dark:bg-gray-800'}`}>
                         <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">

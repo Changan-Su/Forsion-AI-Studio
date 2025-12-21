@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image as ImageIcon, BrainCircuit, Sparkles } from 'lucide-react';
+import { Image as ImageIcon, BrainCircuit, Sparkles, Edit, RefreshCw } from 'lucide-react';
 
 export interface Command {
   command: string;
@@ -31,6 +31,18 @@ export const AVAILABLE_COMMANDS: Command[] = [
     command: '/paint',
     description: 'Generate an image',
     icon: <ImageIcon size={14} />,
+    category: 'image'
+  },
+  {
+    command: '/edit',
+    description: 'Edit uploaded image',
+    icon: <Edit size={14} />,
+    category: 'image'
+  },
+  {
+    command: '/img2img',
+    description: 'Generate image from image',
+    icon: <RefreshCw size={14} />,
     category: 'image'
   },
   {

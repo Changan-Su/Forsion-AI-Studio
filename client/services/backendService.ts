@@ -504,7 +504,8 @@ export const backendService = {
     enableThinking: boolean = false,
     maxTokens?: number,
     onChunk: (content: string, reasoning?: string) => void = () => {},
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    attachments?: Array<{ type: 'image' | 'document'; url: string; mimeType: string; name?: string; extractedText?: string }>
   ): Promise<{ content: string; reasoning?: string; usage?: { prompt_tokens: number; completion_tokens: number } }> {
     console.log('[proxyChatCompletions] Starting request for model:', modelId);
     try {
@@ -530,7 +531,8 @@ export const backendService = {
           messages: finalMessages,
           temperature,
           max_tokens: maxTokens,
-          stream: true // Enable streaming
+          stream: true, // Enable streaming
+          attachments: attachments || [] // Pass attachments to backend
         }),
         signal: signal
       });
@@ -700,7 +702,10 @@ export const backendService = {
     modelId: string,
     prompt: string,
     size: string = '1024x1024',
-    quality: 'standard' | 'hd' = 'standard'
+    quality: 'standard' | 'hd' = 'standard',
+    style?: 'vivid' | 'natural',
+    n: number = 1,
+    response_format: 'url' | 'b64_json' = 'url'
   ): Promise<{ imageUrl: string; usage?: { prompt_tokens: number; completion_tokens: number } }> {
     console.log('[proxyImageGeneration] Starting request for model:', modelId);
     try {
@@ -713,6 +718,84 @@ export const backendService = {
           prompt: prompt,
           size: size,
           quality: quality,
+          style: style,
+          n: n,
+          response_format: response_format,
+        }),
+      });
+
+      if (!res.ok) {
+        markOnline();
+        if (res.status === 401) {
+          clearAuth();
+          throw new AuthRequiredError();
+        }
+        const detail = await extractDetail(res);
+        throw new Error(detail || `API error: ${res.status}`);
+      }
+
+      markOnline();
+
+      const data = await res.json();
+      
+      if (!data.data || !data.data[0]) {
+        throw new Error('No image data returned from API');
+      }
+
+      // Handle both url and b64_json response formats
+      let imageUrl: string;
+      if (response_format === 'b64_json' && data.data[0].b64_json) {
+        imageUrl = `data:image/png;base64,${data.data[0].b64_json}`;
+      } else if (data.data[0].url) {
+        imageUrl = data.data[0].url;
+      } else {
+        throw new Error('No image URL or base64 data returned from API');
+      }
+
+      // Estimate tokens for image generation
+      const estimatedTokens = Math.ceil(prompt.length / 4) + 1000;
+
+      return {
+        imageUrl: imageUrl,
+        usage: {
+          prompt_tokens: estimatedTokens,
+          completion_tokens: 0,
+        },
+      };
+    } catch (error: any) {
+      if (error instanceof AuthRequiredError) throw error;
+      if (isNetworkError(error)) markOffline();
+      else markOnline();
+      throw error;
+    }
+  },
+
+  // 18. Proxy Image Editing (for global models) - uses backend stored API keys
+  async proxyImageEdit(
+    modelId: string,
+    prompt: string,
+    imageBase64: string,
+    mode: 'edit' | 'img2img' = 'edit',
+    size: string = '1024x1024',
+    quality: 'standard' | 'hd' = 'standard',
+    strength: number = 0.7,
+    mask?: string
+  ): Promise<{ imageUrl: string; usage?: { prompt_tokens: number; completion_tokens: number } }> {
+    console.log('[proxyImageEdit] Starting request for model:', modelId, 'mode:', mode);
+    try {
+      console.log('[proxyImageEdit] Sending request to:', `${API_URL}/images/edits`);
+      const res = await fetch(`${API_URL}/images/edits`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          model_id: modelId,
+          prompt: prompt,
+          image: imageBase64,
+          mode: mode,
+          size: size,
+          quality: quality,
+          strength: strength,
+          mask: mask,
         }),
       });
 
@@ -734,7 +817,7 @@ export const backendService = {
         throw new Error('No image URL returned from API');
       }
 
-      // Estimate tokens for image generation
+      // Estimate tokens for image editing
       const estimatedTokens = Math.ceil(prompt.length / 4) + 1000;
 
       return {
@@ -752,7 +835,7 @@ export const backendService = {
     }
   },
 
-  // 16. Register
+  // 19. Register
   async register(username: string, password: string, inviteCode: string): Promise<User> {
     try {
       const res = await fetch(`${API_URL}/auth/register`, {

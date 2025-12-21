@@ -50,6 +50,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   // Refs
   const menuRef = useRef<HTMLDivElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
+  const isSavingRef = useRef(false); // Flag to prevent click during save
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -79,14 +80,23 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const handleSaveRename = () => {
+    if (isSavingRef.current) return; // Prevent double save
+    isSavingRef.current = true;
+    
     if (editingSessionId && editingTitle.trim()) {
       onRenameSession(editingSessionId, editingTitle.trim());
     }
     setEditingSessionId(null);
     setEditingTitle('');
+    
+    // Reset flag after a short delay
+    setTimeout(() => {
+      isSavingRef.current = false;
+    }, 100);
   };
 
   const handleCancelRename = () => {
+    if (isSavingRef.current) return;
     setEditingSessionId(null);
     setEditingTitle('');
   };
@@ -116,7 +126,12 @@ const Sidebar: React.FC<SidebarProps> = ({
             ? 'border-transparent hover:bg-white/30 text-[#4A4B6A]/80 hover:text-[#4A4B6A] font-medium'
             : 'bg-white/30 border-transparent text-gray-600 dark:bg-white/5 dark:text-gray-300 hover:bg-white/60 hover:border-white/70 dark:hover:bg-white/10 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white'
       }`}
-      onClick={() => { onSelectSession(session.id); onClose(); }}
+      onClick={() => {
+        // Don't select session if we're currently editing
+        if (editingSessionId === session.id) return;
+        onSelectSession(session.id);
+        onClose();
+      }}
     >
       {/* Emoji/Icon - Clickable */}
       <button
@@ -151,9 +166,17 @@ const Sidebar: React.FC<SidebarProps> = ({
           type="text"
           value={editingTitle}
           onChange={(e) => setEditingTitle(e.target.value)}
-          onBlur={handleSaveRename}
+          onBlur={(e) => {
+            // Use setTimeout to prevent conflict with onClick
+            setTimeout(() => {
+              if (!isSavingRef.current) {
+                handleSaveRename();
+              }
+            }, 200);
+          }}
           onKeyDown={handleKeyDown}
           onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
           className="flex-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-forsion-500"
         />
       ) : (
