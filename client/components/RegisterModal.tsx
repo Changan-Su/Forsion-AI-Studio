@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { backendService } from '../services/backendService';
 import { User } from '../types';
@@ -49,8 +50,19 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ onClose, onSuccess }) => 
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+    >
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6"
+      >
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Register</h2>
           <button
@@ -145,8 +157,8 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ onClose, onSuccess }) => 
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };
 

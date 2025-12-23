@@ -14,6 +14,7 @@ import { Send, Zap, Menu, Sparkles, MessageSquare, Code, Brain, BrainCircuit, Im
 import { getPresetAvatar, svgToDataUrl } from './src/utils/presetAvatars';
 import { detectImageGenerationIntent, generateImage, detectImageEditIntent, editImage, imageToImage } from './services/imageGenerationService';
 import CommandAutocomplete from './components/CommandAutocomplete';
+import { AnimatePresence } from 'framer-motion';
 
 const App: React.FC = () => {
   // Auth State
@@ -61,6 +62,9 @@ const App: React.FC = () => {
   
   // Force Image Generation Toggle
   const [forceImageGeneration, setForceImageGeneration] = useState<boolean>(false);
+  
+  // Word Enhancement Mode Toggle
+  const [wordEnhancementMode, setWordEnhancementMode] = useState<boolean>(false);
   
   // Command Autocomplete State
   const [showCommandAutocomplete, setShowCommandAutocomplete] = useState(false);
@@ -549,18 +553,50 @@ const App: React.FC = () => {
       shouldUseDeepThinking = true;
     }
     
+    // Store the display input (without Word enhancement prompt) for the UI
+    let displayInput = finalInput;
+    
+    // Word Enhancement Mode: Add formatting instructions to the prompt (for AI only, not shown in UI)
+    let aiInput = finalInput;
+    if (wordEnhancementMode) {
+      const wordEnhancementPrompt = `[WORD DOCUMENT MODE] 请按照以下格式要求输出，以便生成格式化的Word文档：
+
+1. 使用清晰的文档结构，使用Markdown格式
+2. 使用 # 表示一级标题（文档标题，24pt粗体居中）
+3. 使用 ## 表示二级标题（18pt粗体）  
+4. 使用 ### 表示三级标题（14pt粗体）
+5. 使用 **粗体** 和 *斜体* 来强调重要内容
+6. 使用 - 或 * 表示无序列表
+7. 使用 1. 2. 3. 表示有序列表
+8. 正文使用12pt宋体或微软雅黑
+
+请根据用户需求生成适合转换为Word文档的格式化内容。
+
+用户请求：`;
+      aiInput = wordEnhancementPrompt + finalInput;
+    }
+    
     // If there's a document attachment with extracted text, include it in the message
-    let messageContent = finalInput;
+    let messageContent = displayInput;
+    let messageContentForAI = aiInput; // Content to send to AI (may include Word enhancement prompt)
     if (attachment?.type === 'document' && attachment.extractedText) {
-      messageContent = `${finalInput}\n\n---\n📄 Attached Document: ${attachment.name}\n\n${attachment.extractedText}`;
+      const docAttachment = `\n\n---\n📄 Attached Document: ${attachment.name}\n\n${attachment.extractedText}`;
+      messageContent = `${displayInput}${docAttachment}`;
+      messageContentForAI = `${aiInput}${docAttachment}`;
     }
     
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: messageContent,
+      content: messageContent, // Display content (without Word enhancement prompt)
       attachments: currentAttachments,
       timestamp: Date.now(),
+    };
+    
+    // Create a separate message content for AI (with Word enhancement prompt if enabled)
+    const userMessageForAI = {
+      ...userMessage,
+      content: messageContentForAI
     };
 
     setSessions(prev => prev.map(s => {
@@ -962,7 +998,7 @@ const App: React.FC = () => {
          
          const result = await generateGeminiResponseStream(
            currentModel.id, 
-           userMessage.content, 
+           userMessageForAI.content, 
            history, 
            config?.apiKey, 
            currentAttachments,
@@ -997,7 +1033,7 @@ const App: React.FC = () => {
             role: m.role === 'model' ? 'assistant' : m.role === 'user' ? 'user' : 'system',
             content: m.content
         }));
-        history.push({ role: 'user', content: userMessage.content });
+        history.push({ role: 'user', content: userMessageForAI.content });
 
         // Check if this is a global model (uses backend proxy) - now with streaming support
         // Note: gemini-2.5-flash-image should always use direct Gemini API, not backend proxy
@@ -1351,6 +1387,48 @@ const App: React.FC = () => {
       setStreamingMessageId(null);
       abortControllerRef.current = null;
     }
+  };
+
+  const handleGenerateWordDoc = async (content: string, messageId: string) => {
+    try {
+      console.log('[handleGenerateWordDoc] Generating Word document for message:', messageId);
+      console.log('[handleGenerateWordDoc] Content preview:', content.substring(0, 100));
+      
+      if (!content || content.trim().length === 0) {
+        alert('无法生成Word文档：内容为空');
+        return;
+      }
+      
+      // Show loading message
+      const loadingMsg = '正在生成Word文档，请稍候...';
+      console.log(loadingMsg);
+      
+      // Call backend service to generate Word document
+      const filename = await backendService.generateWordDocument(content);
+      console.log('[handleGenerateWordDoc] Word document generation completed');
+      
+      // Show success message with download location info
+      const downloadPath = getDownloadPath();
+      alert(`✅ Word文档生成成功！\n\n文件名：${filename}\n\n文件已保存到浏览器的默认下载文件夹。\n\n${downloadPath ? `下载位置：${downloadPath}` : '请检查浏览器的下载文件夹。'}`);
+    } catch (error: any) {
+      console.error('[handleGenerateWordDoc] Failed to generate Word document:', error);
+      const errorMessage = error?.message || '生成Word文档时发生未知错误';
+      alert(`❌ 生成Word文档失败：${errorMessage}\n\n请检查控制台获取更多信息。`);
+    }
+  };
+
+  // Helper function to get download path info
+  const getDownloadPath = (): string => {
+    // Try to detect common download paths
+    const userAgent = navigator.userAgent.toLowerCase();
+    if (userAgent.includes('windows')) {
+      return '通常在：C:\\Users\\[用户名]\\Downloads';
+    } else if (userAgent.includes('mac')) {
+      return '通常在：~/Downloads';
+    } else if (userAgent.includes('linux')) {
+      return '通常在：~/Downloads';
+    }
+    return '';
   };
 
   const deleteSession = (id: string) => {
@@ -1709,6 +1787,8 @@ const App: React.FC = () => {
           onFileUpload={processFile}
           onRegenerateMessage={handleRegenerateMessage}
           user={user ? { username: user.username, nickname: user.nickname, avatar: user.avatar } : undefined}
+          wordEnhancementMode={wordEnhancementMode}
+          onGenerateWordDoc={handleGenerateWordDoc}
         />
 
         {/* Input Area */}
@@ -1817,6 +1897,65 @@ const App: React.FC = () => {
                  }`}>
                    Will generate image
                  </span>
+               )}
+               
+               {/* Word Enhancement Mode Toggle (only visible in developer mode) */}
+               {appSettings?.developerMode && (
+                 <>
+                   <label className="flex items-center gap-2 cursor-pointer select-none">
+                     <div className="relative">
+                       <input
+                         type="checkbox"
+                         checked={wordEnhancementMode}
+                         onChange={(e) => setWordEnhancementMode(e.target.checked)}
+                         className="sr-only peer"
+                       />
+                       <div className={`w-10 h-5 rounded-full transition-all ${
+                         wordEnhancementMode
+                           ? 'bg-gradient-to-r from-green-500 to-emerald-500'
+                           : isNotion
+                             ? 'bg-gray-300 dark:bg-gray-600'
+                             : 'bg-gray-300 dark:bg-gray-700'
+                       }`}></div>
+                       <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                         wordEnhancementMode ? 'translate-x-5' : 'translate-x-0'
+                       }`}></div>
+                     </div>
+                     <div className="flex items-center gap-1.5">
+                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`${
+                         wordEnhancementMode
+                           ? 'text-green-500 dark:text-green-400'
+                           : isNotion
+                             ? 'text-gray-400 dark:text-gray-500'
+                             : 'text-gray-400 dark:text-gray-500'
+                       }`}>
+                         <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                         <polyline points="14 2 14 8 20 8"/>
+                         <line x1="16" y1="13" x2="8" y2="13"/>
+                         <line x1="16" y1="17" x2="8" y2="17"/>
+                         <line x1="10" y1="9" x2="8" y2="9"/>
+                       </svg>
+                       <span className={`text-sm font-medium ${
+                         wordEnhancementMode
+                           ? isNotion
+                             ? 'text-gray-900 dark:text-white'
+                             : 'text-green-600 dark:text-green-400'
+                           : 'text-gray-500 dark:text-gray-400'
+                       }`}>
+                         Word Enhancement
+                       </span>
+                     </div>
+                   </label>
+                   {wordEnhancementMode && (
+                     <span className={`text-xs px-2 py-0.5 rounded-full ${
+                       isNotion
+                         ? 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+                         : 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-300'
+                     }`}>
+                       Word doc generation enabled
+                     </span>
+                   )}
+                 </>
                )}
              </div>
 
@@ -2029,28 +2168,32 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      {showRegisterModal && (
-        <RegisterModal
-          onClose={() => setShowRegisterModal(false)}
-          onSuccess={handleRegisterSuccess}
-        />
-      )}
+      <AnimatePresence>
+        {showRegisterModal && (
+          <RegisterModal
+            onClose={() => setShowRegisterModal(false)}
+            onSuccess={handleRegisterSuccess}
+          />
+        )}
+      </AnimatePresence>
       
-      {showSettings && (
-        <SettingsModal 
-          onClose={() => setShowSettings(false)} 
-          userRole={user!.role} 
-          user={user!}
-          currentTheme={theme} 
-          onThemeChange={(t) => updateAppSettings({ theme: t })}
-          currentPreset={themePreset}
-          onPresetChange={(p) => updateAppSettings({ themePreset: p })}
-          onModelsChange={syncSettingsFromBackend}
-          onUpdateSettings={updateAppSettings}
-          isOffline={isOfflineMode}
-          onReconnect={attemptReconnect}
-        />
-      )}
+      <AnimatePresence>
+        {showSettings && (
+          <SettingsModal 
+            onClose={() => setShowSettings(false)} 
+            userRole={user!.role} 
+            user={user!}
+            currentTheme={theme} 
+            onThemeChange={(t) => updateAppSettings({ theme: t })}
+            currentPreset={themePreset}
+            onPresetChange={(p) => updateAppSettings({ themePreset: p })}
+            onModelsChange={syncSettingsFromBackend}
+            onUpdateSettings={updateAppSettings}
+            isOffline={isOfflineMode}
+            onReconnect={attemptReconnect}
+          />
+        )}
+      </AnimatePresence>
       
       {/* Expanded Input Modal with bounce animation */}
       {isInputExpanded && (

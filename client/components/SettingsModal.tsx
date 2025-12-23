@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { X, Save, User, Monitor, Code, ToggleLeft, ToggleRight, Plus, Trash2, Box } from 'lucide-react';
 import { AppSettings, UserRole, AIModel } from '../types';
 import { BUILTIN_MODELS, DEFAULT_MODEL_ID } from '../constants';
@@ -271,8 +272,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className={`w-full max-w-4xl shadow-2xl flex flex-col h-[90vh] overflow-hidden rounded-[32px] ${
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+    >
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        className={`w-full max-w-4xl shadow-2xl flex flex-col h-[90vh] overflow-hidden rounded-[32px] ${
         isMonet 
           ? 'glass-dark' 
           : 'bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border'
@@ -576,9 +587,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                     <button
                       onClick={async () => {
-                        const newValue = !developerMode;
-                        setDeveloperMode(newValue);
-                        await backendService.updateSettings({ developerMode: newValue });
+                        try {
+                          const newValue = !developerMode;
+                          setDeveloperMode(newValue);
+                          await backendService.updateSettings({ developerMode: newValue });
+                        } catch (error) {
+                          console.error('Failed to update developer mode:', error);
+                        }
                       }}
                       className="p-2 rounded-lg transition-colors"
                     >
@@ -706,8 +721,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             )}
           </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };
 

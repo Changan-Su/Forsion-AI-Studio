@@ -1061,5 +1061,122 @@ export const backendService = {
       markOffline();
       throw error;
     }
+  },
+
+  // 24. Generate Word Document
+  async generateWordDocument(
+    content: string,
+    formatSpec?: any
+  ): Promise<string> {
+    try {
+      console.log('[generateWordDocument] Starting request, content length:', content.length);
+      const res = await fetch(`${API_URL}/word/generate`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          content,
+          formatSpec
+        })
+      });
+
+      console.log('[generateWordDocument] Response status:', res.status);
+      console.log('[generateWordDocument] Response headers:', {
+        contentType: res.headers.get('Content-Type'),
+        contentDisposition: res.headers.get('Content-Disposition')
+      });
+
+      if (!res.ok) {
+        markOnline();
+        if (res.status === 401) {
+          clearAuth();
+          throw new AuthRequiredError();
+        }
+        const detail = await extractDetail(res);
+        console.error('[generateWordDocument] Error response:', detail);
+        throw new Error(detail || 'Failed to generate Word document');
+      }
+
+      markOnline();
+
+      // Check if response is actually a blob/binary
+      const contentType = res.headers.get('Content-Type');
+      console.log('[generateWordDocument] Content-Type:', contentType);
+      
+      if (!contentType || !contentType.includes('wordprocessingml')) {
+        // If not a Word document, try to get error message
+        const text = await res.text();
+        console.error('[generateWordDocument] Unexpected response type, body:', text.substring(0, 200));
+        throw new Error('Server did not return a Word document. Response: ' + text.substring(0, 100));
+      }
+
+      // Get the blob from response
+      const blob = await res.blob();
+      console.log('[generateWordDocument] Blob created, size:', blob.size, 'type:', blob.type);
+      
+      if (blob.size === 0) {
+        throw new Error('Generated Word document is empty');
+      }
+      
+      // Extract filename from Content-Disposition header or use default
+      const contentDisposition = res.headers.get('Content-Disposition');
+      let filename = 'document.docx';
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+          // Decode URI if needed
+          try {
+            filename = decodeURIComponent(filename);
+          } catch (e) {
+            // If decoding fails, use as is
+          }
+        }
+      }
+
+      // Generate timestamp-based filename if default
+      if (filename === 'document.docx') {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+        filename = `document_${timestamp}.docx`;
+      }
+
+      console.log('[generateWordDocument] Downloading file:', filename);
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.style.display = 'none';
+      link.setAttribute('download', filename); // Ensure download attribute is set
+      document.body.appendChild(link);
+      
+      // Trigger download
+      try {
+        link.click();
+        console.log('[generateWordDocument] Download link clicked');
+      } catch (e) {
+        console.error('[generateWordDocument] Failed to trigger download:', e);
+        // Fallback: open in new window (user can manually save)
+        window.open(url, '_blank');
+      }
+      
+      // Cleanup after a short delay to ensure download starts
+      setTimeout(() => {
+        if (document.body.contains(link)) {
+          document.body.removeChild(link);
+        }
+        window.URL.revokeObjectURL(url);
+        console.log('[generateWordDocument] Download completed');
+      }, 1000); // Increased delay to ensure download starts
+      
+      // Return filename for success message
+      return filename;
+    } catch (error) {
+      console.error('[generateWordDocument] Error:', error);
+      if (error instanceof AuthRequiredError) throw error;
+      if (isNetworkError(error)) markOffline();
+      else markOnline();
+      throw error;
+    }
   }
 };

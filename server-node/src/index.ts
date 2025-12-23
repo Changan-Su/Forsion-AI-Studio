@@ -20,6 +20,7 @@ import usageRoutes from './routes/usage.js';
 import inviteCodeRoutes from './routes/inviteCodes.js';
 import creditRoutes from './routes/credits.js';
 import creditPricingRoutes from './routes/creditPricing.js';
+import wordRoutes from './routes/word.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -65,6 +66,7 @@ app.use('/api', usageRoutes);
 app.use('/api', inviteCodeRoutes);
 app.use('/api', creditRoutes);
 app.use('/api', creditPricingRoutes);
+app.use('/api/word', wordRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -72,8 +74,8 @@ app.get('/api/health', (req, res) => {
 });
 
 // Serve admin panel static files
-// Resolve admin path: from dist/ to project root/admin
-const adminPath = path.resolve(__dirname, '../../admin');
+// Resolve admin path: from dist/ to server-node/admin
+const adminPath = path.resolve(__dirname, '../admin');
 console.log('📁 Admin panel path:', adminPath);
 
 // Serve static files from admin directory (CSS, JS, etc.)

@@ -150,9 +150,11 @@ interface ChatAreaProps {
   onFileUpload: (file: File) => void;
   onRegenerateMessage?: (messageId: string) => void;
   user?: { username: string; nickname?: string; avatar?: string }; // User info for avatar display
+  wordEnhancementMode?: boolean; // Word enhancement mode enabled
+  onGenerateWordDoc?: (content: string, messageId: string) => void; // Handler for generating Word document
 }
 
-const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentModel, allModels, themePreset, onFileUpload, onRegenerateMessage, user }) => {
+const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentModel, allModels, themePreset, onFileUpload, onRegenerateMessage, user, wordEnhancementMode, onGenerateWordDoc }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
@@ -425,56 +427,92 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
               
               {/* Main Text Content */}
               {msg.content && (
-                 <div className={`prose prose-sm max-w-none leading-relaxed 
-                    ${isNotion 
-                        ? 'prose-headings:font-serif prose-headings:font-bold prose-p:font-serif prose-p:leading-7 dark:prose-invert prose-blockquote:border-l-black dark:prose-blockquote:border-l-white' 
-                        : (msg.role === 'user' 
-                          ? 'prose-headings:text-white prose-p:text-white prose-strong:text-white prose-a:text-white/90' 
-                          : isMonet
-                            ? 'prose-headings:text-[#4A4B6A] dark:prose-headings:text-white prose-p:text-[#4A4B6A] dark:prose-p:text-gray-100 prose-strong:text-[#4A4B6A] dark:prose-strong:text-white'
-                            : 'dark:prose-invert prose-p:text-slate-700 dark:prose-p:text-gray-200 prose-headings:text-slate-900 dark:prose-headings:text-white prose-strong:text-slate-900 dark:prose-strong:text-white prose-a:text-forsion-600')
-                    }`}>
-                   <ReactMarkdown
-                     remarkPlugins={[remarkMath]}
-                     rehypePlugins={[rehypeKatex]}
-                     components={{
-                       code: ({ node, className, children, ...props }) => {
-                         const match = /language-(\w+)/.exec(className || '');
-                         const isInline = !match && !className;
-                         
-                         if (isInline) {
+                 <>
+                   <div className={`prose prose-sm max-w-none leading-relaxed 
+                      ${isNotion 
+                          ? 'prose-headings:font-serif prose-headings:font-bold prose-p:font-serif prose-p:leading-7 dark:prose-invert prose-blockquote:border-l-black dark:prose-blockquote:border-l-white' 
+                          : (msg.role === 'user' 
+                            ? 'prose-headings:text-white prose-p:text-white prose-strong:text-white prose-a:text-white/90' 
+                            : isMonet
+                              ? 'prose-headings:text-[#4A4B6A] dark:prose-headings:text-white prose-p:text-[#4A4B6A] dark:prose-p:text-gray-100 prose-strong:text-[#4A4B6A] dark:prose-strong:text-white'
+                              : 'dark:prose-invert prose-p:text-slate-700 dark:prose-p:text-gray-200 prose-headings:text-slate-900 dark:prose-headings:text-white prose-strong:text-slate-900 dark:prose-strong:text-white prose-a:text-forsion-600')
+                      }`}>
+                     <ReactMarkdown
+                       remarkPlugins={[remarkMath]}
+                       rehypePlugins={[rehypeKatex]}
+                       components={{
+                         code: ({ node, className, children, ...props }) => {
+                           const match = /language-(\w+)/.exec(className || '');
+                           const isInline = !match && !className;
+                           
+                           if (isInline) {
+                             return (
+                               <code 
+                                 className={`px-1.5 py-0.5 rounded text-sm font-mono ${
+                                   msg.role === 'user'
+                                     ? 'bg-white/20 text-white'
+                                     : 'bg-slate-100 dark:bg-gray-700 text-forsion-700 dark:text-forsion-300'
+                                 }`}
+                                 {...props}
+                               >
+                                 {children}
+                               </code>
+                             );
+                           }
+                           
                            return (
-                             <code 
-                               className={`px-1.5 py-0.5 rounded text-sm font-mono ${
-                                 msg.role === 'user'
-                                   ? 'bg-white/20 text-white'
-                                   : 'bg-slate-100 dark:bg-gray-700 text-forsion-700 dark:text-forsion-300'
-                               }`}
-                               {...props}
-                             >
-                               {children}
-                             </code>
+                             <CodeBlock language={match ? match[1] : undefined}>
+                               {String(children).replace(/\n$/, '')}
+                             </CodeBlock>
                            );
-                         }
-                         
-                         return (
-                           <CodeBlock language={match ? match[1] : undefined}>
-                             {String(children).replace(/\n$/, '')}
-                           </CodeBlock>
-                         );
-                       },
-                       pre: ({ children }) => <>{children}</>,
-                     }}
-                   >
-                     {msg.content}
-                   </ReactMarkdown>
-                 </div>
+                         },
+                         pre: ({ children }) => <>{children}</>,
+                       }}
+                     >
+                       {msg.content}
+                     </ReactMarkdown>
+                   </div>
+                   
+                   {/* Word Download Button (always visible when Word Enhancement Mode is enabled) */}
+                   {msg.role === 'model' && wordEnhancementMode && onGenerateWordDoc && msg.content && (
+                     <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                       <button
+                         onClick={() => onGenerateWordDoc(msg.content, msg.id)}
+                         className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all hover:scale-105 active:scale-95 ${
+                           isNotion
+                             ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/30'
+                             : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/30'
+                         }`}
+                         title="下载为Word文档"
+                       >
+                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                           <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                           <polyline points="14 2 14 8 20 8"/>
+                           <line x1="16" y1="13" x2="8" y2="13"/>
+                           <line x1="16" y1="17" x2="8" y2="17"/>
+                           <line x1="10" y1="9" x2="8" y2="9"/>
+                         </svg>
+                         <span className="font-medium text-sm">下载为Word文档</span>
+                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-auto">
+                           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                           <polyline points="7 10 12 15 17 10"/>
+                           <line x1="12" y1="15" x2="12" y2="3"/>
+                         </svg>
+                       </button>
+                     </div>
+                   )}
+                 </>
               )}
             </div>
             
             {/* Message Actions (only for model messages) */}
             {msg.role === 'model' && !msg.isError && (
-              <div className={`flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity ${
+              <div className={`flex items-center gap-1 mt-2 ${
+                // Always show Word download button if Word Enhancement Mode is enabled
+                wordEnhancementMode && onGenerateWordDoc && msg.content 
+                  ? 'opacity-100' 
+                  : 'opacity-0 group-hover:opacity-100'
+              } transition-opacity ${
                 msg.role === 'user' ? 'justify-end' : 'justify-start'
               }`}>
                 {/* Copy Button */}
@@ -508,6 +546,27 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
                     title="Regenerate response"
                   >
                     <RefreshCw size={14} />
+                  </button>
+                )}
+                
+                {/* Generate Word Document Button (only when Word Enhancement Mode is enabled) */}
+                {wordEnhancementMode && onGenerateWordDoc && msg.content && (
+                  <button
+                    onClick={() => onGenerateWordDoc(msg.content, msg.id)}
+                    className={`p-1.5 rounded-lg transition-all hover:scale-105 active:scale-95 ${
+                      isNotion
+                        ? 'text-gray-400 hover:text-green-600 dark:text-gray-500 dark:hover:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        : 'text-slate-400 hover:text-green-600 dark:text-gray-500 dark:hover:text-green-400 hover:bg-slate-100 dark:hover:bg-gray-800'
+                    }`}
+                    title="Generate Word document"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                      <line x1="16" y1="13" x2="8" y2="13"/>
+                      <line x1="16" y1="17" x2="8" y2="17"/>
+                      <line x1="10" y1="9" x2="8" y2="9"/>
+                    </svg>
                   </button>
                 )}
               </div>
