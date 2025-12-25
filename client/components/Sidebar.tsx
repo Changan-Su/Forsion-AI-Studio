@@ -51,6 +51,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const menuRef = useRef<HTMLDivElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
   const isSavingRef = useRef(false); // Flag to prevent click during save
+  const emojiButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -135,6 +136,13 @@ const Sidebar: React.FC<SidebarProps> = ({
     >
       {/* Emoji/Icon - Clickable */}
       <button
+        ref={(el) => {
+          if (el) {
+            emojiButtonRefs.current.set(session.id, el);
+          } else {
+            emojiButtonRefs.current.delete(session.id);
+          }
+        }}
         onClick={(e) => {
           e.stopPropagation();
           setShowEmojiPickerFor(showEmojiPickerFor === session.id ? null : session.id);
@@ -155,7 +163,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <EmojiPicker
           onSelect={(emoji) => handleEmojiSelect(session.id, emoji)}
           onClose={() => setShowEmojiPickerFor(null)}
-          position={{ top: 0, left: 32 }}
+          buttonRef={{ current: emojiButtonRefs.current.get(session.id) || null } as React.RefObject<HTMLElement>}
         />
       )}
 

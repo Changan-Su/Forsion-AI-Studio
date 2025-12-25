@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Shuffle, X } from 'lucide-react';
 
 // Common emojis organized by category
@@ -36,23 +37,63 @@ interface EmojiPickerProps {
   onSelect: (emoji: string) => void;
   onClose: () => void;
   position?: { top: number; left: number };
+  buttonRef?: React.RefObject<HTMLElement>;
 }
 
-const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, onClose, position }) => {
+const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, onClose, position, buttonRef }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const pickerRef = useRef<HTMLDivElement>(null);
+  const [calculatedPosition, setCalculatedPosition] = useState<{ top: number; left: number } | null>(null);
+
+  // Calculate position based on button element
+  const updatePosition = () => {
+    if (buttonRef?.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setCalculatedPosition({
+        top: rect.bottom + 4, // 4px spacing
+        left: rect.left
+      });
+    } else if (position) {
+      setCalculatedPosition(position);
+    }
+  };
+
+  useEffect(() => {
+    updatePosition();
+    
+    // Update position on scroll and resize
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+    
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [buttonRef, position]);
 
   // Close picker when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      // Don't close if clicking on the button that opened the picker
+      if (buttonRef?.current && buttonRef.current.contains(event.target as Node)) {
+        return;
+      }
+      
       if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
         onClose();
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [onClose]);
+    // Use setTimeout to avoid immediate closure when button is clicked
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 0);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [onClose, buttonRef]);
 
   // Close on Escape key
   useEffect(() => {
@@ -79,11 +120,14 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, onClose, position }
     ? EMOJI_LIST.filter(emoji => emoji.includes(searchTerm))
     : EMOJI_LIST;
 
-  return (
+  const pickerContent = calculatedPosition ? (
     <div
       ref={pickerRef}
-      className="absolute z-50 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-3 w-72"
-      style={position ? { top: position.top, left: position.left } : { top: '100%', left: 0 }}
+      className="fixed z-[9999] bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-3 w-72"
+      style={{ 
+        top: `${calculatedPosition.top}px`, 
+        left: `${calculatedPosition.left}px` 
+      }}
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
@@ -131,7 +175,10 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, onClose, position }
         </button>
       </div>
     </div>
-  );
+  ) : null;
+
+  // Use portal to render outside the sidebar DOM hierarchy
+  return pickerContent ? createPortal(pickerContent, document.body) : null;
 };
 
 export default EmojiPicker;
