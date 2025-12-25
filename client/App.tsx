@@ -114,11 +114,15 @@ const App: React.FC = () => {
       
       // Update user profile if settings contain nickname or avatar
       // Always update if nickname or avatar is in settings (even if null/empty)
-      if (user && (settings.nickname !== undefined || settings.avatar !== undefined)) {
+      // Read latest user from localStorage to avoid stale closure issues
+      const currentUserStr = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+      const currentUser = currentUserStr ? JSON.parse(currentUserStr) : user;
+      
+      if (currentUser && (settings.nickname !== undefined || settings.avatar !== undefined)) {
         const updatedUser = {
-          ...user,
-          nickname: settings.nickname !== undefined ? settings.nickname : user.nickname,
-          avatar: settings.avatar !== undefined ? settings.avatar : user.avatar
+          ...currentUser,
+          nickname: settings.nickname !== undefined ? settings.nickname : currentUser.nickname,
+          avatar: settings.avatar !== undefined ? settings.avatar : currentUser.avatar
         };
         setUser(updatedUser);
         localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updatedUser));
@@ -335,6 +339,13 @@ const App: React.FC = () => {
         localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(u));
         setUsername('');
         setPassword('');
+        // 立即同步设置以获取头像和昵称
+        try {
+          await syncSettingsFromBackend();
+        } catch (syncError) {
+          // 同步失败不影响登录流程，只记录错误
+          console.warn('Failed to sync settings after login:', syncError);
+        }
       } else {
         setAuthError('Invalid credentials');
       }

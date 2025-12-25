@@ -241,6 +241,26 @@ async function runMigrations() {
     }
   }
 
+  // Add project_source column to api_usage_logs for tracking API call origin
+  try {
+    await query(`ALTER TABLE api_usage_logs ADD COLUMN project_source VARCHAR(50) DEFAULT 'ai-studio' COMMENT 'Project source: ai-studio, desktop, calendar, etc.' AFTER provider`);
+    console.log('✅ Added project_source column to api_usage_logs');
+  } catch (error: any) {
+    if (error.code !== 'ER_DUP_FIELDNAME' && !error.message.includes('Duplicate column name')) {
+      console.warn('⚠️  Could not add project_source column:', error.message);
+    }
+  }
+
+  // Add index for project_source
+  try {
+    await query(`ALTER TABLE api_usage_logs ADD INDEX idx_project_source (project_source)`);
+    console.log('✅ Added index for project_source');
+  } catch (error: any) {
+    if (error.code !== 'ER_DUP_KEYNAME' && !error.message.includes('Duplicate key name')) {
+      console.warn('⚠️  Could not add index for project_source:', error.message);
+    }
+  }
+
   console.log('✅ All migrations completed successfully!');
   process.exit(0);
 }

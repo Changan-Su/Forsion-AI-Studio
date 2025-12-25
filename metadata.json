@@ -1,7 +1,0 @@
-{
-  "name": "Forsion AI Studio",
-  "description": "A futuristic, high-performance AI chat platform supporting multiple models including Gemini, Nano Banana, and custom integrations.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
-}

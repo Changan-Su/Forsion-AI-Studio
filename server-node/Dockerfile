@@ -36,6 +36,9 @@ RUN npm ci --omit=dev && npm cache clean --force
 # Copy built files from builder stage
 COPY --from=builder /app/dist ./dist
 
+# Copy admin panel
+COPY --from=builder /app/admin ./admin
+
 # Change ownership
 RUN chown -R nodejs:nodejs /app
 

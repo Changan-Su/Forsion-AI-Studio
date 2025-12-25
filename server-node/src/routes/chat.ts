@@ -16,6 +16,9 @@ router.post('/chat/completions', authMiddleware, async (req: AuthRequest, res) =
     const body = req.body as ChatCompletionRequest;
     const { model_id, messages, temperature = 0.7, max_tokens, stream = true, attachments = [] } = body;
 
+    // Extract project source from request header
+    const projectSource = (req.headers['x-project-source'] as string) || 'ai-studio';
+
     if (!model_id || !messages || !Array.isArray(messages)) {
       return res.status(400).json({ detail: 'model_id and messages are required' });
     }
@@ -196,7 +199,8 @@ router.post('/chat/completions', authMiddleware, async (req: AuthRequest, res) =
         0,
         0,
         false,
-        errorDetail
+        errorDetail,
+        projectSource
       );
 
       return res.status(response.status).json({ detail: errorDetail });
@@ -288,7 +292,9 @@ router.post('/chat/completions', authMiddleware, async (req: AuthRequest, res) =
           model.provider,
           tokensInput,
           tokensOutput,
-          true
+          true,
+          undefined,
+          projectSource
         );
 
         // Calculate actual cost and deduct credits
@@ -327,7 +333,9 @@ router.post('/chat/completions', authMiddleware, async (req: AuthRequest, res) =
         model.provider,
         tokensInput,
         tokensOutput,
-        true
+        true,
+        undefined,
+        projectSource
       );
 
       // Calculate actual cost and deduct credits
@@ -509,7 +517,8 @@ router.post('/images/generations', authMiddleware, async (req: AuthRequest, res)
         0,
         0,
         false,
-        errorDetail
+        errorDetail,
+        projectSource
       );
 
       return res.status(response.status).json({ detail: errorDetail });
@@ -539,7 +548,9 @@ router.post('/images/generations', authMiddleware, async (req: AuthRequest, res)
       model.provider || 'openai',
       tokensInput,
       tokensOutput,
-      true
+      true,
+      undefined,
+      projectSource
     );
 
     // Calculate actual cost and deduct credits
@@ -759,7 +770,8 @@ router.post('/images/edits', authMiddleware, async (req: AuthRequest, res) => {
         0,
         0,
         false,
-        errorDetail
+        errorDetail,
+        projectSource
       );
 
       return res.status(response.status).json({ detail: errorDetail });
@@ -802,7 +814,9 @@ router.post('/images/edits', authMiddleware, async (req: AuthRequest, res) => {
       model.provider || 'external',
       tokensInput,
       tokensOutput,
-      true
+      true,
+      undefined,
+      projectSource
     );
 
     // Calculate actual cost and deduct credits

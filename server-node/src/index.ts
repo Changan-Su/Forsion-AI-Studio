@@ -27,16 +27,28 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// CORS configuration
+// CORS configuration - Support multiple Forsion projects
 const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:5173',
+  // AI Studio
   'http://localhost:50173',
   'http://localhost:4137',
-  'http://127.0.0.1:5173',
   'http://127.0.0.1:50173',
   'http://127.0.0.1:4137',
+  // Desktop
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  // Calendar
+  'http://localhost:6006',
+  'http://127.0.0.1:6006',
+  // Development common ports
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
 ];
+
+// Support production environment custom domains (via environment variable)
+if (process.env.ALLOWED_ORIGINS) {
+  allowedOrigins.push(...process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim()));
+}
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -66,14 +78,42 @@ app.use('/api', inviteCodeRoutes);
 app.use('/api', creditRoutes);
 app.use('/api', creditPricingRoutes);
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Health check - Enhanced with database status
+app.get('/api/health', async (req, res) => {
+  const dbStatus = await testConnection();
+  res.json({ 
+    status: dbStatus ? 'healthy' : 'unhealthy',
+    service: 'forsion-backend-service',
+    version: '2.0.0',
+    timestamp: new Date().toISOString(),
+    database: dbStatus ? 'connected' : 'disconnected'
+  });
+});
+
+// Service info endpoint
+app.get('/api/info', (req, res) => {
+  res.json({
+    name: 'Forsion Backend Service',
+    version: '2.0.0',
+    description: 'Unified Backend Service for Forsion Projects',
+    supportedProjects: ['ai-studio', 'desktop'],
+    features: ['auth', 'ai-models', 'chat', 'credits', 'usage-stats', 'file-processing'],
+    documentation: '/api/docs',
+    endpoints: {
+      auth: '/api/auth',
+      models: '/api/models',
+      chat: '/api/chat',
+      credits: '/api/credits',
+      usage: '/api/usage',
+      health: '/api/health'
+    }
+  });
 });
 
 // Serve admin panel static files
-// Resolve admin path: from dist/ to project root/admin
-const adminPath = path.resolve(__dirname, '../../admin');
+// Resolve admin path: from dist/ to admin/ (same level as dist/)
+// When running from dist/, __dirname is dist/, admin is at the same level
+const adminPath = path.resolve(__dirname, '../admin');
 console.log('📁 Admin panel path:', adminPath);
 
 // Serve static files from admin directory (CSS, JS, etc.)
@@ -98,7 +138,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 // Start server
 async function startServer() {
-  console.log('🚀 Starting Forsion AI Studio Server (Node.js)...');
+  console.log('🚀 Starting Forsion Backend Service (Unified API)...');
   
   // Test database connection
   const dbConnected = await testConnection();
@@ -133,9 +173,10 @@ async function startServer() {
   }
 
   app.listen(PORT, () => {
-    console.log(`✅ Server is running on http://localhost:${PORT}`);
+    console.log(`✅ Forsion Backend Service is running on http://localhost:${PORT}`);
     console.log(`📊 Admin panel: http://localhost:${PORT}/admin`);
     console.log(`📚 API: http://localhost:${PORT}/api`);
+    console.log(`🔗 Supported projects: AI Studio, Desktop`);
   });
 }
 

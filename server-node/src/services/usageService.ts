@@ -9,14 +9,16 @@ export async function logApiUsage(
   tokensInput: number = 0,
   tokensOutput: number = 0,
   success: boolean = true,
-  errorMessage?: string
+  errorMessage?: string,
+  projectSource?: string
 ): Promise<void> {
   try {
     // Explicitly include created_at to ensure it's always set
+    // Use projectSource from parameter, default to 'ai-studio' if not provided
     await query(
-      `INSERT INTO api_usage_logs (username, model_id, model_name, provider, tokens_input, tokens_output, success, error_message, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-      [username, modelId, modelName ?? null, provider ?? null, tokensInput, tokensOutput, success ? 1 : 0, errorMessage ?? null]
+      `INSERT INTO api_usage_logs (username, model_id, model_name, provider, project_source, tokens_input, tokens_output, success, error_message, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [username, modelId, modelName ?? null, provider ?? null, projectSource ?? 'ai-studio', tokensInput, tokensOutput, success ? 1 : 0, errorMessage ?? null]
     );
   } catch (error: any) {
     // Log error but don't fail the main request
