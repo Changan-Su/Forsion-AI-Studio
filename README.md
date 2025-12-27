@@ -45,24 +45,27 @@
 
 ## 🚀 快速开始
 
+> **重要提示**：本项目采用前后端分离架构。后端服务 (`server-node`) 是独立的项目，需要单独部署或克隆。
+
 ### 方式一：Docker Compose 部署（推荐）
 
-最简单的部署方式，自动配置 MySQL、后端和前端服务。
+#### 场景 A：统一部署（前端 + 后端 + MySQL）
+
+如果后端代码在 `server-node` 目录中，可以统一部署：
 
 ```bash
 # 克隆项目
 git clone https://github.com/your-username/forsion-ai-studio.git
 cd forsion-ai-studio
 
-# 配置环境变量（可选，使用默认值也可以）
-# 如果需要自定义配置，可以创建 .env 文件，参考下面的环境变量说明
+# 如果后端在独立仓库，需要克隆到 server-node 目录
+# git clone https://github.com/your-username/forsion-backend-service.git server-node
+
+# 配置环境变量（可选）
+# 创建 .env 文件，参考下面的环境变量说明
 
 # 一键启动所有服务（包括 MySQL、后端、前端）
-# 注意：由于 MySQL 服务使用了 profiles，需要显式指定 --profile mysql
 docker compose --profile mysql up -d
-
-# 或者如果只需要启动后端和前端（使用外部 MySQL）
-# docker compose up -d
 
 # 查看服务状态
 docker compose ps
@@ -70,6 +73,88 @@ docker compose ps
 # 查看日志
 docker compose logs -f
 ```
+
+#### 场景 B：仅前端部署（后端已单独部署）
+
+如果后端已经单独部署，前端只需要配置后端 API 地址。
+
+**前置要求：**
+- Docker 和 Docker Compose 已安装
+- 后端服务已部署并可访问
+- 知道后端服务的地址（IP 或域名）
+
+**部署步骤：**
+
+```bash
+# 1. 克隆前端项目
+git clone https://github.com/your-username/forsion-ai-studio.git
+cd forsion-ai-studio
+
+# 2. 配置后端地址
+cat > .env << EOF
+# 后端 API 地址（必须配置）
+BACKEND_URL=http://your-backend-host:3001
+
+# 前端端口（可选，默认 8080）
+FRONTEND_PORT=8080
+EOF
+```
+
+**后端地址配置示例：**
+- 本地后端：`http://localhost:3001`
+- 远程服务器：`http://192.168.1.100:3001`
+- 域名：`https://api.yourdomain.com`
+- Docker 网络：`http://backend-container-name:3002`
+
+**启动前端服务：**
+
+```bash
+# 方式 1: 使用专门的配置文件（推荐）
+docker compose -f docker-compose.frontend-only.yml up -d
+
+# 方式 2: 使用主配置文件（需要注释掉 depends_on）
+# 编辑 docker-compose.yml，注释掉 frontend 的 depends_on 部分
+BACKEND_URL=http://your-backend-host:3001 docker compose up -d frontend
+```
+
+**验证部署：**
+
+```bash
+# 查看服务状态
+docker compose -f docker-compose.frontend-only.yml ps
+
+# 测试 API 连接
+curl http://localhost:8080/api/health
+
+# 查看日志
+docker compose -f docker-compose.frontend-only.yml logs -f frontend
+```
+
+**常见问题：**
+
+- **前端无法连接到后端？**
+  - 确认 `BACKEND_URL` 环境变量已正确设置
+  - 确认后端服务正在运行
+  - 检查网络连通性（防火墙、端口等）
+  - 查看前端容器日志：`docker compose logs frontend`
+
+- **如何修改后端地址？**
+  ```bash
+  # 方法 1: 修改 .env 文件后重启
+  vim .env  # 修改 BACKEND_URL
+  docker compose -f docker-compose.frontend-only.yml restart frontend
+  
+  # 方法 2: 使用环境变量
+  BACKEND_URL=http://new-backend-host:3001 docker compose -f docker-compose.frontend-only.yml up -d frontend
+  ```
+
+- **如何更新前端？**
+  ```bash
+  docker compose -f docker-compose.frontend-only.yml down
+  docker compose -f docker-compose.frontend-only.yml up -d --build
+  ```
+
+> **注意**：前端项目不需要后端代码，只需要知道后端 API 的地址即可。
 
 启动后访问：
 - **前端界面**：http://localhost:8080
@@ -105,7 +190,10 @@ FLUSH PRIVILEGES;
 
 #### 3. 启动后端服务
 
+后端服务是独立项目，需要单独部署。如果后端代码在 `server-node` 目录：
+
 ```bash
+# 进入后端目录
 cd server-node
 
 # 安装依赖
@@ -122,6 +210,10 @@ npm run db:seed
 # 启动开发服务器
 npm run dev
 ```
+
+后端服务默认运行在 http://localhost:3001，包含内置的管理面板（访问 http://localhost:3001/admin）。
+
+> **注意**：如果后端已单独部署在其他位置，前端只需配置后端 API 地址即可，无需后端代码。
 
 #### 4. 启动前端服务
 
@@ -510,7 +602,9 @@ forsion-ai-studio/
 │   ├── vite.config.ts     # Vite 配置
 │   ├── tsconfig.json      # TypeScript 配置
 │   └── package.json       # 前端依赖
-├── server-node/           # 后端代码 (Node.js + Express)
+├── server-node/           # 后端代码 (Node.js + Express) - 独立项目
+│   ├── admin/             # 管理面板 (已内置在后端)
+│   │   └── index.html     # 管理界面
 │   ├── src/
 │   │   ├── index.ts       # 入口文件
 │   │   ├── routes/        # API 路由
@@ -521,14 +615,21 @@ forsion-ai-studio/
 │   │   └── types/         # 类型定义
 │   ├── Dockerfile         # 后端 Docker
 │   ├── tsconfig.json      # TypeScript 配置
-│   └── package.json       # 后端依赖
-├── admin/                 # 管理面板 (静态 HTML)
-│   └── index.html         # 管理界面
+│   ├── package.json       # 后端依赖
+│   └── README.md          # 后端服务文档
 ├── docker-compose.yml     # Docker 编排
 ├── Dockerfile             # 前端 Docker
 ├── nginx.conf             # Nginx 配置
+├── deploy.sh              # Linux 部署脚本
+├── deploy.ps1             # Windows 部署脚本
 └── README.md              # 项目文档
 ```
+
+> **架构说明**：
+> - **前端** (`client/`)：React 19 + Vite，独立的前端应用
+> - **后端** (`server-node/`)：Node.js + Express，完全独立的后端服务，包含内置的管理面板
+> - **部署**：通过 Docker Compose 统一编排，支持独立部署
+> - 后端服务可以单独复制、部署和运行，无需依赖前端项目
 
 ## 🤝 贡献
 

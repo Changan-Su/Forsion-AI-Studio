@@ -44,6 +44,15 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-ColorOutput "✓ Docker Compose 已安装" "Green"
 
+# 检查后端目录（仅用于统一部署，不是必需的）
+if (-not (Test-Path "server-node")) {
+    Write-ColorOutput "ℹ 后端目录 server-node 不存在" "Yellow"
+    Write-ColorOutput "  如果后端已单独部署，前端只需配置 API 地址即可" "Blue"
+    Write-ColorOutput "  如果使用 docker-compose 统一部署，需要 server-node 目录" "Blue"
+} else {
+    Write-ColorOutput "✓ 后端目录 server-node 存在（可用于统一部署）" "Green"
+}
+
 Write-Host ""
 
 # 检查 .env 文件
@@ -76,7 +85,17 @@ docker compose down 2>&1 | Out-Null
 
 # 构建并启动
 Write-ColorOutput "构建并启动容器..." "Blue"
-docker compose up -d --build
+
+# 检查是否要部署后端
+if (Test-Path "server-node") {
+    # 有后端目录，可以统一部署
+    # 注意：由于 MySQL 服务使用了 profiles，需要显式指定 --profile mysql
+    docker compose --profile mysql up -d --build
+} else {
+    # 没有后端目录，只部署前端（后端需要单独部署）
+    Write-ColorOutput "⚠ 只部署前端服务，确保后端 API 已部署并可访问" "Yellow"
+    docker compose up -d --build frontend
+}
 
 if ($LASTEXITCODE -ne 0) {
     Write-ColorOutput "✗ 启动失败" "Red"

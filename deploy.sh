@@ -91,9 +91,18 @@ check_requirements() {
         echo -e "${GREEN}✓ Docker 正在运行${NC}"
     fi
     
+    # 检查后端目录（仅用于统一部署，不是必需的）
+    if [ ! -d "server-node" ]; then
+        echo -e "${YELLOW}ℹ 后端目录 server-node 不存在${NC}"
+        echo -e "${BLUE}  如果后端已单独部署，前端只需配置 API 地址即可${NC}"
+        echo -e "${BLUE}  如果使用 docker-compose 统一部署，需要 server-node 目录${NC}"
+    else
+        echo -e "${GREEN}✓ 后端目录 server-node 存在（可用于统一部署）${NC}"
+    fi
+    
     if [ $missing -eq 1 ]; then
         echo ""
-        echo -e "${RED}请先安装缺失的依赖${NC}"
+        echo -e "${RED}请先解决上述问题${NC}"
         exit 1
     fi
     
@@ -332,14 +341,23 @@ start_services() {
     # 删除可能残留的 forsion_mysql 容器
     docker rm -f forsion_mysql 2>/dev/null || true
     
-    if [ "$USE_DOCKER_MYSQL" = "yes" ]; then
-        # 启动所有服务（包括 MySQL）
-        echo -e "${BLUE}构建并启动所有容器（含 MySQL）...${NC}"
-        $COMPOSE_CMD up -d --build
+    # 检查是否要部署后端
+    if [ -d "server-node" ]; then
+        # 有后端目录，可以统一部署
+        if [ "$USE_DOCKER_MYSQL" = "yes" ]; then
+            # 启动所有服务（包括 MySQL）
+            echo -e "${BLUE}构建并启动所有容器（含 MySQL）...${NC}"
+            $COMPOSE_CMD --profile mysql up -d --build
+        else
+            # 只启动 backend 和 frontend，不启动 mysql
+            echo -e "${BLUE}构建并启动容器（不含 MySQL）...${NC}"
+            $COMPOSE_CMD up -d --build backend frontend
+        fi
     else
-        # 只启动 backend 和 frontend，不启动 mysql
-        echo -e "${BLUE}构建并启动容器（不含 MySQL）...${NC}"
-        $COMPOSE_CMD up -d --build backend frontend
+        # 没有后端目录，只部署前端（后端需要单独部署）
+        echo -e "${BLUE}只部署前端服务（后端需单独部署）...${NC}"
+        echo -e "${YELLOW}⚠ 确保后端 API 已部署并可访问${NC}"
+        $COMPOSE_CMD up -d --build frontend
         
         # 如果 MySQL 在其他 Docker 容器中，需要连接网络
         if [ "$EXTERNAL_MYSQL_IN_DOCKER" = "yes" ] && [ -n "$EXTERNAL_MYSQL_NETWORK" ]; then
