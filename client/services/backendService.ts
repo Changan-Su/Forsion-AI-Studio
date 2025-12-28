@@ -443,10 +443,10 @@ export const backendService = {
     }
   },
 
-  // 12. Get Global Models from backend
+  // 12. Get Global Models from backend (project-specific)
   async getGlobalModels(): Promise<any[]> {
     try {
-      const res = await fetch(`${API_URL}/models`, {
+      const res = await fetch(`${API_URL}/projects/ai-studio/models`, {
         headers: getHeaders()
       });
       markOnline();

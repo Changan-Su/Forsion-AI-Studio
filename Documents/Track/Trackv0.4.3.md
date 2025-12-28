@@ -364,3 +364,4 @@ className="fixed z-[9999] ... transition-all duration-200 ease-out animate-in fa
 - **v0.4.3** (2024-XX-XX): 初始版本，修复 emoji 面板显示优先级问题
 
 
+
