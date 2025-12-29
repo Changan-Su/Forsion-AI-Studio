@@ -1,113 +1,38 @@
 # =====================================================
-# Forsion AI Studio - Docker Compose
+# Forsion AI Studio - 仅前端部署配置
 # 
-# 架构说明：
-#   1. 本项目采用前后端分离架构
-#   2. 前端可以独立部署，只需配置后端 API 地址
-#   3. 如果 server-node 目录存在，可以使用 docker-compose 统一部署
+# 使用场景：后端已单独部署，只需要部署前端
 # 
-# 使用方式:
-#   统一部署（需要 server-node 目录）:
-#     docker compose --profile mysql up -d
-#   仅前端部署（后端已单独部署）:
-#     docker compose up -d frontend
-#   仅数据库:   docker compose --profile mysql up -d mysql
-#   查看日志:   docker compose logs -f
-#   停止服务:   docker compose down
+# 使用方法:
+#   docker compose -f docker-compose.frontend-only.yml up -d
+#   或
+#   docker compose -f docker-compose.yml -f docker-compose.frontend-only.yml up -d frontend
 # =====================================================
 
 services:
-  # MySQL 数据库
-  mysql:
-    image: mysql:8.0
-    container_name: forsion_mysql
-    restart: unless-stopped
-    profiles: [mysql]
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-forsion_ai_studio}
-      MYSQL_USER: ${MYSQL_USER:-forsion}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-forsion123}
-    volumes:
-      - mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - forsion_network
-
-  # Node.js 后端服务
-  # 注意：如果 server-node 目录不存在，此服务将无法构建
-  # 如果后端已单独部署，可以只启动 frontend 服务
-  backend:
-    build:
-      context: ./server-node
-      dockerfile: Dockerfile
-    container_name: forsion_backend
-    restart: unless-stopped
-    environment:
-      NODE_ENV: production
-      PORT: ${PORT:-3002}
-      # 支持从 .env 读取外部 MySQL 配置，默认连接 Docker MySQL
-      DB_HOST: ${DB_HOST:-mysql}
-      DB_PORT: ${DB_PORT:-3306}
-      DB_USER: ${DB_USER:-${MYSQL_USER:-forsion}}
-      DB_PASSWORD: ${DB_PASSWORD:-${MYSQL_PASSWORD:-forsion123}}
-      DB_NAME: ${DB_NAME:-${MYSQL_DATABASE:-forsion_ai_studio}}
-      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
-    ports:
-      - "${PORT:-3002}:${PORT:-3002}"
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:${PORT:-3002}/api/health"]
-      interval: 30s
-      timeout: 10s
-      start_period: 30s
-      retries: 3
-    networks:
-      - forsion_network
-    # 如果使用外部 MySQL，需要能访问宿主机网络
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
   # React 前端服务 (Nginx)
-  # 前端可以独立部署，只需配置后端 API 地址（通过 BACKEND_URL 环境变量）
   frontend:
     build:
       context: .
       dockerfile: Dockerfile
-      # Note: No VITE_API_URL arg - frontend detects API URL at runtime
     container_name: forsion_frontend
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-8080}:80"
     environment:
-      # 后端 API 地址
-      # 如果后端在 docker-compose 中：http://backend:3002
-      # 如果后端单独部署：设置为实际的后端地址，如 http://your-backend-host:3001
-      BACKEND_URL: ${BACKEND_URL:-http://backend:3002}
-    # 如果后端在 docker-compose 中，可以依赖后端服务
-    # 如果后端单独部署，注释掉 depends_on 即可
-    # 注意：如果只部署前端，需要注释掉下面的 depends_on 块
-    depends_on:
-      backend:
-        condition: service_healthy
+      # 后端 API 地址 - 必须配置为实际的后端地址
+      # 例如：http://your-backend-host:3001
+      # 或者：http://192.168.1.100:3001
+      # 或者：https://api.yourdomain.com
+      BACKEND_URL: ${BACKEND_URL}
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
       interval: 30s
       timeout: 10s
       start_period: 10s
       retries: 3
-    networks:
-      - forsion_network
-
-volumes:
-  mysql_data:
-    driver: local
-
-networks:
-  forsion_network:
-    driver: bridge
+    # 如果后端在外部网络，可能需要配置网络
+    # networks:
+    #   - external_network
 
 
