@@ -5,7 +5,7 @@ import { API_BASE_URL } from '../config';
 
 // Single source of truth for backend base URL
 const API_URL = API_BASE_URL;
-const API_ROOT = API_URL.replace(/\/api$/, '') || API_URL;
+export const API_ROOT = API_URL.replace(/\/api$/, '') || API_URL;
 
 type ConnectionListener = (online: boolean) => void;
 let isOnline = true;
@@ -173,6 +173,35 @@ export const backendService = {
       // Backend reachable but error happened
       markOnline();
       throw e;
+    }
+  },
+
+  // 2. Get Current User
+  async getCurrentUser(): Promise<User> {
+    try {
+      const res = await fetch(`${API_URL}/auth/me`, {
+        method: 'GET',
+        headers: getHeaders()
+      });
+      markOnline();
+
+      if (res.status === 401) {
+        clearAuth();
+        throw new AuthRequiredError();
+      }
+
+      if (!res.ok) {
+        const detail = await extractDetail(res);
+        throw new Error(detail || 'Failed to load current user');
+      }
+
+      const data = await res.json();
+      return data.user || data;
+    } catch (error) {
+      if (error instanceof AuthRequiredError) throw error;
+      if (isNetworkError(error)) markOffline();
+      else markOnline();
+      throw error;
     }
   },
 
@@ -709,19 +738,46 @@ export const backendService = {
   ): Promise<{ imageUrl: string; usage?: { prompt_tokens: number; completion_tokens: number } }> {
     console.log('[proxyImageGeneration] Starting request for model:', modelId);
     try {
+      // Check if this is a Grok or gpt-image model (which uses low/medium/high instead of standard/hd)
+      const isGrokOrGptImageModel = /grok|gpt-image/i.test(modelId);
+      const isGrokModel = /^grok/i.test(modelId); // Grok models (grok-*) don't support size parameter
+      
+      console.log('[proxyImageGeneration] Model check - isGrokModel:', isGrokModel, 'modelId:', modelId);
+      
+      // Convert quality parameter for Grok/gpt-image models
+      let qualityValue: string = quality;
+      if (isGrokOrGptImageModel) {
+        qualityValue = quality === 'hd' ? 'high' : 'medium';
+      }
+      
+      // Build request body
+      const requestBody: any = {
+        model_id: modelId,
+        prompt: prompt,
+        quality: qualityValue,
+        n: n,
+        response_format: response_format,
+      };
+      
+      // Only include size parameter for non-Grok models
+      if (!isGrokModel) {
+        requestBody.size = size;
+        console.log('[proxyImageGeneration] Including size parameter:', size);
+      } else {
+        console.log('[proxyImageGeneration] Skipping size parameter for Grok model');
+      }
+      
+      // Only include style parameter for non-Grok/gpt-image models (DALL-E models)
+      if (!isGrokOrGptImageModel && style) {
+        requestBody.style = style;
+      }
+      
+      console.log('[proxyImageGeneration] Request body:', JSON.stringify(requestBody, null, 2));
       console.log('[proxyImageGeneration] Sending request to:', `${API_URL}/images/generations`);
       const res = await fetch(`${API_URL}/images/generations`, {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({
-          model_id: modelId,
-          prompt: prompt,
-          size: size,
-          quality: quality,
-          style: style,
-          n: n,
-          response_format: response_format,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!res.ok) {
@@ -783,20 +839,41 @@ export const backendService = {
   ): Promise<{ imageUrl: string; usage?: { prompt_tokens: number; completion_tokens: number } }> {
     console.log('[proxyImageEdit] Starting request for model:', modelId, 'mode:', mode);
     try {
+      // Check if this is a Grok or gpt-image model (which uses low/medium/high instead of standard/hd)
+      const isGrokOrGptImageModel = /grok|gpt-image/i.test(modelId);
+      const isGrokModel = /^grok/i.test(modelId); // Grok models (grok-*) don't support size parameter
+      
+      // Convert quality parameter for Grok/gpt-image models
+      let qualityValue: string = quality;
+      if (isGrokOrGptImageModel) {
+        qualityValue = quality === 'hd' ? 'high' : 'medium';
+      }
+      
+      // Build request body
+      const requestBody: any = {
+        model_id: modelId,
+        prompt: prompt,
+        image: imageBase64,
+        mode: mode,
+        quality: qualityValue,
+        strength: strength,
+      };
+      
+      // Only include size parameter for non-Grok models
+      if (!isGrokModel) {
+        requestBody.size = size;
+      }
+      
+      // Only include mask if provided
+      if (mask) {
+        requestBody.mask = mask;
+      }
+      
       console.log('[proxyImageEdit] Sending request to:', `${API_URL}/images/edits`);
       const res = await fetch(`${API_URL}/images/edits`, {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({
-          model_id: modelId,
-          prompt: prompt,
-          image: imageBase64,
-          mode: mode,
-          size: size,
-          quality: quality,
-          strength: strength,
-          mask: mask,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!res.ok) {

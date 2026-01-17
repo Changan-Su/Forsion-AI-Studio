@@ -77,7 +77,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       }
     };
     loadData();
-  }, [userRole, user]);
+  }, [userRole, user.id, user.nickname, user.avatar]);
 
   const saveToBackend = async (newConfigs = configs, newCustomModels = customModels) => {
     // We only send the partial updates we care about here

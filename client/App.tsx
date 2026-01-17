@@ -1,15 +1,13 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { User, ChatSession, Message, AIModel, AppSettings, UserRole, Attachment } from './types';
-import { login } from './services/authService';
-import { backendService } from './services/backendService'; // New backend
+import { backendService, API_ROOT } from './services/backendService'; // New backend
 import { generateGeminiResponse, generateGeminiResponseStream } from './services/geminiService';
 import { generateExternalResponse, generateExternalResponseStream } from './services/externalApiService';
 import { BUILTIN_MODELS, DEFAULT_MODEL_ID, getAllModels, getConfiguredModels, STORAGE_KEYS } from './constants';
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 import SettingsModal from './components/SettingsModal';
-import RegisterModal from './components/RegisterModal';
 import { Send, Zap, Menu, Sparkles, MessageSquare, Code, Brain, BrainCircuit, Image as ImageIcon, ChevronDown, Paperclip, X as XIcon, Box, Square } from 'lucide-react';
 import { getPresetAvatar, svgToDataUrl } from './src/utils/presetAvatars';
 import { detectImageGenerationIntent, generateImage, detectImageEditIntent, editImage, imageToImage } from './services/imageGenerationService';
@@ -18,17 +16,8 @@ import CommandAutocomplete from './components/CommandAutocomplete';
 const App: React.FC = () => {
   // Auth State
   const [user, setUser] = useState<User | null>(null);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
-  const [showRegisterModal, setShowRegisterModal] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  // Register form state
-  const [registerUsername, setRegisterUsername] = useState('');
-  const [registerPassword, setRegisterPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [inviteCode, setInviteCode] = useState('');
 
   // App State
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -47,6 +36,11 @@ const App: React.FC = () => {
   
   const hasManualModelSelection = useRef(false);
   const previousDefaultModelId = useRef<string | null>(null);
+  const selectedModelIdRef = useRef(selectedModelId);
+
+  useEffect(() => {
+    selectedModelIdRef.current = selectedModelId;
+  }, [selectedModelId]);
 
   // Theme & Settings
   const [theme, setTheme] = useState<'light' | 'dark'>('dark'); // Default to Dark
@@ -91,6 +85,12 @@ const App: React.FC = () => {
     setSelectedModelId(DEFAULT_MODEL_ID);
   }, []);
 
+  const handleUnifiedLogin = useCallback(() => {
+    setIsAuthLoading(true);
+    const redirectUrl = encodeURIComponent(window.location.href);
+    window.location.href = `${API_ROOT}/auth?redirect=${redirectUrl}`;
+  }, []);
+
   const syncSettingsFromBackend = useCallback(async () => {
     try {
       // Fetch settings and global models in parallel
@@ -116,7 +116,7 @@ const App: React.FC = () => {
       // Always update if nickname or avatar is in settings (even if null/empty)
       // Read latest user from localStorage to avoid stale closure issues
       const currentUserStr = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-      const currentUser = currentUserStr ? JSON.parse(currentUserStr) : user;
+      const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
       
       if (currentUser && (settings.nickname !== undefined || settings.avatar !== undefined)) {
         const updatedUser = {
@@ -160,9 +160,10 @@ const App: React.FC = () => {
       // Update selected model if:
       // 1. User hasn't manually selected a model, OR
       // 2. Default model changed AND current selection was the old default (follow default changes)
+      const selectedModelIdSnapshot = selectedModelIdRef.current;
       if (!hasManualModelSelection.current) {
         setSelectedModelId(preferredModel);
-      } else if (defaultModelChanged && selectedModelId === previousDefaultModelId.current) {
+      } else if (defaultModelChanged && selectedModelIdSnapshot === previousDefaultModelId.current) {
         // Default model changed and user was using the old default, update to new default
         setSelectedModelId(preferredModel);
         hasManualModelSelection.current = false; // Reset flag so future default changes apply
@@ -194,20 +195,42 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const initApp = async () => {
-      // 1. Load User
       const storedUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-      if (storedUser) setUser(JSON.parse(storedUser));
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+      } else {
+        try {
+          const currentUser = await backendService.getCurrentUser();
+          setUser(currentUser);
+          localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
+        } catch (error: any) {
+          if (error?.code === 'AUTH_REQUIRED' || error?.name === 'AuthRequiredError') {
+            handleUnifiedLogin();
+            return;
+          }
+          setAuthError('Failed to validate session.');
+          setIsAuthLoading(false);
+          return;
+        }
+      }
       
-      // 2. Load Sessions
       const storedSessions = localStorage.getItem(STORAGE_KEYS.SESSIONS);
       if (storedSessions) setSessions(JSON.parse(storedSessions));
 
-      // 3. Load Settings from Backend
       await syncSettingsFromBackend();
+      setIsAuthLoading(false);
     };
 
+    const authToken = new URLSearchParams(window.location.search).get('token');
+    if (authToken) {
+      localStorage.setItem('auth_token', authToken);
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.delete('token');
+      window.history.replaceState({}, '', currentUrl.toString());
+    }
+
     initApp();
-  }, [syncSettingsFromBackend]);
+  }, []);
 
   const attemptReconnect = useCallback(async () => {
     const success = await backendService.pingBackend();
@@ -328,80 +351,8 @@ const App: React.FC = () => {
   const allModels = [...globalModels, ...configuredBuiltins, ...customModels];
 
   // Auth Handlers
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsAuthLoading(true);
-    setAuthError('');
-    try {
-      const u = await login(username, password);
-      if (u) {
-        setUser(u);
-        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(u));
-        setUsername('');
-        setPassword('');
-        // 立即同步设置以获取头像和昵称
-        try {
-          await syncSettingsFromBackend();
-        } catch (syncError) {
-          // 同步失败不影响登录流程，只记录错误
-          console.warn('Failed to sync settings after login:', syncError);
-        }
-      } else {
-        setAuthError('Invalid credentials');
-      }
-    } catch (err) {
-      setAuthError('Login failed');
-    } finally {
-      setIsAuthLoading(false);
-    }
-  };
-
   const handleLogout = () => {
     clearAuthState();
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError('');
-    
-    // Validation
-    if (!registerUsername || !registerPassword || !inviteCode) {
-      setAuthError('All fields are required');
-      return;
-    }
-
-    if (registerPassword.length < 4) {
-      setAuthError('Password must be at least 4 characters');
-      return;
-    }
-
-    if (registerPassword !== confirmPassword) {
-      setAuthError('Passwords do not match');
-      return;
-    }
-
-    setIsAuthLoading(true);
-    try {
-      const registeredUser = await backendService.register(registerUsername, registerPassword, inviteCode);
-      setUser(registeredUser);
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(registeredUser));
-      // Reset form
-      setRegisterUsername('');
-      setRegisterPassword('');
-      setConfirmPassword('');
-      setInviteCode('');
-      setAuthMode('login');
-    } catch (err: any) {
-      setAuthError(err.message || 'Registration failed');
-    } finally {
-      setIsAuthLoading(false);
-    }
-  };
-
-  const handleRegisterSuccess = (registeredUser: User) => {
-    setUser(registeredUser);
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(registeredUser));
-    setShowRegisterModal(false);
   };
 
   // Chat Handlers
@@ -1431,13 +1382,12 @@ const App: React.FC = () => {
   if (!user) {
     return (
       <div className="min-h-screen bg-dark-bg flex items-center justify-center p-4 relative overflow-hidden">
-        {/* Animated Background */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/40 via-dark-bg to-dark-bg"></div>
         
         <div className="bg-dark-card w-full max-w-md p-8 rounded-2xl shadow-2xl border border-dark-border relative z-10 backdrop-blur-sm">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-forsion-500 via-purple-500 to-pink-500"></div>
           
-          <div className="text-center mb-8">
+          <div className="text-center mb-6">
             <div className="w-16 h-16 bg-gradient-to-br from-forsion-500 to-purple-600 rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg shadow-forsion-500/20">
               <span className="text-3xl font-bold text-white">F</span>
             </div>
@@ -1445,149 +1395,23 @@ const App: React.FC = () => {
             <p className="text-dark-muted text-sm">Enterprise Grade AI Platform</p>
           </div>
 
-          {authMode === 'login' ? (
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-dark-muted uppercase mb-1.5 ml-1">Username</label>
-                <input 
-                  type="text" 
-                  value={username} 
-                  onChange={(e) => setUsername(e.target.value)} 
-                  className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-forsion-500 focus:ring-1 focus:ring-forsion-500 transition-all" 
-                  placeholder="Enter username"
-                  required 
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-dark-muted uppercase mb-1.5 ml-1">Password</label>
-                <input 
-                  type="password" 
-                  value={password} 
-                  onChange={(e) => setPassword(e.target.value)} 
-                  className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-forsion-500 focus:ring-1 focus:ring-forsion-500 transition-all" 
-                  placeholder="Enter password"
-                  required 
-                />
-              </div>
-              
-              {authError && (
-                <div className="p-3 bg-red-900/20 border border-red-900/50 rounded-lg">
-                  <p className="text-red-400 text-sm text-center font-medium">{authError}</p>
-                </div>
-              )}
-              
-              <button 
-                type="submit" 
-                disabled={isAuthLoading}
-                className="w-full bg-white text-black hover:bg-gray-100 font-bold py-3.5 rounded-lg transition-all transform active:scale-[0.98] shadow-lg disabled:opacity-70 disabled:cursor-not-allowed mt-2"
-              >
-                {isAuthLoading ? 'Processing...' : 'Sign In'}
-              </button>
-              
-              <div className="mt-4 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthMode('register');
-                    setAuthError('');
-                  }}
-                  className="text-dark-muted hover:text-white text-sm transition-colors"
-                >
-                  Don't have an account? <span className="text-forsion-400 font-medium">Register</span>
-                </button>
-              </div>
-            </form>
-          ) : (
-            <form onSubmit={handleRegister} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-dark-muted uppercase mb-1.5 ml-1">Username</label>
-                <input 
-                  type="text" 
-                  value={registerUsername} 
-                  onChange={(e) => setRegisterUsername(e.target.value)} 
-                  className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-forsion-500 focus:ring-1 focus:ring-forsion-500 transition-all" 
-                  placeholder="Enter username"
-                  required 
-                  disabled={isAuthLoading}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-dark-muted uppercase mb-1.5 ml-1">Password</label>
-                <input 
-                  type="password" 
-                  value={registerPassword} 
-                  onChange={(e) => setRegisterPassword(e.target.value)} 
-                  className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-forsion-500 focus:ring-1 focus:ring-forsion-500 transition-all" 
-                  placeholder="Enter password (min 4 characters)"
-                  required 
-                  disabled={isAuthLoading}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-dark-muted uppercase mb-1.5 ml-1">Confirm Password</label>
-                <input 
-                  type="password" 
-                  value={confirmPassword} 
-                  onChange={(e) => setConfirmPassword(e.target.value)} 
-                  className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-forsion-500 focus:ring-1 focus:ring-forsion-500 transition-all" 
-                  placeholder="Confirm password"
-                  required 
-                  disabled={isAuthLoading}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-dark-muted uppercase mb-1.5 ml-1">
-                  Invite Code <span className="text-red-400">*</span>
-                </label>
-                <input 
-                  type="text" 
-                  value={inviteCode} 
-                  onChange={(e) => setInviteCode(e.target.value.toUpperCase())} 
-                  className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-forsion-500 focus:ring-1 focus:ring-forsion-500 transition-all" 
-                  placeholder="Enter invite code"
-                  required 
-                  disabled={isAuthLoading}
-                />
-                <p className="mt-1 text-xs text-dark-muted ml-1">
-                  An invite code is required to register
-                </p>
-              </div>
-              
-              {authError && (
-                <div className="p-3 bg-red-900/20 border border-red-900/50 rounded-lg">
-                  <p className="text-red-400 text-sm text-center font-medium">{authError}</p>
-                </div>
-              )}
-              
-              <button 
-                type="submit" 
-                disabled={isAuthLoading}
-                className="w-full bg-white text-black hover:bg-gray-100 font-bold py-3.5 rounded-lg transition-all transform active:scale-[0.98] shadow-lg disabled:opacity-70 disabled:cursor-not-allowed mt-2"
-              >
-                {isAuthLoading ? 'Registering...' : 'Register'}
-              </button>
-              
-              <div className="mt-4 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthMode('login');
-                    setAuthError('');
-                    setRegisterUsername('');
-                    setRegisterPassword('');
-                    setConfirmPassword('');
-                    setInviteCode('');
-                  }}
-                  className="text-dark-muted hover:text-white text-sm transition-colors"
-                >
-                  Already have an account? <span className="text-forsion-400 font-medium">Sign In</span>
-                </button>
-              </div>
-            </form>
+          {authError && (
+            <div className="p-3 mb-4 bg-red-900/20 border border-red-900/50 rounded-lg">
+              <p className="text-red-400 text-sm text-center font-medium">{authError}</p>
+            </div>
           )}
-          
+
+          <button
+            type="button"
+            onClick={handleUnifiedLogin}
+            disabled={isAuthLoading}
+            className="w-full bg-white text-black hover:bg-gray-100 font-bold py-3.5 rounded-lg transition-all transform active:scale-[0.98] shadow-lg disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {isAuthLoading ? 'Redirecting...' : 'Continue with Forsion Account'}
+          </button>
+
           <p className="mt-6 text-center text-xs text-dark-muted">
-            {authMode === 'login' ? 'Contact an administrator to request access.' : 'Need an invite code? Contact an administrator.'}
+            You will be redirected to the unified Forsion login page.
           </p>
         </div>
       </div>
@@ -2040,28 +1864,22 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      {showRegisterModal && (
-        <RegisterModal
-          onClose={() => setShowRegisterModal(false)}
-          onSuccess={handleRegisterSuccess}
-        />
-      )}
-      
-      {showSettings && (
-        <SettingsModal 
-          onClose={() => setShowSettings(false)} 
-          userRole={user!.role} 
-          user={user!}
-          currentTheme={theme} 
-          onThemeChange={(t) => updateAppSettings({ theme: t })}
-          currentPreset={themePreset}
-          onPresetChange={(p) => updateAppSettings({ themePreset: p })}
-          onModelsChange={syncSettingsFromBackend}
-          onUpdateSettings={updateAppSettings}
-          isOffline={isOfflineMode}
-          onReconnect={attemptReconnect}
-        />
-      )}
+       {showSettings && (
+         <SettingsModal 
+           onClose={() => setShowSettings(false)} 
+           userRole={user!.role} 
+           user={user!}
+           currentTheme={theme} 
+           onThemeChange={(t) => updateAppSettings({ theme: t })}
+           currentPreset={themePreset}
+           onPresetChange={(p) => updateAppSettings({ themePreset: p })}
+           onModelsChange={syncSettingsFromBackend}
+           onUpdateSettings={updateAppSettings}
+           isOffline={isOfflineMode}
+           onReconnect={attemptReconnect}
+         />
+       )}
+
       
       {/* Expanded Input Modal with bounce animation */}
       {isInputExpanded && (
