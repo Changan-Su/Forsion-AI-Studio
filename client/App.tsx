@@ -8,7 +8,7 @@ import { BUILTIN_MODELS, DEFAULT_MODEL_ID, getAllModels, getConfiguredModels, ST
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 import SettingsModal from './components/SettingsModal';
-import { Send, Zap, Menu, Sparkles, MessageSquare, Code, Brain, BrainCircuit, Image as ImageIcon, ChevronDown, Paperclip, X as XIcon, Box, Square } from 'lucide-react';
+import { Send, Zap, Menu, Sparkles, MessageSquare, Code, Brain, BrainCircuit, Image as ImageIcon, ChevronDown, Paperclip, X as XIcon, Box, Square, UploadCloud } from 'lucide-react';
 import { getPresetAvatar, svgToDataUrl } from './src/utils/presetAvatars';
 import { detectImageGenerationIntent, generateImage, detectImageEditIntent, editImage, imageToImage } from './services/imageGenerationService';
 import CommandAutocomplete from './components/CommandAutocomplete';
@@ -61,8 +61,12 @@ const App: React.FC = () => {
   const [cursorPosition, setCursorPosition] = useState(0);
 
   // Media Upload State
-  const [attachment, setAttachment] = useState<Attachment | null>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Drag and Drop State for Input Area
+  const [isDraggingOverInput, setIsDraggingOverInput] = useState(false);
+  const dragCounterInput = useRef(0);
   
   // Expanded Input Modal State
   const [isInputExpanded, setIsInputExpanded] = useState(false);
@@ -141,6 +145,11 @@ const App: React.FC = () => {
         defaultBaseUrl: m.defaultBaseUrl,
         isCustom: false,
         isGlobal: true, // Mark as global model from backend
+        // For global models using OpenAI-compatible API:
+        // - Images are generally supported (GPT-4V style)
+        // - PDF/Documents are NOT natively supported by OpenAI API, need text extraction
+        supportsFileUpload: m.supportsFileUpload ?? true, // Support image upload
+        supportedFileTypes: m.supportedFileTypes || ['image/*'], // Only images by default for OpenAI-compatible APIs
       }));
       setGlobalModels(convertedGlobalModels);
       
@@ -370,6 +379,30 @@ const App: React.FC = () => {
   }, [selectedModelId]);
 
   // File Handler with support for documents
+  // Helper to check if provider supports native document upload (PDF/Word)
+  const providerSupportsDocuments = (provider?: string): boolean => {
+    // Based on backend documentation, providers that support native document upload:
+    // - gemini: natively supports PDF/Word
+    // - Others (openai, anthropic, deepseek, etc.): only support images, not documents
+    return provider === 'gemini';
+  };
+
+  // Helper to check if current model supports file upload for a given type
+  const modelSupportsFileType = (mimeType: string): boolean => {
+    const model = allModels.find(m => m.id === selectedModelId);
+    if (!model?.supportsFileUpload) return false;
+    if (!model.supportedFileTypes) return true; // If no types specified, assume all supported
+    
+    return model.supportedFileTypes.some(pattern => {
+      if (pattern.endsWith('/*')) {
+        // Wildcard pattern like 'image/*'
+        const prefix = pattern.slice(0, -1); // 'image/'
+        return mimeType.startsWith(prefix);
+      }
+      return mimeType === pattern;
+    });
+  };
+
   const processFile = async (file: File) => {
     const reader = new FileReader();
     
@@ -380,16 +413,19 @@ const App: React.FC = () => {
                    file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
     const isText = file.type === 'text/plain' || file.type === 'text/markdown';
     
+    // Check if model supports this file type for native upload
+    const supportsNativeUpload = modelSupportsFileType(file.type);
+    
     if (isImage) {
-      // Handle image files
+      // Handle image files - always send as base64 for models that support it
       reader.onload = (event) => {
         if (event.target?.result) {
-          setAttachment({
+          setAttachments(prev => [...prev, {
             type: 'image',
-            url: event.target.result as string,
+            url: event.target!.result as string,
             mimeType: file.type,
             name: file.name
-          });
+          }]);
         }
       };
       reader.readAsDataURL(file);
@@ -398,78 +434,192 @@ const App: React.FC = () => {
       reader.onload = (event) => {
         if (event.target?.result) {
           const textContent = event.target.result as string;
-          setAttachment({
+          setAttachments(prev => [...prev, {
             type: 'document',
             url: '', // No preview URL for text
             mimeType: file.type,
             name: file.name,
             extractedText: textContent
-          });
+          }]);
         }
       };
       reader.readAsText(file);
     } else if (isPdf || isWord) {
-      // Handle PDF and Word files - try backend extraction first
-      try {
-        const result = await backendService.parseFile(file);
-        if (result.text) {
-          setAttachment({
-            type: 'document',
-            url: result.base64 ? `data:${file.type};base64,${result.base64}` : '',
-            mimeType: file.type,
-            name: file.name,
-            extractedText: result.text
-          });
-          return;
-        }
-      } catch (error) {
-        console.warn('Backend file parsing failed, using fallback', error);
-      }
+      // Handle PDF and Word files
+      // Strategy: Check provider to determine if native document upload is supported
+      // - gemini provider: natively supports PDF/Word, use native upload
+      // - Other providers (openai, anthropic, etc.): don't support documents natively, extract text
+      const model = allModels.find(m => m.id === selectedModelId);
+      const provider = model?.provider || 'external';
+      const providerSupportsDocUpload = providerSupportsDocuments(provider);
+      const modelSupportsFileUpload = model?.supportsFileUpload ?? false;
       
-      // Fallback: read as base64 with hint text
-      reader.onload = async (event) => {
-        if (event.target?.result) {
-          const base64 = event.target.result as string;
-          let extractedText = '';
-          
-          // Try backend parsing with base64
-          try {
-            const result = await backendService.parseBase64(base64, file.name, file.type);
-            if (result.text) {
-              extractedText = result.text;
-            }
-          } catch {
-            // Use placeholder if backend fails
-            if (isPdf) {
-              extractedText = `[PDF Document: ${file.name}]\n\nNote: The document has been attached. Text extraction requires backend support.`;
-            } else if (isWord) {
-              extractedText = `[Word Document: ${file.name}]\n\nNote: The document has been attached. Text extraction requires backend support.`;
-            }
+      // Use native upload only if:
+      // 1. Provider supports documents (e.g., gemini), OR
+      // 2. Model explicitly supports this file type via supportedFileTypes
+      const shouldUseNativeUpload = providerSupportsDocUpload || (modelSupportsFileUpload && modelSupportsFileType(file.type));
+      
+      console.log('[processFile] PDF/Word file upload decision:', {
+        fileType: file.type,
+        fileName: file.name,
+        modelId: model?.id,
+        provider,
+        providerSupportsDocUpload,
+        modelSupportsFileUpload,
+        shouldUseNativeUpload
+      });
+      
+      if (shouldUseNativeUpload) {
+        // Model/backend supports native file upload - always use native upload for PDF/Word
+        // Don't extract text, let the backend/model handle the file directly
+        // Backend will convert format based on provider (Gemini format for gemini, OpenAI format for others)
+        reader.onload = (event) => {
+          if (event.target?.result) {
+            setAttachments(prev => [...prev, {
+              type: 'document',
+              url: event.target!.result as string,
+              mimeType: file.type,
+              name: file.name
+              // No extractedText - let backend/model handle it natively
+            }]);
           }
-          
-          setAttachment({
-            type: 'document',
-            url: base64,
-            mimeType: file.type,
-            name: file.name,
-            extractedText: extractedText
-          });
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // Model doesn't support native upload - extract text as fallback
+        try {
+          const result = await backendService.parseFile(file);
+          if (result.text) {
+            setAttachments(prev => [...prev, {
+              type: 'document',
+              url: result.base64 ? `data:${file.type};base64,${result.base64}` : '',
+              mimeType: file.type,
+              name: file.name,
+              extractedText: result.text
+            }]);
+            return;
+          }
+        } catch (error) {
+          console.warn('Backend file parsing failed, using fallback', error);
         }
-      };
-      reader.readAsDataURL(file);
+        
+        // Fallback: read as base64 with hint text
+        reader.onload = async (event) => {
+          if (event.target?.result) {
+            const base64 = event.target.result as string;
+            let extractedText = '';
+            
+            // Try backend parsing with base64
+            try {
+              const result = await backendService.parseBase64(base64, file.name, file.type);
+              if (result.text) {
+                extractedText = result.text;
+              }
+            } catch {
+              // Use placeholder if backend fails
+              if (isPdf) {
+                extractedText = `[PDF Document: ${file.name}]\n\nNote: The document has been attached. Text extraction requires backend support.`;
+              } else if (isWord) {
+                extractedText = `[Word Document: ${file.name}]\n\nNote: The document has been attached. Text extraction requires backend support.`;
+              }
+            }
+            
+            setAttachments(prev => [...prev, {
+              type: 'document',
+              url: base64,
+              mimeType: file.type,
+              name: file.name,
+              extractedText: extractedText
+            }]);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
     } else {
       alert('Unsupported file type. Please upload images, PDFs, Word documents, or text files.');
     }
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      await processFile(e.target.files[0]);
+    if (e.target.files && e.target.files.length > 0) {
+      // Process all selected files
+      const files = Array.from(e.target.files);
+      for (const file of files) {
+        await processFile(file);
+      }
     }
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const clearAttachment = () => setAttachment(null);
+  const clearAttachment = (index?: number) => {
+    if (index !== undefined) {
+      // Remove specific attachment by index
+      setAttachments(prev => prev.filter((_, i) => i !== index));
+    } else {
+      // Clear all attachments
+      setAttachments([]);
+    }
+  };
+
+  // Drag and Drop Handlers for Input Area
+  const handleInputDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterInput.current++;
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDraggingOverInput(true);
+    }
+  };
+
+  const handleInputDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterInput.current--;
+    if (dragCounterInput.current === 0) {
+      setIsDraggingOverInput(false);
+    }
+  };
+
+  const handleInputDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleInputDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOverInput(false);
+    dragCounterInput.current = 0;
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const files = Array.from(e.dataTransfer.files);
+      // Support images and documents
+      const supportedTypes = [
+        'image/',
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'text/plain',
+        'text/markdown'
+      ];
+      
+      // Process all supported files
+      const supportedFiles = files.filter(file => 
+        supportedTypes.some(type => 
+          file.type.startsWith(type) || file.type === type
+        )
+      );
+      
+      if (supportedFiles.length > 0) {
+        // Upload all supported files
+        supportedFiles.forEach(file => {
+          processFile(file);
+        });
+      } else {
+        alert('Supported files: Images, PDF, Word (.doc, .docx), Text files');
+      }
+    }
+  };
 
   // Stop generation handler
   const handleStopGeneration = () => {
@@ -483,7 +633,7 @@ const App: React.FC = () => {
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if ((!input.trim() && !attachment) || isProcessing) return;
+    if ((!input.trim() && attachments.length === 0) || isProcessing) return;
     
     // Check if any model is configured
     if (allModels.length === 0) {
@@ -497,7 +647,7 @@ const App: React.FC = () => {
     }
 
     const currentModel = allModels.find(m => m.id === selectedModelId) || allModels[0];
-    const currentAttachments = attachment ? [attachment] : [];
+    const currentAttachments = [...attachments];
     
     // 处理 /dt 命令（深度思考）
     let finalInput = input;
@@ -511,10 +661,22 @@ const App: React.FC = () => {
       shouldUseDeepThinking = true;
     }
     
-    // If there's a document attachment with extracted text, include it in the message
+    // If there's a document attachment with extracted text (fallback for models that don't support native upload), include it in the message
+    // Note: Documents uploaded natively (without extractedText) are sent directly to the model and should not be included as text
     let messageContent = finalInput;
-    if (attachment?.type === 'document' && attachment.extractedText) {
-      messageContent = `${finalInput}\n\n---\n📄 Attached Document: ${attachment.name}\n\n${attachment.extractedText}`;
+    const documentAttachments = currentAttachments.filter(a => a.type === 'document' && a.extractedText);
+    
+    console.log('[handleSendMessage] Attachment check:', {
+      allAttachments: currentAttachments.map(a => ({ type: a.type, name: a.name, hasExtractedText: !!a.extractedText, hasUrl: !!a.url })),
+      documentAttachmentsWithText: documentAttachments.map(a => a.name),
+      willAddToMessage: documentAttachments.length > 0
+    });
+    
+    if (documentAttachments.length > 0) {
+      const docsText = documentAttachments.map(a => 
+        `📄 Attached Document: ${a.name}\n\n${a.extractedText}`
+      ).join('\n\n---\n');
+      messageContent = `${finalInput}\n\n---\n${docsText}`;
     }
     
     const userMessage: Message = {
@@ -538,20 +700,22 @@ const App: React.FC = () => {
     }));
 
     setInput('');
-    setAttachment(null);
+    setAttachments([]);
     setIsProcessing(true);
     
     // Create new AbortController for this request
     abortControllerRef.current = new AbortController();
     
     // 检测是否为图像编辑或以图生图请求
-    const hasImageAttachment = currentAttachments.length > 0 && currentAttachments[0].type === 'image';
+    const imageAttachments = currentAttachments.filter(a => a.type === 'image');
+    const hasImageAttachment = imageAttachments.length > 0;
     const { isEditRequest, isImg2ImgRequest, prompt: editPrompt, mode: editMode } = hasImageAttachment 
       ? detectImageEditIntent(finalInput, true)
       : { isEditRequest: false, isImg2ImgRequest: false, prompt: finalInput, mode: 'none' as const };
     
     if ((isEditRequest || isImg2ImgRequest) && hasImageAttachment) {
-      // 处理图像编辑或以图生图请求
+      // 处理图像编辑或以图生图请求 (use first image attachment)
+      const imageAttachment = imageAttachments[0];
       const botMessageId = (Date.now() + 1).toString();
       const modeText = isEditRequest ? '编辑图像' : '以图生图';
       const botMessage: Message = {
@@ -561,7 +725,7 @@ const App: React.FC = () => {
         timestamp: Date.now(),
         modelId: currentModel.id,
         editMode: editMode,
-        sourceImageUrl: currentAttachments[0].url
+        sourceImageUrl: imageAttachment.url
       };
 
       setSessions(prev => prev.map(s => {
@@ -573,7 +737,7 @@ const App: React.FC = () => {
 
       try {
         let result: { imageUrl: string; usage?: { prompt_tokens: number; completion_tokens: number } };
-        const imageBase64 = currentAttachments[0].url;
+        const imageBase64 = imageAttachment.url;
         
         // 使用全局模型（后端代理）
         if ((currentModel as any).isGlobal) {
@@ -1554,7 +1718,77 @@ const App: React.FC = () => {
               ? 'glass border-t border-white/10'
               : 'bg-white/5 dark:bg-[#030712]/60 backdrop-blur-xl border-white/40 dark:border-white/10'
         }`}>
-          <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto relative group">
+          <form 
+            onSubmit={handleSendMessage} 
+            className="max-w-4xl mx-auto relative group"
+            onDragEnter={handleInputDragEnter}
+            onDragOver={handleInputDragOver}
+            onDragLeave={handleInputDragLeave}
+            onDrop={handleInputDrop}
+          >
+             {/* Drag Overlay - Fixed over input area */}
+             {isDraggingOverInput && (
+               <div className="fixed inset-0 bg-white/80 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center pointer-events-none">
+                 <div className="text-center">
+                   <UploadCloud size={64} className="text-forsion-500 mx-auto mb-4" />
+                   <h3 className="text-2xl font-bold text-gray-800 dark:text-white">Drop to upload</h3>
+                   <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">Images, PDF, Word, Text files</p>
+                 </div>
+               </div>
+             )}
+
+             {/* Attachment Preview - Moved above toggles */}
+             {attachments.length > 0 && (
+               <div className="mb-3 ml-2">
+                 <div className="flex gap-2 flex-wrap max-w-full overflow-x-auto pb-2">
+                   {attachments.map((attachment, index) => (
+                     <div key={index} className="relative group/preview flex-shrink-0">
+                       {attachment.type === 'image' ? (
+                         <>
+                           <img 
+                             src={attachment.url} 
+                             alt={`Preview ${index + 1}`}
+                             className={`h-20 w-auto rounded-lg shadow-lg object-cover ${isNotion ? 'border border-gray-300' : 'border border-gray-200 dark:border-dark-border bg-gray-100'}`} 
+                           />
+                           {/* Image editing hint - only show on first image */}
+                           {index === 0 && (
+                             <div className={`absolute top-full left-0 mt-2 px-3 py-1.5 rounded-md text-xs whitespace-nowrap z-10 ${
+                               isNotion 
+                                 ? 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700' 
+                                 : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                             }`}>
+                               💡 Try: /edit or /img2img commands
+                             </div>
+                           )}
+                         </>
+                       ) : (
+                         <div className={`h-20 px-4 rounded-lg shadow-lg flex items-center gap-3 ${isNotion ? 'border border-gray-300 bg-gray-100' : 'border border-gray-200 dark:border-dark-border bg-gray-100 dark:bg-gray-800'}`}>
+                           <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                           </svg>
+                           <div className="overflow-hidden max-w-[120px]">
+                             <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{attachment.name}</div>
+                             <div className="text-xs text-gray-500 dark:text-gray-400">
+                               {attachment.mimeType.includes('pdf') ? 'PDF' : 
+                                attachment.mimeType.includes('word') ? 'Word' : 
+                                attachment.mimeType.includes('text') ? 'Text' : 'Document'}
+                             </div>
+                           </div>
+                         </div>
+                       )}
+                       <button 
+                         type="button" 
+                         onClick={() => clearAttachment(index)} 
+                         className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors"
+                       >
+                         <XIcon size={12} />
+                       </button>
+                     </div>
+                   ))}
+                 </div>
+               </div>
+             )}
+
              {/* Deep Thinking and Force Image Generation Toggles */}
              <div className="flex items-center gap-4 mb-3 ml-2">
                <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -1655,52 +1889,6 @@ const App: React.FC = () => {
                )}
              </div>
 
-             {/* Attachment Preview */}
-             {attachment && (
-               <div className="absolute bottom-full left-0 mb-3 ml-2">
-                 <div className="relative group/preview inline-block">
-                    {attachment.type === 'image' ? (
-                      <>
-                        <img 
-                          src={attachment.url} 
-                          alt="Preview" 
-                          className={`h-20 w-auto rounded-lg shadow-lg object-cover ${isNotion ? 'border border-gray-300' : 'border border-gray-200 dark:border-dark-border bg-gray-100'}`} 
-                        />
-                        {/* Image editing hint */}
-                        <div className={`absolute top-full left-0 mt-2 px-3 py-1.5 rounded-md text-xs whitespace-nowrap ${
-                          isNotion 
-                            ? 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700' 
-                            : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                        }`}>
-                          💡 Try: /edit or /img2img commands
-                        </div>
-                      </>
-                    ) : (
-                      <div className={`h-20 px-4 rounded-lg shadow-lg flex items-center gap-3 ${isNotion ? 'border border-gray-300 bg-gray-100' : 'border border-gray-200 dark:border-dark-border bg-gray-100 dark:bg-gray-800'}`}>
-                        <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        <div className="overflow-hidden max-w-[120px]">
-                          <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{attachment.name}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {attachment.mimeType.includes('pdf') ? 'PDF' : 
-                             attachment.mimeType.includes('word') ? 'Word' : 
-                             attachment.mimeType.includes('text') ? 'Text' : 'Document'}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <button 
-                      type="button" 
-                      onClick={clearAttachment} 
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors"
-                    >
-                      <XIcon size={12} />
-                    </button>
-                 </div>
-               </div>
-             )}
-
              <div className={`relative flex items-end gap-2 p-2 transition-all ${
                isNotion
                  ? 'bg-transparent border-t-0 border-b-2 border-gray-200 dark:border-gray-700 rounded-none focus-within:border-black dark:focus-within:border-white'
@@ -1708,7 +1896,7 @@ const App: React.FC = () => {
                    ? 'bg-white/40 border border-white/30 rounded-[2rem] shadow-sm focus-within:ring-2 focus-within:ring-white/30 backdrop-blur-md'
                    : 'bg-white/80 dark:bg-white/10 backdrop-blur-2xl rounded-[2rem] shadow-[0_20px_60px_rgba(15,23,42,0.12)] dark:shadow-[0_25px_80px_rgba(2,6,23,0.75)] border border-white/60 dark:border-white/15 focus-within:ring-2 focus-within:ring-forsion-400/40 dark:focus-within:ring-cyan-400/20'
              }`}>
-               <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*,.pdf,.doc,.docx,.txt,.md" className="hidden" />
+               <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*,.pdf,.doc,.docx,.txt,.md" multiple className="hidden" />
                <button 
                  type="button"
                  onClick={() => fileInputRef.current?.click()}
@@ -1842,10 +2030,10 @@ const App: React.FC = () => {
                    <Square size={20} fill="currentColor" />
                  </button>
                ) : (
-                 <button 
-                   type="submit"
-                   disabled={(!input.trim() && !attachment)}
-                   className={`p-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                  <button 
+                    type="submit"
+                    disabled={(!input.trim() && attachments.length === 0)}
+                    className={`p-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                       isNotion 
                         ? 'text-gray-500 hover:text-black dark:text-gray-400 dark:hover:text-white'
                         : isMonet

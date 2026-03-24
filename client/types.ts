@@ -50,6 +50,8 @@ export interface AIModel {
   configKey?: string; // Used to group models under one API key (e.g. 'openai', 'google')
   isCustom?: boolean; // Flag to identify user-added models
   isGlobal?: boolean; // Flag to identify admin-managed global models
+  supportsFileUpload?: boolean; // Whether the model supports direct file/image upload via API
+  supportedFileTypes?: string[]; // MIME types supported for upload (e.g., ['image/*', 'application/pdf'])
 }
 
 export interface AppSettings {

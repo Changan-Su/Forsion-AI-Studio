@@ -528,7 +528,7 @@ export const backendService = {
   // 14. Proxy Chat Completions (for global models) with streaming support
   async proxyChatCompletions(
     modelId: string,
-    messages: Array<{ role: string; content: string }>,
+    messages: Array<{ role: string; content: string | any[] }>,
     temperature: number = 0.7,
     enableThinking: boolean = false,
     maxTokens?: number,
@@ -539,15 +539,58 @@ export const backendService = {
     console.log('[proxyChatCompletions] Starting request for model:', modelId);
     try {
       // Modify messages if thinking is enabled
-      let finalMessages = [...messages];
+      let finalMessages: Array<{ role: string; content: string | any[] }> = [...messages];
       if (enableThinking && finalMessages.length > 0) {
         const lastMsgIdx = finalMessages.length - 1;
         if (finalMessages[lastMsgIdx].role === 'user') {
           const thinkingPrefix = "Think step by step carefully before answering. Show your reasoning process in <think></think> tags before providing your final answer.\n\n";
-          finalMessages[lastMsgIdx] = {
-            ...finalMessages[lastMsgIdx],
-            content: thinkingPrefix + finalMessages[lastMsgIdx].content
-          };
+          const currentContent = finalMessages[lastMsgIdx].content;
+          if (typeof currentContent === 'string') {
+            finalMessages[lastMsgIdx] = {
+              ...finalMessages[lastMsgIdx],
+              content: thinkingPrefix + currentContent
+            };
+          } else if (Array.isArray(currentContent)) {
+            // If content is already multimodal array, prepend thinking to first text part
+            const newContent = [...currentContent];
+            const textPartIdx = newContent.findIndex(p => p.type === 'text');
+            if (textPartIdx >= 0) {
+              newContent[textPartIdx] = { ...newContent[textPartIdx], text: thinkingPrefix + newContent[textPartIdx].text };
+            }
+            finalMessages[lastMsgIdx] = { ...finalMessages[lastMsgIdx], content: newContent };
+          }
+        }
+      }
+
+      // Convert attachments to OpenAI multimodal format in the last user message
+      // Note: OpenAI-compatible APIs only support images, not PDF/documents natively
+      if (attachments && attachments.length > 0 && finalMessages.length > 0) {
+        const lastMsgIdx = finalMessages.length - 1;
+        if (finalMessages[lastMsgIdx].role === 'user') {
+          const lastMsg = finalMessages[lastMsgIdx];
+          const contentArray: any[] = [];
+          
+          // Add existing text content
+          if (typeof lastMsg.content === 'string') {
+            contentArray.push({ type: 'text', text: lastMsg.content });
+          } else if (Array.isArray(lastMsg.content)) {
+            contentArray.push(...lastMsg.content);
+          }
+          
+          // Add image attachments only (OpenAI-compatible APIs support images via image_url)
+          const imageAttachments = attachments.filter(att => att.type === 'image');
+          imageAttachments.forEach(att => {
+            contentArray.push({
+              type: 'image_url',
+              image_url: { url: att.url }
+            });
+          });
+          
+          // Only convert to multimodal format if we have images
+          if (imageAttachments.length > 0) {
+            finalMessages[lastMsgIdx] = { role: 'user', content: contentArray };
+            console.log('[proxyChatCompletions] Converted images to multimodal format, parts:', contentArray.length);
+          }
         }
       }
 
@@ -560,8 +603,7 @@ export const backendService = {
           messages: finalMessages,
           temperature,
           max_tokens: maxTokens,
-          stream: true, // Enable streaming
-          attachments: attachments || [] // Pass attachments to backend
+          stream: true // Enable streaming
         }),
         signal: signal
       });

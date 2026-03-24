@@ -108,6 +108,12 @@ export const generateGeminiResponseStream = async (
             currentParts.push({
               inlineData: { mimeType: att.mimeType, data: base64Data }
             });
+          } else if (att.type === 'document' && att.url && !att.extractedText) {
+            // Native document upload - send file directly to model
+            const base64Data = att.url.split(',')[1];
+            currentParts.push({
+              inlineData: { mimeType: att.mimeType, data: base64Data }
+            });
           }
         });
       }
@@ -265,11 +271,20 @@ export const generateGeminiResponse = async (
         currentParts.push({ text: prompt });
       }
 
-      // Add attachments (images)
+      // Add attachments (images and documents)
       if (attachments && attachments.length > 0) {
         attachments.forEach(att => {
           if (att.type === 'image') {
             // Strip the data:image/png;base64, prefix if present
+            const base64Data = att.url.split(',')[1];
+            currentParts.push({
+              inlineData: {
+                mimeType: att.mimeType,
+                data: base64Data
+              }
+            });
+          } else if (att.type === 'document' && att.url && !att.extractedText) {
+            // Native document upload - send file directly to model
             const base64Data = att.url.split(',')[1];
             currentParts.push({
               inlineData: {

@@ -200,7 +200,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
     dragCounter.current = 0;
     
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const file = e.dataTransfer.files[0];
+      const files = Array.from(e.dataTransfer.files);
       // Support images and documents
       const supportedTypes = [
         'image/',
@@ -211,12 +211,18 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
         'text/markdown'
       ];
       
-      const isSupported = supportedTypes.some(type => 
-        file.type.startsWith(type) || file.type === type
+      // Process all supported files
+      const supportedFiles = files.filter(file => 
+        supportedTypes.some(type => 
+          file.type.startsWith(type) || file.type === type
+        )
       );
       
-      if (isSupported) {
-        onFileUpload(file);
+      if (supportedFiles.length > 0) {
+        // Upload all supported files
+        supportedFiles.forEach(file => {
+          onFileUpload(file);
+        });
       } else {
         alert('Supported files: Images, PDF, Word (.doc, .docx), Text files');
       }
@@ -295,16 +301,6 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
       onDrop={handleDrop}
     >
       
-      {/* Drag Overlay */}
-      {isDragging && (
-         <div className="absolute inset-0 bg-white/80 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center border-4 border-dashed border-forsion-500 m-4 rounded-xl pointer-events-none">
-           <div className="text-center">
-              <UploadCloud size={64} className="text-forsion-500 mx-auto mb-4" />
-              <h3 className="text-2xl font-bold text-gray-800 dark:text-white">Drop to upload</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">Images, PDF, Word, Text files</p>
-           </div>
-         </div>
-      )}
 
       {messages.map((msg) => (
         <div

@@ -13,7 +13,9 @@ export const BUILTIN_MODELS: AIModel[] = [
     provider: 'gemini',
     description: 'Fast and versatile model for everyday tasks.',
     icon: 'Zap',
-    configKey: 'google', 
+    configKey: 'google',
+    supportsFileUpload: true,
+    supportedFileTypes: ['image/*', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/*'],
   },
   {
     id: 'gemini-3-pro-preview',
@@ -22,6 +24,8 @@ export const BUILTIN_MODELS: AIModel[] = [
     description: 'Advanced reasoning and complex tasks.',
     icon: 'Brain',
     configKey: 'google',
+    supportsFileUpload: true,
+    supportedFileTypes: ['image/*', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/*'],
   },
   {
     id: 'gemini-2.5-flash-image',
@@ -30,6 +34,8 @@ export const BUILTIN_MODELS: AIModel[] = [
     description: 'Generate and edit images.',
     icon: 'Image',
     configKey: 'google',
+    supportsFileUpload: true,
+    supportedFileTypes: ['image/*'],
   },
 
   // --- OpenAI Models ---
@@ -43,6 +49,8 @@ export const BUILTIN_MODELS: AIModel[] = [
     apiModelId: 'gpt-5',
     defaultBaseUrl: 'https://api.openai.com/v1',
     configKey: 'openai',
+    supportsFileUpload: true,
+    supportedFileTypes: ['image/*'],
   },
   {
     id: 'chatgpt-4o',
@@ -54,6 +62,8 @@ export const BUILTIN_MODELS: AIModel[] = [
     apiModelId: 'gpt-4o',
     defaultBaseUrl: 'https://api.openai.com/v1',
     configKey: 'openai',
+    supportsFileUpload: true,
+    supportedFileTypes: ['image/*'],
   },
   {
     id: 'chatgpt-4o-mini',
@@ -65,6 +75,8 @@ export const BUILTIN_MODELS: AIModel[] = [
     apiModelId: 'gpt-4o-mini',
     defaultBaseUrl: 'https://api.openai.com/v1',
     configKey: 'openai',
+    supportsFileUpload: true,
+    supportedFileTypes: ['image/*'],
   },
 
   // --- Other Providers ---
@@ -78,6 +90,7 @@ export const BUILTIN_MODELS: AIModel[] = [
     apiModelId: 'deepseek-chat',
     defaultBaseUrl: 'https://api.deepseek.com',
     configKey: 'deepseek',
+    supportsFileUpload: false, // DeepSeek doesn't support file uploads in standard API
   },
   {
     id: 'deepseek-reasoner',
@@ -89,6 +102,7 @@ export const BUILTIN_MODELS: AIModel[] = [
     apiModelId: 'deepseek-reasoner',
     defaultBaseUrl: 'https://api.deepseek.com',
     configKey: 'deepseek',
+    supportsFileUpload: false, // DeepSeek doesn't support file uploads in standard API
   }
 ];
 
