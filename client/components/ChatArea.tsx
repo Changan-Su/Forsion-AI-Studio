@@ -1,23 +1,60 @@
 
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { Message, AIModel } from '../types';
-import { Bot, Cpu, AlertCircle, BrainCircuit, ChevronDown, ChevronRight, UploadCloud, Copy, Check, RefreshCw } from 'lucide-react';
+import { Bot, Cpu, AlertCircle, BrainCircuit, ChevronDown, ChevronRight, UploadCloud, Copy, Check, RefreshCw, Wrench, Play, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import ModelAvatar from './ModelAvatar';
+import ToolCallBlock from './ToolCallBlock';
+import ExecutionOutput from './ExecutionOutput';
+import { pyodideService } from '../services/pyodideService';
+import { workspaceService } from '../services/workspaceService';
 
-// Code Block Component with Copy functionality
-const CodeBlock: React.FC<{ language?: string; children: string }> = ({ language, children }) => {
+// Code Block Component with Copy functionality and Python Run button
+const CodeBlock: React.FC<{
+  language?: string;
+  children: string;
+  sessionId?: string;
+  themePreset?: 'default' | 'notion' | 'monet';
+}> = ({ language, children, sessionId, themePreset }) => {
   const [copied, setCopied] = useState(false);
-  
+  const [isRunning, setIsRunning] = useState(false);
+  const [execResult, setExecResult] = useState<{
+    stdout: string; stderr: string; images: Array<{ path: string; dataUrl: string }>; durationMs?: number;
+  } | null>(null);
+
+  const isPython = language === 'python' || language === 'py';
+  const canRun = isPython && !!sessionId;
+
   const handleCopy = async () => {
     await navigator.clipboard.writeText(children);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-  
+
+  const handleRun = async () => {
+    if (!sessionId || isRunning) return;
+    setIsRunning(true);
+    setExecResult(null);
+    try {
+      const result = await pyodideService.execute(sessionId, children);
+      const images: Array<{ path: string; dataUrl: string }> = [];
+      for (const f of result.generatedFiles) {
+        if (f.mimeType.startsWith('image/')) {
+          const dataUrl = await workspaceService.readFileAsDataUrl(sessionId, f.path);
+          if (dataUrl) images.push({ path: f.path, dataUrl });
+        }
+      }
+      setExecResult({ stdout: result.stdout, stderr: result.stderr, images, durationMs: result.durationMs });
+    } catch (e: any) {
+      setExecResult({ stdout: '', stderr: e.message || String(e), images: [] });
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
   return (
     <div className="relative group my-4 rounded-xl overflow-hidden bg-[#1e1e1e] dark:bg-[#0d1117] border border-gray-700 dark:border-gray-800">
       {/* Header */}
@@ -25,22 +62,32 @@ const CodeBlock: React.FC<{ language?: string; children: string }> = ({ language
         <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
           {language || 'code'}
         </span>
-        <button
-          onClick={handleCopy}
-          className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-400 hover:text-white rounded-md hover:bg-gray-700 transition-colors"
-        >
-          {copied ? (
-            <>
-              <Check size={14} className="text-green-400" />
-              <span className="text-green-400">Copied!</span>
-            </>
-          ) : (
-            <>
-              <Copy size={14} />
-              <span>Copy</span>
-            </>
+        <div className="flex items-center gap-1">
+          {canRun && (
+            <button
+              onClick={handleRun}
+              disabled={isRunning}
+              className="flex items-center gap-1.5 px-2 py-1 text-xs text-green-400 hover:text-green-300 rounded-md hover:bg-green-900/30 transition-colors disabled:opacity-50"
+              title="Run Python code"
+            >
+              {isRunning ? (
+                <><Loader2 size={14} className="animate-spin" /><span>Running</span></>
+              ) : (
+                <><Play size={14} /><span>Run</span></>
+              )}
+            </button>
           )}
-        </button>
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-400 hover:text-white rounded-md hover:bg-gray-700 transition-colors"
+          >
+            {copied ? (
+              <><Check size={14} className="text-green-400" /><span className="text-green-400">Copied!</span></>
+            ) : (
+              <><Copy size={14} /><span>Copy</span></>
+            )}
+          </button>
+        </div>
       </div>
       {/* Code Content */}
       <pre className="p-4 overflow-x-auto text-sm leading-relaxed">
@@ -48,6 +95,17 @@ const CodeBlock: React.FC<{ language?: string; children: string }> = ({ language
           {children}
         </code>
       </pre>
+      {/* Execution Output */}
+      {(isRunning || execResult) && (
+        <ExecutionOutput
+          stdout={execResult?.stdout ?? ''}
+          stderr={execResult?.stderr ?? ''}
+          images={execResult?.images ?? []}
+          isRunning={isRunning}
+          durationMs={execResult?.durationMs}
+          themePreset={themePreset ?? 'default'}
+        />
+      )}
     </div>
   );
 };
@@ -150,9 +208,10 @@ interface ChatAreaProps {
   onFileUpload: (file: File) => void;
   onRegenerateMessage?: (messageId: string) => void;
   user?: { username: string; nickname?: string; avatar?: string }; // User info for avatar display
+  sessionId?: string; // For workspace Python execution
 }
 
-const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentModel, allModels, themePreset, onFileUpload, onRegenerateMessage, user }) => {
+const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentModel, allModels, themePreset, onFileUpload, onRegenerateMessage, user, sessionId }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
@@ -302,7 +361,16 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
     >
       
 
-      {messages.map((msg) => (
+      {messages.map((msg, msgIdx) => {
+        // Tool result messages are rendered inline via ToolCallBlock on the preceding model message
+        if (msg.role === 'tool') return null;
+
+        // Find matching tool results for model messages with tool calls
+        const nextToolMsg = msg.toolCalls?.length
+          ? messages.find((m, i) => i > msgIdx && m.role === 'tool' && m.iterationIndex === msg.iterationIndex)
+          : undefined;
+
+        return (
         <div
           key={msg.id}
           className={`flex gap-4 max-w-4xl mx-auto group ${
@@ -412,6 +480,24 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
                 <ThinkingBlock reasoning={msg.reasoning.trim()} isNotion={isNotion} />
               )}
 
+              {/* Tool Call Blocks */}
+              {msg.toolCalls && msg.toolCalls.length > 0 && (
+                <div className="mb-3 space-y-1">
+                  {msg.toolCalls.map((tc) => {
+                    const matchingResult = nextToolMsg?.toolResults?.find((r) => r.toolCallId === tc.id);
+                    return (
+                      <ToolCallBlock
+                        key={tc.id}
+                        toolCall={tc}
+                        toolResult={matchingResult}
+                        isLoading={!matchingResult}
+                        themePreset={themePreset}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+
               {/* Main Content (Generated Image) */}
               {msg.imageUrl && (
                  <div className="mb-3">
@@ -454,7 +540,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
                          }
                          
                          return (
-                           <CodeBlock language={match ? match[1] : undefined}>
+                           <CodeBlock language={match ? match[1] : undefined} sessionId={sessionId} themePreset={themePreset}>
                              {String(children).replace(/\n$/, '')}
                            </CodeBlock>
                          );
@@ -516,7 +602,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
             </span>
           </div>
         </div>
-      ))}
+        );
+      })}
 
       {isProcessing && (
         <div className="flex gap-4 max-w-4xl mx-auto">

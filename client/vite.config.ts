@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
     return {
       server: {
         port: 50173,
-        host: 'localhost',
+        host: true,
         proxy: {
           // Proxy /admin requests to backend
           '/admin': {

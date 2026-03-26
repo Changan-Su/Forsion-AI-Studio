@@ -1,7 +1,8 @@
 
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
-import { Attachment } from "../types";
+import { Attachment, ToolDefinition, ToolCall } from "../types";
 import { estimateGeminiMessageTokens, estimateGeminiTokens } from "./tokenUtils.js";
+import { buildGeminiToolConfig, extractToolCallsFromGeminiParts } from "./toolCallNormalizer";
 
 // Streaming version of generateGeminiResponse
 export const generateGeminiResponseStream = async (
@@ -12,8 +13,9 @@ export const generateGeminiResponseStream = async (
   attachments: Attachment[] = [],
   onChunk: (text: string, reasoning?: string) => void = () => {},
   enableThinking: boolean = false,
-  signal?: AbortSignal
-): Promise<{ text: string; imageUrl?: string; reasoning?: string; usage?: { prompt_tokens: number; completion_tokens: number } }> => {
+  signal?: AbortSignal,
+  tools?: ToolDefinition[]
+): Promise<{ text: string; imageUrl?: string; reasoning?: string; usage?: { prompt_tokens: number; completion_tokens: number }; toolCalls?: ToolCall[] }> => {
   const finalKey = apiKey || process.env.API_KEY;
 
   if (!finalKey) {
@@ -122,14 +124,19 @@ export const generateGeminiResponseStream = async (
 
       // Use streaming
       console.log('[generateGeminiResponseStream] Starting stream for model:', modelId);
-      const streamResult = await aiClient.models.generateContentStream({
+      const streamConfig: Parameters<typeof aiClient.models.generateContentStream>[0] = {
         model: modelId,
         contents: contents,
-      });
+      };
+      if (tools && tools.length > 0) {
+        (streamConfig as any).tools = buildGeminiToolConfig(tools);
+      }
+      const streamResult = await aiClient.models.generateContentStream(streamConfig);
 
       let fullText = '';
       let reasoning: string | undefined = undefined;
       let chunkCount = 0;
+      const functionCallParts: Array<{ functionCall?: { name: string; args: Record<string, unknown> } }> = [];
 
       for await (const chunk of streamResult) {
         chunkCount++;
@@ -139,9 +146,16 @@ export const generateGeminiResponseStream = async (
           throw new DOMException('The operation was aborted.', 'AbortError');
         }
 
+        // Collect function call parts (for tool calling)
+        const chunkParts = (chunk as any).candidates?.[0]?.content?.parts ?? [];
+        for (const part of chunkParts) {
+          if (part.functionCall) functionCallParts.push(part);
+        }
+
         const chunkText = chunk.text || '';
+        if (!chunkText) continue;
         fullText += chunkText;
-        
+
         // Check for think tags in progress
         const thinkRegex = /<think>([\s\S]*?)<\/think>/i;
         const match = fullText.match(thinkRegex);
@@ -172,6 +186,11 @@ export const generateGeminiResponseStream = async (
       // Final callback with cleaned content
       onChunk(fullText, reasoning);
 
+      // Extract tool calls if present
+      const toolCalls = functionCallParts.length > 0
+        ? extractToolCallsFromGeminiParts(functionCallParts)
+        : undefined;
+
       // Estimate tokens for Gemini (Gemini API doesn't return usage in streaming)
       const tokenEstimate = estimateGeminiMessageTokens(contents, prompt, attachments);
       const outputTokens = estimateGeminiTokens(fullText);
@@ -180,7 +199,7 @@ export const generateGeminiResponseStream = async (
         completion_tokens: outputTokens
       };
 
-      return { text: fullText, reasoning, usage };
+      return { text: fullText, reasoning, usage, toolCalls };
     }
 
   } catch (error: any) {

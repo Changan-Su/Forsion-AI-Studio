@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prototype v1.0 — Forsion AI Studio 新功能模块</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:wght@400;500;600;700&family=Dancing+Script:wght@400;700&display=swap" rel="stylesheet">
+  <script>tailwind.config={darkMode:'class',theme:{extend:{fontFamily:{sans:['Inter','-apple-system','sans-serif'],serif:['Lora','Georgia','serif'],cursive:['"Dancing Script"','cursive']}}}}</script>
+  <style>
+    /* ====== Theme: Cyber Tech (dark default) ====== */
+    [data-theme="cyber"] { --bg:#0d1117; --bg-card:#161b22; --bg-hover:#1c2128; --border:#30363d; --text:#c9d1d9; --text2:#8b949e; --text3:#484f58; --accent:#22d3ee; --accent-bg:rgba(34,211,238,.1); --accent-border:#164e63; --success:#34d399; --warn:#fbbf24; --error:#f87171; --glass-bg:rgba(22,27,34,.85); --glass-border:rgba(48,54,61,.8); font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); }
+    [data-theme="cyber"] .card-glass { background:var(--bg-card); border:1px solid var(--border); }
+    [data-theme="cyber"] .user-bubble { background:rgba(34,211,238,.12); border:1px solid rgba(34,211,238,.2); }
+    [data-theme="cyber"] .skill-icon-1 { background:linear-gradient(135deg,#3b82f6,#22d3ee); }
+    [data-theme="cyber"] .skill-icon-2 { background:linear-gradient(135deg,#10b981,#34d399); }
+    [data-theme="cyber"] .skill-icon-3 { background:linear-gradient(135deg,#f59e0b,#fb923c); }
+    [data-theme="cyber"] .skill-icon-4 { background:linear-gradient(135deg,#8b5cf6,#a78bfa); }
+    [data-theme="cyber"] .skill-icon-5 { background:linear-gradient(135deg,#0ea5e9,#6366f1); }
+    [data-theme="cyber"] .btn-primary { background:#0891b2; color:#fff; }
+    [data-theme="cyber"] .btn-primary:hover { background:#06b6d4; }
+
+    /* ====== Theme: Notion Style ====== */
+    [data-theme="notion"] { --bg:#ffffff; --bg-card:#f7f7f5; --bg-hover:#efefed; --border:#e3e3e0; --text:#37352f; --text2:#787774; --text3:#b4b4b0; --accent:#37352f; --accent-bg:#f1f1ef; --accent-border:#d3d3d0; --success:#4daa57; --warn:#cb912f; --error:#e16259; --glass-bg:#f7f7f5; --glass-border:#e3e3e0; font-family:'Lora','Georgia',serif; background:var(--bg); color:var(--text); }
+    [data-theme="notion"] .card-glass { background:var(--bg-card); border:1px solid var(--border); }
+    [data-theme="notion"] .user-bubble { background:#f1f1ef; border:1px solid #e3e3e0; }
+    [data-theme="notion"] .skill-icon-1,.skill-icon-2,.skill-icon-3,.skill-icon-4,.skill-icon-5 { background:#37352f; }
+    [data-theme="notion"] .btn-primary { background:#37352f; color:#fff; }
+    [data-theme="notion"] .btn-primary:hover { background:#2f2f2a; }
+    [data-theme="notion"] .nav-pill.active { background:#f1f1ef; color:#37352f; }
+
+    /* ====== Theme: Apple Glass ====== */
+    [data-theme="apple"] { --bg:#f5f5f7; --bg-card:rgba(255,255,255,.72); --bg-hover:rgba(255,255,255,.9); --border:rgba(0,0,0,.08); --text:#1d1d1f; --text2:#6e6e73; --text3:#aeaeb2; --accent:#0071e3; --accent-bg:rgba(0,113,227,.06); --accent-border:rgba(0,113,227,.15); --success:#34c759; --warn:#ff9f0a; --error:#ff3b30; --glass-bg:rgba(255,255,255,.72); --glass-border:rgba(0,0,0,.06); font-family:-apple-system,'SF Pro Display','Inter','Helvetica Neue',sans-serif; background:var(--bg); color:var(--text); }
+    [data-theme="apple"] .card-glass { background:var(--glass-bg); border:1px solid var(--glass-border); backdrop-filter:blur(20px) saturate(180%); box-shadow:0 2px 16px rgba(0,0,0,.04),0 0 1px rgba(0,0,0,.1); }
+    [data-theme="apple"] .user-bubble { background:var(--accent); color:#fff; border:none; }
+    [data-theme="apple"] .user-bubble * { color:#fff !important; }
+    [data-theme="apple"] .skill-icon-1 { background:linear-gradient(135deg,#5ac8fa,#007aff); }
+    [data-theme="apple"] .skill-icon-2 { background:linear-gradient(135deg,#34c759,#30d158); }
+    [data-theme="apple"] .skill-icon-3 { background:linear-gradient(135deg,#ff9f0a,#ff6723); }
+    [data-theme="apple"] .skill-icon-4 { background:linear-gradient(135deg,#bf5af2,#af52de); }
+    [data-theme="apple"] .skill-icon-5 { background:linear-gradient(135deg,#64d2ff,#5e5ce6); }
+    [data-theme="apple"] .btn-primary { background:var(--accent); color:#fff; border-radius:980px; }
+    [data-theme="apple"] .btn-primary:hover { background:#0077ed; }
+    [data-theme="apple"] .btn-secondary { border-radius:980px; }
+    [data-theme="apple"] .nav-pill.active { background:rgba(0,113,227,.1); color:#0071e3; }
+    [data-theme="apple"] .module-title { background:linear-gradient(90deg,#0071e3,#5ac8fa,#34c759,#ff9f0a,#ff2d55,#bf5af2); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+
+    /* ====== Theme: Monet 2.0 (Clear & Luminous) ====== */
+    [data-theme="monet"] { --bg:rgba(255,255,255,.4); --bg-card:rgba(255,255,255,.6); --bg-hover:rgba(255,255,255,.72); --border:rgba(255,255,255,.5); --text:#2c3e6b; --text2:#4a5d88; --text3:rgba(44,62,107,.45); --accent:#3d68b5; --accent-bg:rgba(61,104,181,.07); --accent-border:rgba(61,104,181,.16); --success:#2aab6e; --warn:#e49830; --error:#e04e4e; --glass-bg:rgba(255,255,255,.75); --glass-border:rgba(255,255,255,.55); font-family:'Inter',sans-serif; background:linear-gradient(135deg,#b8e6f2 0%,#f2d4e2 42%,#a8c4eb 100%); color:var(--text); }
+    [data-theme="monet"] .card-glass { background:var(--glass-bg); border:1px solid var(--glass-border); backdrop-filter:blur(24px) saturate(200%); box-shadow:0 2px 16px -4px rgba(44,62,107,.06),0 0 0 .5px rgba(255,255,255,.6); }
+    [data-theme="monet"] .user-bubble { background:linear-gradient(135deg,#3d68b5,#5a8ad5); color:#fff; border:1px solid rgba(255,255,255,.2); }
+    [data-theme="monet"] .user-bubble * { color:#fff !important; }
+    [data-theme="monet"] .skill-icon-1 { background:linear-gradient(135deg,#4a90d9,#68b8e8); }
+    [data-theme="monet"] .skill-icon-2 { background:linear-gradient(135deg,#52b88a,#7ad4a8); }
+    [data-theme="monet"] .skill-icon-3 { background:linear-gradient(135deg,#e8a060,#f0c088); }
+    [data-theme="monet"] .skill-icon-4 { background:linear-gradient(135deg,#9078c0,#b098d8); }
+    [data-theme="monet"] .skill-icon-5 { background:linear-gradient(135deg,#5098c8,#78b8dd); }
+    [data-theme="monet"] .btn-primary { background:rgba(61,104,181,.88); color:#fff; backdrop-filter:blur(6px); }
+    [data-theme="monet"] .btn-primary:hover { background:rgba(90,138,213,.92); }
+    [data-theme="monet"] .nav-pill.active { background:rgba(255,255,255,.5); color:#2c3e6b; backdrop-filter:blur(6px); }
+    [data-theme="monet"] .module-title { font-family:'Dancing Script',cursive; font-size:1.5rem; color:#2c3e6b; }
+    [data-theme="monet"] .overlay-backdrop { background:rgba(61,104,181,.15); backdrop-filter:blur(12px) saturate(160%); }
+
+    /* ====== Theme: Forsion Theme 1 (Morandi + Apple glass) ====== */
+    [data-theme="forsion1"] { --bg:#edeae5; --bg-card:rgba(250,248,244,.62); --bg-hover:rgba(250,248,244,.88); --border:rgba(100,95,88,.09); --text:#4a4540; --text2:#8a8580; --text3:#b0aba5; --accent:#8e8578; --accent-bg:rgba(142,133,120,.07); --accent-border:rgba(142,133,120,.15); --success:#8fa89a; --warn:#c2a88a; --error:#c09088; --glass-bg:rgba(250,248,244,.62); --glass-border:rgba(100,95,88,.07); font-family:-apple-system,'SF Pro Display','Inter','Helvetica Neue',sans-serif; background:linear-gradient(160deg,#edeae5 0%,#e8e4de 50%,#e5e0d9 100%); color:var(--text); }
+    [data-theme="forsion1"] .card-glass { background:var(--glass-bg); border:1px solid var(--glass-border); backdrop-filter:blur(24px) saturate(140%); box-shadow:0 1px 12px rgba(80,75,65,.04),0 0 0 .5px rgba(100,95,88,.05); }
+    [data-theme="forsion1"] .user-bubble { background:rgba(142,133,120,.13); border:1px solid rgba(142,133,120,.12); }
+    [data-theme="forsion1"] .skill-icon-1 { background:linear-gradient(135deg,#9aaab5,#8a9aa6); }
+    [data-theme="forsion1"] .skill-icon-2 { background:linear-gradient(135deg,#9ab5a2,#8aa698); }
+    [data-theme="forsion1"] .skill-icon-3 { background:linear-gradient(135deg,#c5b098,#b8a48e); }
+    [data-theme="forsion1"] .skill-icon-4 { background:linear-gradient(135deg,#b0a0b8,#a292ab); }
+    [data-theme="forsion1"] .skill-icon-5 { background:linear-gradient(135deg,#95b0b5,#88a2a8); }
+    [data-theme="forsion1"] .btn-primary { background:#8e8578; color:#fff; border-radius:980px; }
+    [data-theme="forsion1"] .btn-primary:hover { background:#7e7568; }
+    [data-theme="forsion1"] .btn-secondary { border-radius:980px; }
+    [data-theme="forsion1"] .nav-pill.active { background:rgba(142,133,120,.1); color:#6a625a; }
+    [data-theme="forsion1"] .module-title { color:#6a625a; }
+    [data-theme="forsion1"] .overlay-backdrop { background:rgba(50,48,44,.3); backdrop-filter:blur(8px); }
+
+    /* ====== Shared ====== */
+    body { min-height:100vh; transition:background .4s,color .3s; }
+    .card-glass { border-radius:16px; transition:all .2s; }
+    .card-glass:hover { transform:translateY(-1px); }
+    .nav-pill { transition:all .15s; padding:6px 14px; border-radius:10px; font-size:12px; text-decoration:none; }
+    .nav-pill.active { font-weight:600; }
+    .nav-pill:hover:not(.active) { background:var(--bg-hover); }
+    .fade-in { animation:fadeIn .3s ease-out; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes pulse-glow { 0%,100%{box-shadow:0 0 0 0 rgba(var(--accent-rgb,.3))} 50%{box-shadow:0 0 12px 4px rgba(var(--accent-rgb,.1))} }
+    .toggle-track { width:36px; height:20px; border-radius:10px; position:relative; cursor:pointer; transition:background .2s; }
+    .toggle-knob { width:16px; height:16px; border-radius:50%; position:absolute; top:2px; transition:transform .2s; box-shadow:0 1px 3px rgba(0,0,0,.2); }
+    .toggle-on .toggle-knob { transform:translateX(16px); }
+    .tool-bar { border-left:2px solid; border-radius:12px; transition:all .15s; }
+    .scope-badge { font-size:10px; padding:2px 8px; border-radius:6px; }
+    .section-module { margin-bottom:4rem; }
+    .overlay-backdrop { background:rgba(0,0,0,.45); backdrop-filter:blur(6px); }
+    .step-dot { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; transition:all .3s; }
+    .step-dot.active { background:var(--accent); color:#fff; box-shadow:0 0 12px rgba(var(--accent-rgb,.4)); }
+    .step-dot.done { background:var(--success); color:#fff; }
+    [data-feature] { transition:opacity .3s,filter .3s; }
+
+    /* Theme switcher */
+    .theme-btn { width:28px; height:28px; border-radius:8px; border:2px solid transparent; cursor:pointer; transition:all .2s; position:relative; overflow:hidden; }
+    .theme-btn.active { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-bg); }
+    .theme-btn:hover { transform:scale(1.1); }
+    .theme-cyber { background:linear-gradient(135deg,#0d1117,#22d3ee); }
+    .theme-notion { background:#f7f7f5; border-color:#e3e3e0; }
+    .theme-notion::after { content:'N'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:Georgia,serif; font-size:11px; font-weight:700; color:#37352f; }
+    .theme-monet { background:linear-gradient(135deg,#b8e6f2,#f2d4e2,#a8c4eb); }
+    .theme-apple { background:linear-gradient(135deg,#f5f5f7,#0071e3,#34c759,#ff9f0a,#ff2d55); background-size:200% 200%; }
+    .theme-forsion1 { background:linear-gradient(135deg,#edeae5,#b0a0b8,#9aaab5); }
+  </style>
+</head>
+<body>
+<div id="app" data-theme="cyber">
+
+  <!-- ========== Top Navigation ========== -->
+  <nav class="fixed top-0 left-0 right-0 z-50" style="border-bottom:1px solid var(--border); background:var(--glass-bg); backdrop-filter:blur(16px) saturate(180%);">
+    <div class="max-w-6xl mx-auto px-4 h-12 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="../index.html" class="text-[11px] px-2 py-1 rounded-lg transition-colors" style="color:var(--text2); background:var(--bg); border:1px solid var(--border);">← 文档库</a>
+        <div class="w-6 h-6 rounded-md bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-[10px] font-bold text-white">AI</div>
+        <span class="text-sm font-semibold" style="color:var(--text);">Prototype v1.0</span>
+      </div>
+
+      <!-- Module nav -->
+      <div class="flex items-center gap-1">
+        <a href="#skills-market" onclick="navigate('skills-market')" class="nav-pill" style="color:var(--text2);" data-nav="skills-market">Skills 市场</a>
+        <a href="#skill-scope" onclick="navigate('skill-scope')" class="nav-pill" style="color:var(--text2);" data-nav="skill-scope">作用域</a>
+        <a href="#skill-execution" onclick="navigate('skill-execution')" class="nav-pill" style="color:var(--text2);" data-nav="skill-execution">执行可视化</a>
+        <a href="#auth-dialog" onclick="navigate('auth-dialog')" class="nav-pill" style="color:var(--text2);" data-nav="auth-dialog">授权</a>
+        <a href="#onboarding" onclick="navigate('onboarding')" class="nav-pill" style="color:var(--text2);" data-nav="onboarding">引导</a>
+      </div>
+
+      <!-- Theme switcher -->
+      <div class="flex items-center gap-2">
+        <div class="text-[10px] font-medium" style="color:var(--text3);">THEME</div>
+        <button class="theme-btn theme-cyber active" onclick="setTheme('cyber')" title="Cyber Tech"></button>
+        <button class="theme-btn theme-notion" onclick="setTheme('notion')" title="Notion Style"></button>
+        <button class="theme-btn theme-monet" onclick="setTheme('monet')" title="Monet 2.0"></button>
+        <button class="theme-btn theme-apple" onclick="setTheme('apple')" title="Apple Glass"></button>
+        <button class="theme-btn theme-forsion1" onclick="setTheme('forsion1')" title="Forsion Theme 1"></button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="pt-16 pb-12 max-w-5xl mx-auto px-4">
+
+    <!-- ============================================================ -->
+    <!-- MODULE 1: Skills Market                                       -->
+    <!-- ============================================================ -->
+    <section id="skills-market" class="section-module fade-in" data-feature="skills-market">
+      <div class="mb-6">
+        <h2 class="text-lg font-bold mb-1 module-title" style="color:var(--text);">Skills 市场</h2>
+        <p class="text-sm" style="color:var(--text3);">Settings &gt; Skills — 浏览、安装和管理 AI 技能扩展</p>
+      </div>
+
+      <div class="card-glass overflow-hidden">
+        <!-- Settings tabs -->
+        <div class="flex" style="border-bottom:1px solid var(--border);">
+          <button class="px-4 py-3 text-xs" style="color:var(--text3);">General</button>
+          <button class="px-4 py-3 text-xs" style="color:var(--text3);">Account</button>
+          <button class="px-4 py-3 text-xs font-semibold" style="color:var(--accent); border-bottom:2px solid var(--accent);">Skills</button>
+          <button class="px-4 py-3 text-xs" style="color:var(--text3);">Developer</button>
+        </div>
+
+        <div class="p-5">
+          <!-- Search + filters -->
+          <div class="flex items-center gap-3 mb-5">
+            <div class="relative flex-1">
+              <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style="color:var(--text3);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <input type="text" placeholder="搜索 Skills…" class="w-full pl-9 pr-3 py-2 text-sm rounded-xl outline-none" style="background:var(--bg); border:1px solid var(--border); color:var(--text);" />
+            </div>
+            <div class="flex gap-1">
+              <button class="px-3 py-1.5 text-[11px] rounded-lg font-medium" style="background:var(--accent-bg); color:var(--accent); border:1px solid var(--accent-border);">全部</button>
+              <button class="px-3 py-1.5 text-[11px] rounded-lg" style="color:var(--text3); border:1px solid transparent;">官方</button>
+              <button class="px-3 py-1.5 text-[11px] rounded-lg" style="color:var(--text3); border:1px solid transparent;">已安装</button>
+            </div>
+          </div>
+
+          <!-- Skills grid -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <!-- Skill: Web Access -->
+            <div class="card-glass p-4">
+              <div class="flex items-start justify-between mb-3">
+                <div class="flex items-center gap-3">
+                  <div class="skill-icon-1 w-10 h-10 rounded-xl flex items-center justify-center"><svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9"/></svg></div>
+                  <div>
+                    <div class="text-sm font-semibold" style="color:var(--text);">Web Access</div>
+                    <div class="text-[11px] flex items-center gap-1" style="color:var(--text3);"><span class="w-1.5 h-1.5 rounded-full" style="background:var(--accent);"></span>官方</div>
+                  </div>
+                </div>
+                <button class="btn-secondary px-3 py-1 text-[11px] rounded-lg" style="background:var(--bg-hover); color:var(--accent); border:1px solid var(--accent-border);">已安装</button>
+              </div>
+              <p class="text-[12px] mb-3 leading-relaxed" style="color:var(--text2);">联网搜索最新信息，抓取和解析网页内容。让 AI 不再局限于训练数据。</p>
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-[10px] px-2 py-0.5 rounded" style="background:var(--bg-hover); color:var(--text3);">web_search</span>
+                <span class="text-[10px] px-2 py-0.5 rounded" style="background:var(--bg-hover); color:var(--text3);">fetch_url</span>
+                <span class="scope-badge" style="background:var(--accent-bg); color:var(--accent);">全局启用</span>
+              </div>
+            </div>
+
+            <!-- Skill: Code Execution -->
+            <div class="card-glass p-4">
+              <div class="flex items-start justify-between mb-3">
+                <div class="flex items-center gap-3">
+                  <div class="skill-icon-2 w-10 h-10 rounded-xl flex items-center justify-center"><svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg></div>
+                  <div>
+                    <div class="text-sm font-semibold" style="color:var(--text);">Code Execution</div>
+                    <div class="text-[11px] flex items-center gap-1" style="color:var(--text3);"><span class="w-1.5 h-1.5 rounded-full" style="background:var(--accent);"></span>官方</div>
+                  </div>
+                </div>
+                <button class="btn-secondary px-3 py-1 text-[11px] rounded-lg" style="background:var(--bg-hover); color:var(--accent); border:1px solid var(--accent-border);">已安装</button>
+              </div>
+              <p class="text-[12px] mb-3 leading-relaxed" style="color:var(--text2);">在安全沙盒中运行 JavaScript/Python 代码，获取执行结果和输出。</p>
+              <div class="flex items-center gap-2"><span class="text-[10px] px-2 py-0.5 rounded" style="background:var(--bg-hover); color:var(--text3);">run_code</span><span class="scope-badge" style="background:var(--accent-bg); color:var(--accent);">全局启用</span></div>
+            </div>
+
+            <!-- Skill: Calendar (cross-app) -->
+            <div class="card-glass p-4">
+              <div class="flex items-start justify-between mb-3">
+                <div class="flex items-center gap-3">
+                  <div class="skill-icon-3 w-10 h-10 rounded-xl flex items-center justify-center"><svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+                  <div>
+                    <div class="text-sm font-semibold" style="color:var(--text);">Forsion Calendar</div>
+                    <div class="text-[11px] flex items-center gap-1" style="color:var(--text3);"><span class="w-1.5 h-1.5 rounded-full" style="background:var(--accent);"></span>官方 · 跨应用</div>
+                  </div>
+                </div>
+                <button class="btn-primary px-3 py-1 text-[11px] rounded-lg transition-colors" onclick="this.textContent='已安装'; this.className='btn-secondary px-3 py-1 text-[11px] rounded-lg'; this.style.background='var(--bg-hover)'; this.style.color='var(--accent)'; this.style.border='1px solid var(--accent-border)';">安装</button>
+              </div>
+              <p class="text-[12px] mb-3 leading-relaxed" style="color:var(--text2);">读取和管理 Forsion Calendar 中的日程。AI 可以查询你的安排、创建新事件。</p>
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-[10px] px-2 py-0.5 rounded" style="background:var(--bg-hover); color:var(--text3);">get_events</span>
+                <span class="text-[10px] px-2 py-0.5 rounded" style="background:var(--bg-hover); color:var(--text3);">create_event</span>
+                <span class="scope-badge" style="background:rgba(251,191,36,.1); color:var(--warn);">需授权</span>
+              </div>
+            </div>
+
+            <!-- Skill: Productivity -->
+            <div class="card-glass p-4">
+              <div class="flex items-start justify-between mb-3">
+                <div class="flex items-center gap-3">
+                  <div class="skill-icon-4 w-10 h-10 rounded-xl flex items-center justify-center"><svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></div>
+                  <div>
+                    <div class="text-sm font-semibold" style="color:var(--text);">Productivity</div>
+                    <div class="text-[11px] flex items-center gap-1" style="color:var(--text3);"><span class="w-1.5 h-1.5 rounded-full" style="background:var(--accent);"></span>官方</div>
+                  </div>
+                </div>
+                <button class="btn-secondary px-3 py-1 text-[11px] rounded-lg" style="background:var(--bg-hover); color:var(--accent); border:1px solid var(--accent-border);">已安装</button>
+              </div>
+              <p class="text-[12px] mb-3 leading-relaxed" style="color:var(--text2);">文件处理、格式转换、数据提取等日常效率工具集合。</p>
+              <div class="flex items-center gap-2"><span class="text-[10px] px-2 py-0.5 rounded" style="background:var(--bg-hover); color:var(--text3);">process_file</span><span class="scope-badge" style="background:var(--accent-bg); color:var(--accent);">全局启用</span></div>
+            </div>
+
+            <!-- Skill: Desktop (cross-app) -->
+            <div class="card-glass p-4">
+              <div class="flex items-start justify-between mb-3">
+                <div class="flex items-center gap-3">
+                  <div class="skill-icon-5 w-10 h-10 rounded-xl flex items-center justify-center"><svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg></div>
+                  <div>
+                    <div class="text-sm font-semibold" style="color:var(--text);">Forsion Desktop</div>
+                    <div class="text-[11px] flex items-center gap-1" style="color:var(--text3);"><span class="w-1.5 h-1.5 rounded-full" style="background:var(--accent);"></span>官方 · 跨应用</div>
+                  </div>
+                </div>
+                <button class="btn-primary px-3 py-1 text-[11px] rounded-lg transition-colors">安装</button>
+              </div>
+              <p class="text-[12px] mb-3 leading-relaxed" style="color:var(--text2);">访问 Forsion Desktop 中的文件索引，让 AI 搜索和读取你的文档内容。</p>
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-[10px] px-2 py-0.5 rounded" style="background:var(--bg-hover); color:var(--text3);">search_files</span>
+                <span class="text-[10px] px-2 py-0.5 rounded" style="background:var(--bg-hover); color:var(--text3);">read_file</span>
+                <span class="scope-badge" style="background:rgba(251,191,36,.1); color:var(--warn);">需授权</span>
+              </div>
+            </div>
+
+            <!-- Create custom -->
+            <div class="card-glass p-4 flex flex-col items-center justify-center text-center cursor-pointer min-h-[160px]" style="border-style:dashed;">
+              <div class="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style="background:var(--bg-hover);"><svg class="w-5 h-5" style="color:var(--text3);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg></div>
+              <div class="text-sm font-medium" style="color:var(--text2);">创建自定义 Skill</div>
+              <div class="text-[11px] mt-1" style="color:var(--text3);">定义 Tools + 提示词</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- MODULE 2: Skill Scope Control                                 -->
+    <!-- ============================================================ -->
+    <section id="skill-scope" class="section-module fade-in" data-feature="skill-scope">
+      <div class="mb-6">
+        <h2 class="text-lg font-bold mb-1 module-title" style="color:var(--text);">Skill 作用域控制</h2>
+        <p class="text-sm" style="color:var(--text3);">Skills 市场 &gt; 已安装 — 设置每个 Skill 的启用范围</p>
+      </div>
+      <div class="card-glass p-5">
+        <div class="text-[11px] font-semibold uppercase tracking-wider mb-4" style="color:var(--text3);">已安装 Skills · 作用域管理</div>
+
+        <div id="scope-list" class="space-y-2">
+          <!-- Rows rendered by JS for theme reactivity -->
+        </div>
+
+        <div class="mt-4 p-3 rounded-xl" style="background:var(--bg); border:1px solid var(--border);">
+          <div class="text-[11px] flex items-start gap-2" style="color:var(--text2);">
+            <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" style="color:var(--accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span><strong style="color:var(--text);">全局启用</strong>的 Skill 在所有新会话中自动生效。<strong style="color:var(--text);">仅当前 Session</strong>仅在本次对话中激活。</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- MODULE 3: Skill Execution Visualization                       -->
+    <!-- ============================================================ -->
+    <section id="skill-execution" class="section-module fade-in" data-feature="skill-execution">
+      <div class="mb-6">
+        <h2 class="text-lg font-bold mb-1 module-title" style="color:var(--text);">Skill 执行可视化</h2>
+        <p class="text-sm" style="color:var(--text3);">ChatArea 消息流 — Skill 被调用时的状态展示</p>
+      </div>
+      <div class="card-glass p-5 space-y-4">
+        <!-- User message -->
+        <div class="flex justify-end"><div class="user-bubble max-w-md rounded-2xl rounded-br-md px-4 py-3 text-sm">明天有什么重要会议吗？帮我总结一下要准备什么</div></div>
+
+        <!-- AI response -->
+        <div class="flex justify-start">
+          <div class="max-w-lg space-y-2">
+            <!-- Success -->
+            <div class="tool-bar rounded-xl overflow-hidden" style="border:1px solid var(--border); background:var(--bg); border-left-color:var(--success);">
+              <div class="flex items-center gap-2 px-3 py-2 cursor-pointer" style="color:var(--text2);" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                <svg class="w-3.5 h-3.5" style="color:var(--accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35"/><circle cx="12" cy="12" r="3"/></svg>
+                <span class="text-xs font-semibold" style="color:var(--accent);">get_events</span>
+                <span class="text-[10px]" style="color:var(--text3);">Calendar · 320ms</span>
+                <svg class="w-3.5 h-3.5 ml-auto" style="color:var(--success);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+              </div>
+              <div class="hidden px-3 pb-3 text-[11px] font-mono" style="color:var(--text3); border-top:1px solid var(--border); padding-top:8px;">
+                <div style="color:var(--text2);">Result:</div>
+                <pre style="color:var(--success);">[{"title":"Q1 Review","time":"10:00","participants":5}]</pre>
+              </div>
+            </div>
+
+            <!-- Loading -->
+            <div class="tool-bar rounded-xl overflow-hidden" style="border:1px solid var(--border); background:var(--bg); border-left-color:var(--warn);">
+              <div class="flex items-center gap-2 px-3 py-2" style="color:var(--text2);">
+                <svg class="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                <svg class="w-3.5 h-3.5" style="color:var(--accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35"/><circle cx="12" cy="12" r="3"/></svg>
+                <span class="text-xs font-semibold" style="color:var(--accent);">web_search</span>
+                <span class="text-[10px] ml-auto" style="color:var(--warn);">执行中…</span>
+              </div>
+            </div>
+
+            <!-- AI text -->
+            <div class="card-glass px-4 py-3 text-sm leading-relaxed" style="border-radius:16px 16px 16px 6px;">
+              <span style="color:var(--text);">根据你的 Calendar 数据，明天有</span>
+              <strong style="color:var(--accent);"> 1 个重要会议</strong><span style="color:var(--text);">：</span>
+              <div class="mt-2 p-2.5 rounded-lg" style="background:var(--bg-hover); border:1px solid var(--border);">
+                <div class="font-medium" style="color:var(--text);">Q1 Review — 10:00 AM</div>
+                <div class="text-[12px] mt-0.5" style="color:var(--text2);">5 位参会者 · 会议室 A</div>
+              </div>
+              <div class="mt-2" style="color:var(--text2);">正在搜索相关资料帮你准备…<span class="animate-pulse">▊</span></div>
+            </div>
+
+            <!-- Failed -->
+            <div class="tool-bar rounded-xl overflow-hidden mt-3" style="border:1px solid var(--border); background:var(--bg); border-left-color:var(--error);">
+              <div class="flex items-center gap-2 px-3 py-2 cursor-pointer" style="color:var(--text2);" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                <span class="text-xs font-semibold" style="color:var(--accent);">fetch_url</span>
+                <span class="text-[10px]" style="color:var(--text3);">Web Access</span>
+                <svg class="w-3.5 h-3.5 ml-auto" style="color:var(--error);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </div>
+              <div class="hidden px-3 pb-3" style="border-top:1px solid var(--border); padding-top:8px;">
+                <div class="text-[11px] mb-2" style="color:var(--error);">目标网站不可访问 (timeout after 10s)</div>
+                <button class="text-[11px] px-3 py-1 rounded-lg transition-colors" style="background:var(--bg-hover); color:var(--text2); border:1px solid var(--border);">重试</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- MODULE 4: Cross-App Authorization Dialog                      -->
+    <!-- ============================================================ -->
+    <section id="auth-dialog" class="section-module fade-in" data-feature="auth-dialog">
+      <div class="mb-6">
+        <h2 class="text-lg font-bold mb-1 module-title" style="color:var(--text);">跨应用数据授权</h2>
+        <p class="text-sm" style="color:var(--text3);">AI 首次通过 Skill 访问其他 App 数据时触发</p>
+      </div>
+
+      <div class="relative rounded-2xl overflow-hidden" style="min-height:420px; background:var(--bg);">
+        <div class="absolute inset-0 p-6 opacity-20"><div class="max-w-md mx-auto space-y-3"><div class="flex justify-end"><div class="rounded-2xl px-4 py-2 text-sm" style="background:var(--bg-hover);">明天上午有什么安排？</div></div></div></div>
+
+        <div class="absolute inset-0 overlay-backdrop flex items-center justify-center p-4">
+          <div class="w-full max-w-sm card-glass rounded-2xl shadow-2xl overflow-hidden">
+            <div class="px-6 pt-6 pb-4">
+              <div class="flex items-center gap-3 mb-4">
+                <div class="skill-icon-3 w-12 h-12 rounded-2xl flex items-center justify-center"><svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+                <div>
+                  <div class="text-base font-bold" style="color:var(--text);">授权访问 Calendar</div>
+                  <div class="text-[12px]" style="color:var(--text3);">Forsion Calendar Skill 请求</div>
+                </div>
+              </div>
+              <div class="text-sm leading-relaxed mb-4" style="color:var(--text2);">AI 需要访问你在 <strong style="color:var(--text);">Forsion Calendar</strong> 中的数据来回答你的问题。</div>
+              <div class="space-y-2 mb-4">
+                <div class="flex items-center gap-3 p-2.5 rounded-xl" style="background:var(--bg);">
+                  <svg class="w-4 h-4 shrink-0" style="color:var(--success);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                  <span class="text-[12px]" style="color:var(--text);">读取日程事件（标题、时间、参与者）</span>
+                </div>
+                <div class="flex items-center gap-3 p-2.5 rounded-xl" style="background:var(--bg);">
+                  <svg class="w-4 h-4 shrink-0" style="color:var(--success);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                  <span class="text-[12px]" style="color:var(--text);">创建和修改日程事件</span>
+                </div>
+              </div>
+              <div class="text-[11px] flex items-start gap-2 mb-4" style="color:var(--text3);">
+                <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                授权后可随时在 Settings &gt; 数据授权 中撤销。
+              </div>
+            </div>
+            <div class="flex gap-3 px-6 pb-6">
+              <button class="flex-1 py-2.5 text-sm rounded-xl btn-secondary transition-colors" style="background:var(--bg); color:var(--text2); border:1px solid var(--border);">拒绝</button>
+              <button class="flex-1 py-2.5 text-sm rounded-xl btn-primary font-medium transition-colors">允许访问</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- MODULE 5: Onboarding Flow                                     -->
+    <!-- ============================================================ -->
+    <section id="onboarding" class="section-module fade-in" data-feature="onboarding">
+      <div class="mb-6">
+        <h2 class="text-lg font-bold mb-1 module-title" style="color:var(--text);">新用户引导流程</h2>
+        <p class="text-sm" style="color:var(--text3);">首次登录后 — 3 步 Tooltip 引导，可跳过</p>
+      </div>
+
+      <!-- Step dots -->
+      <div class="flex items-center justify-center gap-8 mb-8">
+        <div class="flex items-center gap-2 cursor-pointer" onclick="showStep(1)">
+          <div class="step-dot active" id="sd1" style="background:var(--accent); color:#fff;">1</div>
+          <span class="text-xs font-medium" style="color:var(--accent);">选择模型</span>
+        </div>
+        <div class="w-8 h-px" style="background:var(--border);"></div>
+        <div class="flex items-center gap-2 cursor-pointer" onclick="showStep(2)">
+          <div class="step-dot" id="sd2" style="background:var(--border); color:var(--text3);">2</div>
+          <span class="text-xs" style="color:var(--text3);">发送消息</span>
+        </div>
+        <div class="w-8 h-px" style="background:var(--border);"></div>
+        <div class="flex items-center gap-2 cursor-pointer" onclick="showStep(3)">
+          <div class="step-dot" id="sd3" style="background:var(--border); color:var(--text3);">3</div>
+          <span class="text-xs" style="color:var(--text3);">探索 Skills</span>
+        </div>
+      </div>
+
+      <!-- Step panels -->
+      <div id="ob1" class="card-glass p-6">
+        <div class="flex items-center gap-2 mb-6">
+          <div class="text-xs" style="color:var(--text3);">当前模型：</div>
+          <div class="relative">
+            <button class="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm" style="background:var(--bg); border:2px solid var(--accent); color:var(--text);">
+              <span class="w-4 h-4 rounded skill-icon-1 flex items-center justify-center text-[8px] text-white font-bold">G</span>Gemini Flash
+              <svg class="w-3 h-3" style="color:var(--text3);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div class="absolute top-full left-0 mt-2 w-72 p-4 rounded-2xl shadow-xl z-10" style="background:var(--accent); color:#fff;">
+              <div class="absolute -top-2 left-6 w-4 h-4 rotate-45" style="background:var(--accent);"></div>
+              <div class="text-sm font-bold mb-1">选择一个 AI 模型</div>
+              <div class="text-[12px] opacity-80 leading-relaxed mb-3">不同模型擅长不同任务。不确定？先用默认的就好。</div>
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] opacity-60">1 / 3</span>
+                <div class="flex gap-2">
+                  <button class="text-[11px] px-3 py-1 rounded-lg opacity-70 hover:opacity-100">跳过</button>
+                  <button class="text-[11px] px-3 py-1 rounded-lg bg-white/20 hover:bg-white/30" onclick="showStep(2)">下一步</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="text-center py-12 opacity-30"><div class="text-4xl mb-3">👋</div><div class="text-lg font-medium" style="color:var(--text);">欢迎使用 Forsion AI Studio</div></div>
+      </div>
+      <div id="ob2" class="card-glass p-6 hidden">
+        <div class="opacity-30 mb-4"><div class="px-3 py-1.5 rounded-xl text-sm inline-block" style="background:var(--bg); border:1px solid var(--border); color:var(--text2);">Gemini Flash</div></div>
+        <div class="relative mt-16">
+          <div class="flex items-center gap-2 p-3 rounded-2xl" style="background:var(--bg); border:2px solid var(--accent);">
+            <input type="text" value="帮我写一封感谢信" class="flex-1 bg-transparent text-sm outline-none" style="color:var(--text);" readonly />
+            <button class="btn-primary p-2 rounded-xl"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg></button>
+          </div>
+          <div class="absolute bottom-full left-0 mb-2 w-72 p-4 rounded-2xl shadow-xl z-10" style="background:var(--accent); color:#fff;">
+            <div class="absolute -bottom-2 left-6 w-4 h-4 rotate-45" style="background:var(--accent);"></div>
+            <div class="text-sm font-bold mb-1">发送你的第一条消息</div>
+            <div class="text-[12px] opacity-80 leading-relaxed mb-3">输入任何问题，AI 会实时回复。</div>
+            <div class="flex items-center justify-between"><span class="text-[11px] opacity-60">2 / 3</span><div class="flex gap-2"><button class="text-[11px] px-3 py-1 rounded-lg opacity-70 hover:opacity-100" onclick="showStep(1)">上一步</button><button class="text-[11px] px-3 py-1 rounded-lg bg-white/20 hover:bg-white/30" onclick="showStep(3)">下一步</button></div></div>
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-2 mt-4">
+          <div class="p-3 rounded-xl text-center cursor-pointer" style="background:var(--bg); border:1px solid var(--border);"><div class="text-base mb-1">✉️</div><div class="text-[11px]" style="color:var(--text2);">写邮件</div></div>
+          <div class="p-3 rounded-xl text-center cursor-pointer" style="background:var(--bg); border:1px solid var(--border);"><div class="text-base mb-1">📄</div><div class="text-[11px]" style="color:var(--text2);">总结文章</div></div>
+          <div class="p-3 rounded-xl text-center cursor-pointer" style="background:var(--bg); border:1px solid var(--border);"><div class="text-base mb-1">📅</div><div class="text-[11px]" style="color:var(--text2);">查看日程</div></div>
+        </div>
+      </div>
+      <div id="ob3" class="card-glass p-6 hidden">
+        <div class="flex items-center justify-center py-10">
+          <div class="relative">
+            <div class="flex items-center gap-3 px-5 py-3 rounded-2xl" style="background:var(--bg); border:2px solid var(--accent);">
+              <svg class="w-5 h-5" style="color:var(--accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              <span class="text-sm" style="color:var(--text);">探索 Skills 市场</span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full" style="background:var(--accent-bg); color:var(--accent);">4 个可用</span>
+            </div>
+            <div class="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-80 p-4 rounded-2xl shadow-xl z-10" style="background:var(--accent); color:#fff;">
+              <div class="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 rotate-45" style="background:var(--accent);"></div>
+              <div class="text-sm font-bold mb-1">给 AI 添加超能力</div>
+              <div class="text-[12px] opacity-80 leading-relaxed mb-3">Skills 让 AI 不只是聊天——它可以联网搜索、运行代码、查看日历。</div>
+              <div class="flex items-center justify-between"><span class="text-[11px] opacity-60">3 / 3</span><div class="flex gap-2"><button class="text-[11px] px-3 py-1 rounded-lg opacity-70 hover:opacity-100" onclick="showStep(2)">上一步</button><button class="text-[11px] px-3 py-1 rounded-lg bg-white/20 hover:bg-white/30" onclick="showStep(0)">完成</button></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  function setTheme(t) {
+    document.getElementById('app').dataset.theme = t;
+    document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.theme-'+t)?.classList.add('active');
+    localStorage.setItem('proto-theme', t);
+  }
+
+  function navigate(id) {
+    document.querySelectorAll('.nav-pill').forEach(p => p.classList.remove('active'));
+    document.querySelector(`[data-nav="${id}"]`)?.classList.add('active');
+    document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+
+  function showStep(n) {
+    for(let i=1;i<=3;i++){
+      const p=document.getElementById('ob'+i), d=document.getElementById('sd'+i);
+      if(p) p.classList.toggle('hidden',i!==n);
+      if(d){ d.classList.remove('active','done'); d.style.background = i<n?'var(--success)' : i===n?'var(--accent)' : 'var(--border)'; d.style.color = i<=n?'#fff':'var(--text3)'; }
+    }
+  }
+
+  // Focus Mode
+  const fp = new URLSearchParams(location.search).get('focus');
+  if(fp) document.querySelectorAll('[data-feature]').forEach(el=>{if(el.dataset.feature!==fp){el.style.pointerEvents='none';el.style.opacity='.12';el.style.filter='blur(2px)';}});
+
+  // Init
+  const hash = location.hash.slice(1)||'skills-market';
+  navigate(hash);
+  const saved = localStorage.getItem('proto-theme');
+  if(saved) setTheme(saved);
+</script>
+</body>
+</html>

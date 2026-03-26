@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Docs — Forsion AI Studio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: ['selector', '[data-theme="dark"]'],
+      theme: {
+        extend: {
+          fontFamily: { sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', '"PingFang SC"', '"Hiragino Sans GB"', 'sans-serif'] },
+        }
+      }
+    }
+  </script>
+  <style>
+    :root { --sidebar-w: 260px; }
+    * { scrollbar-width: thin; scrollbar-color: #d1d5db transparent; }
+    [data-theme="dark"] * { scrollbar-color: #374151 transparent; }
+    .timeline-dot { position: relative; }
+    .timeline-dot::before { content:''; position:absolute; left:-22px; top:6px; width:10px; height:10px; border-radius:50%; border:2px solid; }
+    [data-theme="light"] .timeline-dot::before { border-color: #6366f1; background: #eef2ff; }
+    [data-theme="dark"] .timeline-dot::before { border-color: #818cf8; background: #312e81; }
+    .doc-card { transition: transform .15s, box-shadow .15s; }
+    .doc-card:hover { transform: translateY(-2px); }
+    [data-theme="light"] .doc-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,.08); }
+    [data-theme="dark"] .doc-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,.3); }
+    .preview-tip { opacity:0; transform: translateY(4px); transition: opacity .2s, transform .2s; pointer-events: none; }
+    .doc-card:hover .preview-tip { opacity:1; transform: translateY(0); }
+    .nav-link.active { background: var(--nav-active-bg); color: var(--nav-active-text); }
+    [data-theme="light"] { --nav-active-bg: #eef2ff; --nav-active-text: #4338ca; --bg-main: #f8fafc; --bg-card: #ffffff; --bg-sidebar: #ffffff; --border: #e5e7eb; --text-primary: #0f172a; --text-secondary: #64748b; --text-muted: #94a3b8; --badge-bg: #f1f5f9; }
+    [data-theme="dark"] { --nav-active-bg: #1e1b4b; --nav-active-text: #a5b4fc; --bg-main: #0f172a; --bg-card: #1e293b; --bg-sidebar: #1e293b; --border: #334155; --text-primary: #f1f5f9; --text-secondary: #94a3b8; --text-muted: #64748b; --badge-bg: #334155; }
+    body { background: var(--bg-main); color: var(--text-primary); }
+    .stat-card { position:relative; overflow:hidden; }
+    .stat-card::after { content:''; position:absolute; top:-20px; right:-20px; width:80px; height:80px; border-radius:50%; opacity:.08; }
+    .stat-card:nth-child(1)::after { background:#6366f1; }
+    .stat-card:nth-child(2)::after { background:#8b5cf6; }
+    .stat-card:nth-child(3)::after { background:#06b6d4; }
+    .stat-card:nth-child(4)::after { background:#f59e0b; }
+    [data-lang="en"] [data-zh] { display:none; }
+    [data-lang="zh"] [data-en] { display:none; }
+    @media (max-width:768px) { :root { --sidebar-w:0; } }
+  </style>
+</head>
+<body data-lang="zh" class="min-h-screen flex">
+
+  <!-- ========== Sidebar ========== -->
+  <aside id="sidebar" class="fixed top-0 left-0 bottom-0 z-30 flex flex-col border-r"
+    style="width:var(--sidebar-w); background:var(--bg-sidebar); border-color:var(--border);">
+
+    <div class="px-5 pt-6 pb-4">
+      <div class="flex items-center gap-3 mb-1">
+        <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white text-xs font-bold tracking-tight">AI</div>
+        <div class="min-w-0">
+          <h1 class="text-sm font-semibold truncate" style="color:var(--text-primary);" id="project-name">Forsion AI Studio</h1>
+          <p class="text-[11px] truncate" style="color:var(--text-muted);" id="project-desc">跨应用统一个人 AI Agent 平台</p>
+        </div>
+      </div>
+    </div>
+
+    <nav class="flex-1 px-3 space-y-0.5 overflow-y-auto text-[13px]" style="color:var(--text-secondary);">
+      <a href="#overview" class="nav-link active flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors"
+        onclick="navigateTo('overview',this)">
+        <svg class="w-4 h-4 shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1"/></svg>
+        <span data-zh>概览</span><span data-en>Overview</span>
+      </a>
+      <a href="#progress" class="nav-link flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors hover:bg-[var(--badge-bg)]"
+        onclick="navigateTo('progress',this)">
+        <svg class="w-4 h-4 shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        <span>功能进度</span>
+        <span class="ml-auto text-[11px] px-1.5 py-0.5 rounded-full" style="background:#d1fae5; color:#065f46;">6/12</span>
+      </a>
+      <a href="#prd" class="nav-link flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors hover:bg-[var(--badge-bg)]"
+        onclick="navigateTo('prd',this)">
+        <svg class="w-4 h-4 shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <span data-zh>PRD 文档</span><span data-en>PRD Documents</span>
+        <span class="ml-auto text-[11px] px-1.5 py-0.5 rounded-full" style="background:var(--badge-bg);" id="nav-stat-prd">1</span>
+      </a>
+      <a href="#prototype" class="nav-link flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors hover:bg-[var(--badge-bg)]"
+        onclick="navigateTo('prototype',this)">
+        <svg class="w-4 h-4 shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 8a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zm10 0a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6z"/></svg>
+        <span data-zh>原型文件</span><span data-en>Prototypes</span>
+        <span class="ml-auto text-[11px] px-1.5 py-0.5 rounded-full" style="background:var(--badge-bg);" id="nav-stat-proto">1</span>
+      </a>
+      <a href="#flowchart" class="nav-link flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors hover:bg-[var(--badge-bg)]"
+        onclick="navigateTo('flowchart',this)">
+        <svg class="w-4 h-4 shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/></svg>
+        <span data-zh>流程图</span><span data-en>Flowcharts</span>
+        <span class="ml-auto text-[11px] px-1.5 py-0.5 rounded-full" style="background:var(--badge-bg);" id="nav-stat-chart">1</span>
+      </a>
+      <a href="#annex" class="nav-link flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors hover:bg-[var(--badge-bg)]"
+        onclick="navigateTo('annex',this)">
+        <svg class="w-4 h-4 shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+        <span data-zh>附件</span><span data-en>Annexes</span>
+      </a>
+
+      <div class="pt-3 mt-3" style="border-top:1px solid var(--border);"></div>
+
+      <a href="#changelog" class="nav-link flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors hover:bg-[var(--badge-bg)]"
+        onclick="navigateTo('changelog',this)">
+        <svg class="w-4 h-4 shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span data-zh>变更日志</span><span data-en>Changelog</span>
+        <span class="ml-auto text-[11px] px-1.5 py-0.5 rounded-full" style="background:var(--badge-bg);" id="nav-stat-changes">2</span>
+      </a>
+    </nav>
+
+    <div class="px-4 py-4 space-y-2 border-t" style="border-color:var(--border);">
+      <div class="flex items-center justify-between">
+        <button onclick="toggleTheme()" class="p-2 rounded-lg transition-colors hover:bg-[var(--badge-bg)]" title="Toggle theme">
+          <svg id="icon-sun" class="w-4 h-4" style="color:var(--text-secondary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+          <svg id="icon-moon" class="w-4 h-4 hidden" style="color:var(--text-secondary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+        </button>
+        <button onclick="toggleLang()" class="text-[11px] px-2.5 py-1 rounded-lg transition-colors hover:bg-[var(--badge-bg)]" style="color:var(--text-secondary);">
+          <span data-zh>EN</span><span data-en>中</span>
+        </button>
+      </div>
+      <div class="text-[11px]" style="color:var(--text-muted);">
+        <span data-zh>最后更新</span><span data-en>Updated</span>: <span id="last-updated">2026-03-26</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ========== Main ========== -->
+  <main class="flex-1 min-h-screen" style="margin-left:var(--sidebar-w);">
+
+    <header class="sticky top-0 z-20 border-b px-6 lg:px-10"
+      style="background:var(--bg-main); border-color:var(--border); backdrop-filter:blur(8px); background:color-mix(in srgb, var(--bg-main) 85%, transparent);">
+      <div class="flex items-center justify-between h-14">
+        <div class="flex items-center gap-3">
+          <span class="text-sm font-medium" style="color:var(--text-primary);">
+            <span data-zh>文档库</span><span data-en>Documentation</span>
+          </span>
+          <span class="text-[11px] px-2 py-0.5 rounded-full font-medium bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300" id="project-version">v1.0</span>
+        </div>
+        <div class="relative w-64">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style="color:var(--text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input id="search-input" type="text" oninput="filterDocs(this.value)" class="w-full pl-9 pr-3 py-1.5 text-[13px] rounded-lg border outline-none transition-colors focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
+            style="background:var(--bg-card); border-color:var(--border); color:var(--text-primary);"
+            data-zh-placeholder="搜索文档…" data-en-placeholder="Search docs…" placeholder="搜索文档…" />
+        </div>
+      </div>
+    </header>
+
+    <div class="px-6 lg:px-10 py-8 max-w-5xl">
+
+      <!-- ===== Overview Section ===== -->
+      <section id="section-overview">
+        <div class="mb-8">
+          <h2 class="text-xl font-semibold mb-1" style="color:var(--text-primary);" id="project-title">Forsion AI Studio</h2>
+          <p class="text-sm" style="color:var(--text-secondary);" id="project-desc-main">跨应用统一个人 AI Agent 平台 — Forsion 生态的 AI 中枢</p>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+          <div class="stat-card rounded-xl border p-4" style="background:var(--bg-card); border-color:var(--border);">
+            <div class="text-[11px] font-medium uppercase tracking-wider mb-2" style="color:var(--text-muted);">
+              <span data-zh>PRD 文档</span><span data-en>PRD Docs</span>
+            </div>
+            <div class="text-2xl font-bold text-indigo-600 dark:text-indigo-400" id="stat-prd">1</div>
+          </div>
+          <div class="stat-card rounded-xl border p-4" style="background:var(--bg-card); border-color:var(--border);">
+            <div class="text-[11px] font-medium uppercase tracking-wider mb-2" style="color:var(--text-muted);">
+              <span data-zh>原型文件</span><span data-en>Prototypes</span>
+            </div>
+            <div class="text-2xl font-bold text-violet-600 dark:text-violet-400" id="stat-proto">1</div>
+          </div>
+          <div class="stat-card rounded-xl border p-4" style="background:var(--bg-card); border-color:var(--border);">
+            <div class="text-[11px] font-medium uppercase tracking-wider mb-2" style="color:var(--text-muted);">
+              <span data-zh>流程图</span><span data-en>Flowcharts</span>
+            </div>
+            <div class="text-2xl font-bold text-cyan-600 dark:text-cyan-400" id="stat-chart">1</div>
+          </div>
+          <div class="stat-card rounded-xl border p-4" style="background:var(--bg-card); border-color:var(--border);">
+            <div class="text-[11px] font-medium uppercase tracking-wider mb-2" style="color:var(--text-muted);">
+              <span data-zh>累计变更</span><span data-en>Changes</span>
+            </div>
+            <div class="text-2xl font-bold text-amber-600 dark:text-amber-400" id="stat-changes">2</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== v1.0 Feature Progress ===== -->
+      <section id="section-progress" class="mb-10">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold flex items-center gap-2" style="color:var(--text-primary);">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span>v1.0 功能进度</span>
+          </h3>
+          <span class="text-[11px]" style="color:var(--text-muted);">6 / 12 功能已完成</span>
+        </div>
+
+        <!-- Progress bar -->
+        <div class="rounded-full overflow-hidden mb-4" style="height:6px; background:var(--border);">
+          <div class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all" style="width:50%"></div>
+        </div>
+
+        <div class="rounded-xl border overflow-hidden" style="background:var(--bg-card); border-color:var(--border);">
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border);">
+                <th style="text-align:left; padding:8px 14px; color:var(--text-muted); font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:.05em;">功能模块</th>
+                <th style="text-align:left; padding:8px 14px; color:var(--text-muted); font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:.05em; width:110px;">状态</th>
+                <th style="text-align:left; padding:8px 14px; color:var(--text-muted); font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:.05em; width:60px;">优先级</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:9px 14px; color:var(--text-primary);">Skills 市场页面</td>
+                <td style="padding:9px 14px;"><span style="font-size:11px; padding:2px 8px; border-radius:20px; background:#d1fae5; color:#065f46; font-weight:500;">原型完成</span></td>
+                <td style="padding:9px 14px; font-size:12px; color:var(--text-muted);">P0</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:9px 14px; color:var(--text-primary);">Skill 作用域控制</td>
+                <td style="padding:9px 14px;"><span style="font-size:11px; padding:2px 8px; border-radius:20px; background:#d1fae5; color:#065f46; font-weight:500;">原型完成</span></td>
+                <td style="padding:9px 14px; font-size:12px; color:var(--text-muted);">P0</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:9px 14px; color:var(--text-primary);">Skill 执行可视化</td>
+                <td style="padding:9px 14px;"><span style="font-size:11px; padding:2px 8px; border-radius:20px; background:#d1fae5; color:#065f46; font-weight:500;">原型完成</span></td>
+                <td style="padding:9px 14px; font-size:12px; color:var(--text-muted);">P1</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:9px 14px; color:var(--text-primary);">跨应用数据授权</td>
+                <td style="padding:9px 14px;"><span style="font-size:11px; padding:2px 8px; border-radius:20px; background:#d1fae5; color:#065f46; font-weight:500;">原型完成</span></td>
+                <td style="padding:9px 14px; font-size:12px; color:var(--text-muted);">P0</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:9px 14px; color:var(--text-primary);">新用户引导流程</td>
+                <td style="padding:9px 14px;"><span style="font-size:11px; padding:2px 8px; border-radius:20px; background:#d1fae5; color:#065f46; font-weight:500;">原型完成</span></td>
+                <td style="padding:9px 14px; font-size:12px; color:var(--text-muted);">P1</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:9px 14px; color:var(--text-primary);">多主题风格系统</td>
+                <td style="padding:9px 14px;"><span style="font-size:11px; padding:2px 8px; border-radius:20px; background:#d1fae5; color:#065f46; font-weight:500;">原型完成</span></td>
+                <td style="padding:9px 14px; font-size:12px; color:var(--text-muted);">P0</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:9px 14px; color:var(--text-primary);">对话历史云同步</td>
+                <td style="padding:9px 14px;"><span style="font-size:11px; padding:2px 8px; border-radius:20px; background:#f1f5f9; color:#64748b; font-weight:500;">待启动</span></td>
+                <td style="padding:9px 14px; font-size:12px; color:var(--text-muted);">P1</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:9px 14px; color:var(--text-primary);">用户级数据分区</td>
+                <td style="padding:9px 14px;"><span style="font-size:11px; padding:2px 8px; border-radius:20px; background:#f1f5f9; color:#64748b; font-weight:500;">待启动</span></td>
+                <td style="padding:9px 14px; font-size:12px; color:var(--text-muted);">P0</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:9px 14px; color:var(--text-primary);">跨应用 Skill 调用</td>
+                <td style="padding:9px 14px;"><span style="font-size:11px; padding:2px 8px; border-radius:20px; background:#f1f5f9; color:#64748b; font-weight:500;">待启动</span></td>
+                <td style="padding:9px 14px; font-size:12px; color:var(--text-muted);">P0</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:9px 14px; color:var(--text-primary);">统一用户画像</td>
+                <td style="padding:9px 14px;"><span style="font-size:11px; padding:2px 8px; border-radius:20px; background:#f1f5f9; color:#64748b; font-weight:500;">待启动</span></td>
+                <td style="padding:9px 14px; font-size:12px; color:var(--text-muted);">P1</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:9px 14px; color:var(--text-primary);">App 数据同步接口</td>
+                <td style="padding:9px 14px;"><span style="font-size:11px; padding:2px 8px; border-radius:20px; background:#f1f5f9; color:#64748b; font-weight:500;">待启动</span></td>
+                <td style="padding:9px 14px; font-size:12px; color:var(--text-muted);">P1</td>
+              </tr>
+              <tr>
+                <td style="padding:9px 14px; color:var(--text-primary);">官方 Skills 管理（后台）</td>
+                <td style="padding:9px 14px;"><span style="font-size:11px; padding:2px 8px; border-radius:20px; background:#f1f5f9; color:#64748b; font-weight:500;">待启动</span></td>
+                <td style="padding:9px 14px; font-size:12px; color:var(--text-muted);">P1</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="px-4 py-3 flex items-center gap-4 flex-wrap" style="border-top:1px solid var(--border); background:var(--bg-card);">
+            <div class="flex items-center gap-1.5 text-[11px]" style="color:var(--text-muted);">
+              <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#10b981;"></span>原型完成
+            </div>
+            <div class="flex items-center gap-1.5 text-[11px]" style="color:var(--text-muted);">
+              <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#6366f1;"></span>PRD完成
+            </div>
+            <div class="flex items-center gap-1.5 text-[11px]" style="color:var(--text-muted);">
+              <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#f59e0b;"></span>开发中
+            </div>
+            <div class="flex items-center gap-1.5 text-[11px]" style="color:var(--text-muted);">
+              <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#94a3b8;"></span>待启动
+            </div>
+            <div class="flex items-center gap-1.5 text-[11px] ml-auto" style="color:var(--text-muted);">
+              暂缓（智能模型推荐、非官方 Skills 渠道）已推迟到 v1.5 / v2.0
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== PRD Section ===== -->
+      <section id="section-prd" class="mb-10">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold flex items-center gap-2" style="color:var(--text-primary);">
+            <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+            <span data-zh>PRD 文档</span><span data-en>PRD Documents</span>
+          </h3>
+          <span class="text-[11px]" style="color:var(--text-muted);">
+            <span data-zh>产品需求规格</span><span data-en>Product Requirement Specs</span>
+          </span>
+        </div>
+        <div class="space-y-2" id="prd-list">
+          <a href="prd/prd_v1.0.html" class="doc-card block rounded-xl border p-4 no-underline" style="background:var(--bg-card); border-color:var(--border);" data-searchable="PRD v1.0 初稿 AI Studio Skills Agent 跨应用 需求背景 功能清单">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-sm font-medium" style="color:var(--text-primary);">PRD v1.0</div>
+                <div class="text-[12px] mt-0.5" style="color:var(--text-muted);">初稿 — 需求背景、功能清单与基础逻辑</div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300">Draft</span>
+                <span class="text-[11px]" style="color:var(--text-muted);">2026-03-26</span>
+              </div>
+            </div>
+            <div class="preview-tip mt-3 pt-3 text-[12px] leading-relaxed" style="color:var(--text-secondary); border-top:1px solid var(--border);">
+              Forsion AI Studio v1.0 初版 PRD，包含产品背景、业务目标、用户旅程图、Skills 体系设计和跨应用数据中枢功能清单。
+            </div>
+          </a>
+        </div>
+      </section>
+
+      <!-- ===== Prototype Section ===== -->
+      <section id="section-prototype" class="mb-10">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold flex items-center gap-2" style="color:var(--text-primary);">
+            <span class="w-1.5 h-1.5 rounded-full bg-violet-500"></span>
+            <span data-zh>原型文件</span><span data-en>Prototypes</span>
+          </h3>
+          <span class="text-[11px]" style="color:var(--text-muted);">
+            <span data-zh>高保真 HTML 原型</span><span data-en>Hi-fi HTML Prototypes</span>
+          </span>
+        </div>
+        <div class="space-y-2" id="proto-list">
+          <a href="prd/prototype_v1.0.html" class="doc-card block rounded-xl border p-4 no-underline" style="background:var(--bg-card); border-color:var(--border);" data-searchable="Prototype v1.0 原型 Skills市场 作用域 执行可视化 授权 引导">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-sm font-medium" style="color:var(--text-primary);">Prototype v1.0</div>
+                <div class="text-[12px] mt-0.5" style="color:var(--text-muted);">新功能模块原型 — Skills 市场 / 作用域 / 执行可视化 / 授权 / 引导</div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300">Draft</span>
+                <span class="text-[11px]" style="color:var(--text-muted);">2026-03-26</span>
+              </div>
+            </div>
+            <div class="preview-tip mt-3 pt-3 text-[12px] leading-relaxed" style="color:var(--text-secondary); border-top:1px solid var(--border);">
+              5 个新功能模块的交互原型：Skills 市场页面、Skill 作用域控制、Skill 执行可视化、跨应用数据授权弹窗、新用户引导流程。
+            </div>
+          </a>
+        </div>
+      </section>
+
+      <!-- ===== Flowchart Section ===== -->
+      <section id="section-flowchart" class="mb-10">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold flex items-center gap-2" style="color:var(--text-primary);">
+            <span class="w-1.5 h-1.5 rounded-full bg-cyan-500"></span>
+            <span data-zh>流程图</span><span data-en>Flowcharts</span>
+          </h3>
+          <span class="text-[11px]" style="color:var(--text-muted);">
+            <span data-zh>Mermaid / 业务逻辑图</span><span data-en>Mermaid / Business Logic</span>
+          </span>
+        </div>
+        <div class="space-y-2" id="chart-list">
+          <a href="prd/flowcharts/v1.0-core-flows.md" class="doc-card block rounded-xl border p-4 no-underline" style="background:var(--bg-card); border-color:var(--border);" data-searchable="Flowcharts v1.0 流程图 Mermaid 用户主流程 Skills安装 Skill执行 跨应用授权 引导 积分">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-sm font-medium" style="color:var(--text-primary);">Flowcharts v1.0</div>
+                <div class="text-[12px] mt-0.5" style="color:var(--text-muted);">6 个核心业务流程图 — Mermaid 格式</div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-[11px] px-2 py-0.5 rounded-full bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300">Done</span>
+                <span class="text-[11px]" style="color:var(--text-muted);">2026-03-26</span>
+              </div>
+            </div>
+            <div class="preview-tip mt-3 pt-3 text-[12px] leading-relaxed" style="color:var(--text-secondary); border-top:1px solid var(--border);">
+              用户主流程、Skills 安装与作用域、Skill 执行可视化、跨应用数据授权(时序图)、新用户引导(状态图)、积分消耗与模型调用。
+            </div>
+          </a>
+        </div>
+      </section>
+
+      <!-- ===== Annex Section ===== -->
+      <section id="section-annex" class="mb-10">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold flex items-center gap-2" style="color:var(--text-primary);">
+            <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+            <span data-zh>附件与参考</span><span data-en>Annexes &amp; References</span>
+          </h3>
+        </div>
+        <div class="space-y-2" id="annex-list">
+          <div class="text-[13px] text-center py-8 rounded-xl border border-dashed" style="color:var(--text-muted); border-color:var(--border);">
+            <span data-zh>暂无附件</span><span data-en>No annexes yet</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== Changelog Section ===== -->
+      <section id="section-changelog" class="mb-16">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-sm font-semibold flex items-center gap-2" style="color:var(--text-primary);">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+            <span data-zh>变更日志</span><span data-en>Changelog</span>
+          </h3>
+        </div>
+        <div class="relative pl-6 border-l-2" style="border-color:var(--border);" id="changelog">
+          <div class="timeline-dot mb-6">
+            <div class="text-[11px] font-medium mb-1" style="color:var(--text-muted);">2026-03-26 · v1.0</div>
+            <div class="text-[13px] font-medium mb-0.5" style="color:var(--text-primary);">产出 Flowcharts v1.0 — 6 个核心业务流程图 + Monet 2.0 主题定稿</div>
+            <div class="text-[12px]" style="color:var(--text-secondary);">用户主流程、Skills 安装与作用域、Skill 执行可视化、跨应用授权时序图、新用户引导状态图、积分消耗流程。Monet 2.0 替代旧版 Monet Cliffs，产出可复用 Skill。</div>
+          </div>
+          <div class="timeline-dot mb-6">
+            <div class="text-[11px] font-medium mb-1" style="color:var(--text-muted);">2026-03-26 · v1.0</div>
+            <div class="text-[13px] font-medium mb-0.5" style="color:var(--text-primary);">产出 Prototype v1.0 — 5 个新功能模块交互原型</div>
+            <div class="text-[12px]" style="color:var(--text-secondary);">Skills 市场、作用域控制、执行可视化、跨应用授权、新用户引导</div>
+          </div>
+          <div class="timeline-dot mb-6">
+            <div class="text-[11px] font-medium mb-1" style="color:var(--text-muted);">2026-03-26 · v1.0</div>
+            <div class="text-[13px] font-medium mb-0.5" style="color:var(--text-primary);">初始化项目文档库 & 产出 PRD v1.0 初稿</div>
+            <div class="text-[12px]" style="color:var(--text-secondary);">包含需求背景、业务目标、用户旅程、功能清单与基础逻辑</div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <script>
+    function toggleTheme() {
+      const html = document.documentElement;
+      const next = html.dataset.theme === 'dark' ? 'light' : 'dark';
+      html.dataset.theme = next;
+      document.getElementById('icon-sun').classList.toggle('hidden', next === 'dark');
+      document.getElementById('icon-moon').classList.toggle('hidden', next === 'light');
+      localStorage.setItem('docs-theme', next);
+    }
+
+    function toggleLang() {
+      const body = document.body;
+      const next = body.dataset.lang === 'zh' ? 'en' : 'zh';
+      body.dataset.lang = next;
+      document.querySelectorAll('[data-zh-placeholder]').forEach(el => {
+        el.placeholder = next === 'zh' ? el.dataset.zhPlaceholder : el.dataset.enPlaceholder;
+      });
+      localStorage.setItem('docs-lang', next);
+    }
+
+    function navigateTo(sectionId, el) {
+      document.querySelectorAll('.nav-link').forEach(a => a.classList.remove('active'));
+      if (el) el.classList.add('active');
+      const target = document.getElementById('section-' + sectionId);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function filterDocs(query) {
+      const q = query.toLowerCase().trim();
+      document.querySelectorAll('.doc-card').forEach(card => {
+        const text = (card.dataset.searchable || card.textContent).toLowerCase();
+        card.style.display = !q || text.includes(q) ? '' : 'none';
+      });
+    }
+
+    (function init() {
+      const savedTheme = localStorage.getItem('docs-theme');
+      if (savedTheme === 'dark') toggleTheme();
+
+      const savedLang = localStorage.getItem('docs-lang');
+      if (savedLang === 'en') toggleLang();
+
+      const observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const id = entry.target.id.replace('section-', '');
+            document.querySelectorAll('.nav-link').forEach(a => {
+              a.classList.toggle('active', a.getAttribute('href') === '#' + id);
+            });
+          }
+        });
+      }, { rootMargin: '-20% 0px -70% 0px' });
+
+      document.querySelectorAll('section[id^="section-"]').forEach(s => observer.observe(s));
+    })();
+  </script>
+</body>
+</html>

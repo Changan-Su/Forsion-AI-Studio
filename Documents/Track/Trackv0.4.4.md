@@ -69,3 +69,93 @@
 
 
 
+
+---
+
+# Agent SKILL.md 微型架构重构 (v0.4.4 增量)
+
+## 1. 背景与目标
+
+Agent 模式原有的 skills 和工具定义全部硬编码在 `skillsRegistry.ts` 中（TypeScript 常量），缺乏可读性、可扩展性和统一的格式规范。目标是将其重构为**标准 SKILL.md 文件格式**，形成微型 agent 架构：
+
+- 内置 skills → `client/skills/*.skill.md`（构建时打包）
+- 自定义 skills → session workspace 的 `.agent/skills/*.skill.md`（IndexedDB，每个会话独立）
+
+## 2. 标准 SKILL.md 格式
+
+每个文件由两部分组成：
+
+- **YAML frontmatter**：机器可解析的工具定义（名称、描述、参数 schema、executor 类型）
+- **Markdown body**：自然语言指令，agent 启用该 skill 时注入 system prompt
+
+```markdown
+---
+id: web
+name: Web Access
+description: Search the web and fetch URLs
+icon: Globe
+isBuiltin: true
+tools:
+  - name: web_search
+    description: ...
+    executor: builtin
+    parameters: { ... }
+---
+
+# Web Access Skill
+
+Use `web_search` when you need up-to-date information...
+```
+
+## 3. 新增文件
+
+| 文件 | 作用 |
+|---|---|
+| `client/skills/web.skill.md` | Web Access 内置 skill |
+| `client/skills/code.skill.md` | Code Execution 内置 skill |
+| `client/skills/productivity.skill.md` | Productivity 内置 skill |
+| `client/skills/workspace.skill.md` | Workspace 内置 skill（自动注入） |
+| `client/services/skillParser.ts` | SKILL.md 解析器 / 序列化器 |
+| `client/services/agentWorkspace.ts` | `.agent/skills/` CRUD + 旧数据迁移 |
+| `client/src/skill-md.d.ts` | Vite `?raw` 导入的 TypeScript 声明 |
+
+## 4. 修改文件
+
+### `types.ts`
+- `ToolDefinition` 新增 `executorType?: 'builtin' | 'javascript' | 'http'` 和 `executorConfig?: CustomToolExecutorConfig`
+- `SkillDefinition` 新增 `instructions?: string`（markdown body）和 `isWorkspace?: boolean`
+- `CustomToolExecutorConfig` 相关类型定义移至 `ToolDefinition` 之前，避免前向引用问题
+
+### `skillsRegistry.ts`（完全重写）
+- 通过 `import rawWeb from '../skills/web.skill.md?raw'` + `parseSkillMd()` 替代硬编码常量
+- `getToolsForSkills()` 新增 `extraSkills` 参数支持 workspace skills
+- 新增 `getSkillInstructions()` 收集启用 skill 的 markdown body 用于 system prompt
+- 保留旧的 localStorage 相关函数供迁移期兼容
+
+### `agentRuntime.ts`
+- 进入 agent 循环前异步加载该 session 的 `.agent/skills/`（`listWorkspaceSkills`）
+- 将 skill instructions 拼接到 system prompt 末尾（`## Skill Instructions`）
+- `executeOneTool` / `executeToolCallsBatch` 新增 `allTools` 参数，支持通过 `executorConfig` 执行自定义工具
+
+### `builtinTools.ts`
+- `executeBuiltinTool` 新增 `toolDef?: ToolDefinition` 参数
+- 执行优先级：hardcoded executor → toolDef.executorConfig → localStorage custom executor
+
+### `AgentConfigPanel.tsx`
+- `useEffect` 打开时先执行 `migrateLocalStorageSkills` → 再 `listWorkspaceSkills`
+- 显示 builtin + workspace skills 合并列表
+- 新建/编辑 skill 保存到 `saveWorkspaceSkill`（SKILL.md → IndexedDB）
+- 删除调用 `deleteWorkspaceSkill`
+
+## 5. 向后兼容迁移
+
+`agentWorkspace.migrateLocalStorageSkills(sessionId)`：
+- 首次运行读取 `localStorage.forsion_custom_skills`
+- 将每个 `CustomSkillDefinition` 转为 SKILL.md 写入当前 session 的 `.agent/skills/`
+- 清除 localStorage 并写入迁移标记 `forsion_agent_skills_migrated = done`
+- 幂等，多次调用无副作用
+
+## 6. 构建验证
+
+- `npx tsc --noEmit`：我新增/修改的文件无类型错误（其余预存错误不在本次范围内）
+- `npx vite build`：构建成功，`?raw` import 和 `yaml` 包均正常解析

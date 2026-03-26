@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { User, ChatSession, Message, AIModel, AppSettings, UserRole, Attachment } from './types';
+import { User, ChatSession, Message, AIModel, AppSettings, UserRole, Attachment, AgentConfig, AgentStatusEvent } from './types';
 import { backendService, API_ROOT } from './services/backendService'; // New backend
 import { generateGeminiResponse, generateGeminiResponseStream } from './services/geminiService';
 import { generateExternalResponse, generateExternalResponseStream } from './services/externalApiService';
@@ -8,10 +8,15 @@ import { BUILTIN_MODELS, DEFAULT_MODEL_ID, getAllModels, getConfiguredModels, ST
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 import SettingsModal from './components/SettingsModal';
-import { Send, Zap, Menu, Sparkles, MessageSquare, Code, Brain, BrainCircuit, Image as ImageIcon, ChevronDown, Paperclip, X as XIcon, Box, Square, UploadCloud } from 'lucide-react';
+import { Send, Zap, Menu, Sparkles, MessageSquare, Code, Brain, BrainCircuit, Image as ImageIcon, ChevronDown, Paperclip, X as XIcon, Box, Square, UploadCloud, Bot, FolderOpen } from 'lucide-react';
 import { getPresetAvatar, svgToDataUrl } from './src/utils/presetAvatars';
 import { detectImageGenerationIntent, generateImage, detectImageEditIntent, editImage, imageToImage } from './services/imageGenerationService';
 import CommandAutocomplete from './components/CommandAutocomplete';
+import AgentConfigPanel from './components/AgentConfigPanel';
+import AgentStatusBar from './components/AgentStatusBar';
+import WorkspacePanel from './components/WorkspacePanel';
+import { runAgentLoop } from './services/agentRuntime';
+import { workspaceService } from './services/workspaceService';
 
 const App: React.FC = () => {
   // Auth State
@@ -72,6 +77,11 @@ const App: React.FC = () => {
   const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [expandedInput, setExpandedInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Agent State
+  const [showAgentConfig, setShowAgentConfig] = useState(false);
+  const [agentStatus, setAgentStatus] = useState<AgentStatusEvent | null>(null);
+  const [showWorkspacePanel, setShowWorkspacePanel] = useState(false);
 
   // Mobile UI State
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -224,7 +234,23 @@ const App: React.FC = () => {
       }
       
       const storedSessions = localStorage.getItem(STORAGE_KEYS.SESSIONS);
-      if (storedSessions) setSessions(JSON.parse(storedSessions));
+      if (storedSessions) {
+        const parsed: ChatSession[] = JSON.parse(storedSessions);
+        // Reset MCP server connection status on load (connections don't survive reloads)
+        const normalized = parsed.map(s => ({
+          ...s,
+          agentConfig: s.agentConfig ? {
+            ...s.agentConfig,
+            mcpServers: s.agentConfig.mcpServers.map(srv => ({ ...srv, status: 'disconnected' as const })),
+          } : undefined,
+        }));
+        setSessions(normalized);
+
+        const storedSessionId = localStorage.getItem(STORAGE_KEYS.CURRENT_SESSION_ID);
+        if (storedSessionId && normalized.find(s => s.id === storedSessionId)) {
+          setCurrentSessionId(storedSessionId);
+        }
+      }
 
       await syncSettingsFromBackend();
       setIsAuthLoading(false);
@@ -272,9 +298,20 @@ const App: React.FC = () => {
   }, [theme, themePreset]);
 
   // Persist Sessions locally (could move to backend too in future)
+  // Guard against overwriting stored sessions with the initial empty state on first render
+  const sessionsInitialized = useRef(false);
   useEffect(() => {
+    if (sessions.length === 0 && !sessionsInitialized.current) return;
+    sessionsInitialized.current = true;
     localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessions));
   }, [sessions]);
+
+  // Persist current session ID so it can be restored on page refresh
+  useEffect(() => {
+    if (currentSessionId) {
+      localStorage.setItem(STORAGE_KEYS.CURRENT_SESSION_ID, currentSessionId);
+    }
+  }, [currentSessionId]);
 
   // Handle Settings Updates
   const updateAppSettings = async (newSettings: Partial<AppSettings>) => {
@@ -1066,8 +1103,8 @@ const App: React.FC = () => {
           if (s.id === sessionId) {
             return {
               ...s,
-              messages: s.messages.map(m => 
-                m.id === botMessageId 
+              messages: s.messages.map(m =>
+                m.id === botMessageId
                   ? { ...m, content, reasoning }
                   : m
               ),
@@ -1080,17 +1117,50 @@ const App: React.FC = () => {
 
       let usage: { prompt_tokens: number; completion_tokens: number } | undefined;
 
-      if (currentModel.provider === 'gemini') {
+      // ── Agentic path (when agent mode is enabled for this session) ──
+      if (session?.agentConfig?.enabled) {
+        setAgentStatus({ type: 'iteration_start', iteration: 0 });
+        const agentOutput = await runAgentLoop({
+          sessionId: sessionId,
+          userMessage: userMessage.content,
+          attachments: currentAttachments,
+          history: (session.messages || []).filter(m => m.id !== botMessageId),
+          model: currentModel,
+          agentConfig: session.agentConfig,
+          appSettings,
+          enableThinking: shouldUseDeepThinking,
+          signal: abortControllerRef.current?.signal,
+          onStatusUpdate: (event) => setAgentStatus(event),
+          onStreamChunk: updateStreamingMessage,
+        });
+
+        // Insert intermediate tool messages before the final bot message
+        if (agentOutput.toolMessages.length > 0) {
+          setSessions(prev => prev.map(s => {
+            if (s.id !== sessionId) return s;
+            const withoutBot = s.messages.filter(m => m.id !== botMessageId);
+            return {
+              ...s,
+              messages: [...withoutBot, ...agentOutput.toolMessages, { ...botMessage, content: agentOutput.finalContent, reasoning: agentOutput.reasoning }],
+              updatedAt: Date.now(),
+            };
+          }));
+        }
+
+        usage = agentOutput.usage;
+        setAgentStatus(null);
+
+      } else if (currentModel.provider === 'gemini') {
          // Gemini Logic with streaming
          console.log('[handleSendMessage] Using Gemini provider for model:', currentModel.id);
-         const history = currentModel.id === 'gemini-2.5-flash-image' ? [] : 
+         const history = currentModel.id === 'gemini-2.5-flash-image' ? [] :
             (session?.messages || []).filter(m => m.id !== botMessageId).map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.content }] }));
-         
+
          const result = await generateGeminiResponseStream(
-           currentModel.id, 
-           userMessage.content, 
-           history, 
-           config?.apiKey, 
+           currentModel.id,
+           userMessage.content,
+           history,
+           config?.apiKey,
            currentAttachments,
            updateStreamingMessage,
            shouldUseDeepThinking,
@@ -1482,6 +1552,8 @@ const App: React.FC = () => {
   const deleteSession = (id: string) => {
     setSessions(prev => prev.filter(s => s.id !== id));
     if (currentSessionId === id) setCurrentSessionId(null);
+    // Clean up workspace files for this session
+    workspaceService.deleteAllFiles(id).catch(() => {});
   };
 
   const renameSession = (id: string, newTitle: string) => {
@@ -1699,15 +1771,16 @@ const App: React.FC = () => {
           </div>
         </header>
 
-        <ChatArea 
-          messages={currentSession?.messages || []} 
-          isProcessing={isProcessing} 
-          currentModel={currentModel} 
+        <ChatArea
+          messages={currentSession?.messages || []}
+          isProcessing={isProcessing}
+          currentModel={currentModel}
           allModels={allModels}
           themePreset={themePreset}
           onFileUpload={processFile}
           onRegenerateMessage={handleRegenerateMessage}
           user={user ? { username: user.username, nickname: user.nickname, avatar: user.avatar } : undefined}
+          sessionId={currentSession?.agentConfig?.enabled ? currentSessionId ?? undefined : undefined}
         />
 
         {/* Input Area */}
@@ -1887,7 +1960,58 @@ const App: React.FC = () => {
                    Will generate image
                  </span>
                )}
+
+               {/* Agent Mode Toggle Button */}
+               <button
+                 type="button"
+                 onClick={() => setShowAgentConfig(true)}
+                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                   sessions.find(s => s.id === currentSessionId)?.agentConfig?.enabled
+                     ? isNotion
+                       ? 'bg-gray-800 text-white'
+                       : isMonet
+                         ? 'bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/40'
+                         : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
+                     : isNotion
+                       ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800'
+                       : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                 }`}
+                 title="Configure agent mode for this session"
+               >
+                 <Bot size={14} />
+                 <span>Agent</span>
+               </button>
+
+               {/* Workspace Panel Toggle */}
+               {sessions.find(s => s.id === currentSessionId)?.agentConfig?.enabled && (
+                 <button
+                   type="button"
+                   onClick={() => setShowWorkspacePanel(!showWorkspacePanel)}
+                   className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                     showWorkspacePanel
+                       ? isNotion
+                         ? 'bg-gray-800 text-white'
+                         : isMonet
+                           ? 'bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/40'
+                           : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
+                       : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                   }`}
+                   title="Toggle workspace file browser"
+                 >
+                   <FolderOpen size={14} />
+                   <span>Files</span>
+                 </button>
+               )}
              </div>
+
+             {/* Agent Status Bar */}
+             <AgentStatusBar
+               isActive={agentStatus !== null}
+               currentIteration={agentStatus?.iteration ?? 0}
+               maxIterations={sessions.find(s => s.id === currentSessionId)?.agentConfig?.maxIterations ?? 10}
+               currentToolName={agentStatus?.toolName}
+               themePreset={themePreset}
+             />
 
              <div className={`relative flex items-end gap-2 p-2 transition-all ${
                isNotion
@@ -2053,11 +2177,11 @@ const App: React.FC = () => {
       </div>
 
        {showSettings && (
-         <SettingsModal 
-           onClose={() => setShowSettings(false)} 
-           userRole={user!.role} 
+         <SettingsModal
+           onClose={() => setShowSettings(false)}
+           userRole={user!.role}
            user={user!}
-           currentTheme={theme} 
+           currentTheme={theme}
            onThemeChange={(t) => updateAppSettings({ theme: t })}
            currentPreset={themePreset}
            onPresetChange={(p) => updateAppSettings({ themePreset: p })}
@@ -2065,6 +2189,34 @@ const App: React.FC = () => {
            onUpdateSettings={updateAppSettings}
            isOffline={isOfflineMode}
            onReconnect={attemptReconnect}
+         />
+       )}
+
+       {showAgentConfig && currentSessionId && (
+         <AgentConfigPanel
+           sessionId={currentSessionId}
+           agentConfig={sessions.find(s => s.id === currentSessionId)?.agentConfig}
+           onSave={(config) => {
+             setSessions(prev => prev.map(s =>
+               s.id === currentSessionId ? { ...s, agentConfig: config } : s
+             ));
+           }}
+           onSkillsChanged={() => {
+             // Force re-render so the skill list updates
+             setShowAgentConfig(false);
+             setTimeout(() => setShowAgentConfig(true), 0);
+           }}
+           onClose={() => setShowAgentConfig(false)}
+           themePreset={themePreset}
+         />
+       )}
+
+       {showWorkspacePanel && currentSessionId && (
+         <WorkspacePanel
+           sessionId={currentSessionId}
+           isOpen={showWorkspacePanel}
+           onClose={() => setShowWorkspacePanel(false)}
+           themePreset={themePreset}
          />
        )}
 

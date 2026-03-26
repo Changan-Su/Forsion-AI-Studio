@@ -534,8 +534,9 @@ export const backendService = {
     maxTokens?: number,
     onChunk: (content: string, reasoning?: string) => void = () => {},
     signal?: AbortSignal,
-    attachments?: Array<{ type: 'image' | 'document'; url: string; mimeType: string; name?: string; extractedText?: string }>
-  ): Promise<{ content: string; reasoning?: string; usage?: { prompt_tokens: number; completion_tokens: number } }> {
+    attachments?: Array<{ type: 'image' | 'document'; url: string; mimeType: string; name?: string; extractedText?: string }>,
+    tools?: Array<{ type: string; function: { name: string; description: string; parameters: unknown } }>
+  ): Promise<{ content: string; reasoning?: string; usage?: { prompt_tokens: number; completion_tokens: number }; toolCalls?: Array<{ id: string; name: string; arguments: Record<string, unknown> }> }> {
     console.log('[proxyChatCompletions] Starting request for model:', modelId);
     try {
       // Modify messages if thinking is enabled
@@ -595,16 +596,21 @@ export const backendService = {
       }
 
       console.log('[proxyChatCompletions] Sending request to:', `${API_URL}/chat/completions`);
+      const bodyPayload: Record<string, unknown> = {
+        model_id: modelId,
+        messages: finalMessages,
+        temperature,
+        max_tokens: maxTokens,
+        stream: true,
+      };
+      if (tools && tools.length > 0) {
+        bodyPayload.tools = tools;
+        bodyPayload.tool_choice = 'auto';
+      }
       const res = await fetch(`${API_URL}/chat/completions`, {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({
-          model_id: modelId,
-          messages: finalMessages,
-          temperature,
-          max_tokens: maxTokens,
-          stream: true // Enable streaming
-        }),
+        body: JSON.stringify(bodyPayload),
         signal: signal
       });
 
@@ -636,6 +642,7 @@ export const backendService = {
         let fullContent = '';
         let fullReasoning = '';
         let usage: { prompt_tokens: number; completion_tokens: number } | undefined;
+        const toolCallChunks: Array<{ index: number; id?: string; type?: string; function?: { name?: string; arguments?: string } }> = [];
 
         while (true) {
           const { done, value } = await reader.read();
@@ -660,6 +667,13 @@ export const backendService = {
                   prompt_tokens: json.usage.prompt_tokens || 0,
                   completion_tokens: json.usage.completion_tokens || 0
                 };
+              }
+
+              // Accumulate tool call fragments
+              if (delta?.tool_calls) {
+                for (const tc of delta.tool_calls) {
+                  toolCallChunks.push(tc);
+                }
               }
 
               if (delta?.content) {
@@ -717,10 +731,31 @@ export const backendService = {
           };
         }
 
+        // Resolve tool calls from accumulated fragments
+        let resolvedToolCalls: Array<{ id: string; name: string; arguments: Record<string, unknown> }> | undefined;
+        if (toolCallChunks.length > 0) {
+          const byIndex: Record<number, { id: string; name: string; argumentsStr: string }> = {};
+          for (const chunk of toolCallChunks) {
+            if (!byIndex[chunk.index]) {
+              byIndex[chunk.index] = { id: chunk.id ?? '', name: '', argumentsStr: '' };
+            }
+            const entry = byIndex[chunk.index];
+            if (chunk.id) entry.id = chunk.id;
+            if (chunk.function?.name) entry.name += chunk.function.name;
+            if (chunk.function?.arguments) entry.argumentsStr += chunk.function.arguments;
+          }
+          resolvedToolCalls = Object.values(byIndex).map((entry) => {
+            let args: Record<string, unknown> = {};
+            try { args = JSON.parse(entry.argumentsStr || '{}'); } catch { args = { _raw: entry.argumentsStr }; }
+            return { id: entry.id, name: entry.name, arguments: args };
+          });
+        }
+
         return {
           content: fullContent,
           reasoning: fullReasoning || undefined,
-          usage
+          usage,
+          toolCalls: resolvedToolCalls
         };
       } else {
         // Non-streaming response (fallback)

@@ -132,5 +132,7 @@ export const STORAGE_KEYS = {
   USERS: 'forsion_users',
   CURRENT_USER: 'forsion_current_user',
   SESSIONS: 'forsion_sessions',
+  CURRENT_SESSION_ID: 'forsion_current_session_id',
   SETTINGS: 'forsion_settings',
+  CUSTOM_SKILLS: 'forsion_custom_skills',
 };

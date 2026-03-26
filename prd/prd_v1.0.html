@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PRD v1.0 — Forsion AI Studio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: ['selector', '[data-theme="dark"]'],
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', '"PingFang SC"', '"Hiragino Sans GB"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', '"Fira Code"', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root { --sidebar-w: 240px; }
+    [data-theme="light"] {
+      --bg: #f8fafc; --bg-card: #ffffff; --bg-sidebar: #ffffff; --border: #e5e7eb;
+      --text: #0f172a; --text2: #475569; --text3: #94a3b8;
+      --accent: #4f46e5; --accent-bg: #eef2ff; --accent-border: #c7d2fe;
+      --tag-p0: #dc2626; --tag-p0-bg: #fef2f2; --tag-p1: #ea580c; --tag-p1-bg: #fff7ed;
+      --tag-p2: #2563eb; --tag-p2-bg: #eff6ff; --tag-new: #059669; --tag-new-bg: #ecfdf5;
+    }
+    [data-theme="dark"] {
+      --bg: #0f172a; --bg-card: #1e293b; --bg-sidebar: #1e293b; --border: #334155;
+      --text: #f1f5f9; --text2: #94a3b8; --text3: #64748b;
+      --accent: #818cf8; --accent-bg: #1e1b4b; --accent-border: #3730a3;
+      --tag-p0: #f87171; --tag-p0-bg: #450a0a; --tag-p1: #fb923c; --tag-p1-bg: #431407;
+      --tag-p2: #60a5fa; --tag-p2-bg: #172554; --tag-new: #34d399; --tag-new-bg: #022c22;
+    }
+    body { background: var(--bg); color: var(--text); line-height: 1.7; }
+    * { scrollbar-width: thin; scrollbar-color: #d1d5db transparent; }
+
+    .toc-link { display:block; padding:5px 12px; font-size:13px; color:var(--text2); border-left:2px solid transparent; transition:all .15s; text-decoration:none; }
+    .toc-link:hover { color:var(--accent); background:var(--accent-bg); }
+    .toc-link.active { color:var(--accent); border-left-color:var(--accent); font-weight:500; }
+    .toc-sub { padding-left:16px; font-size:12px; }
+
+    .section { margin-bottom:3rem; }
+    .section-title { font-size:1.25rem; font-weight:700; color:var(--text); margin-bottom:1rem; padding-bottom:0.5rem; border-bottom:2px solid var(--border); }
+    .card { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.25rem; margin-bottom:1rem; }
+    .info-table { width:100%; border-collapse:collapse; font-size:14px; }
+    .info-table th { text-align:left; padding:10px 14px; background:var(--accent-bg); color:var(--accent); font-weight:600; border:1px solid var(--border); white-space:nowrap; width:140px; }
+    .info-table td { padding:10px 14px; border:1px solid var(--border); color:var(--text); }
+
+    .journey-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .journey-table th { padding:10px 12px; background:var(--accent-bg); color:var(--accent); font-weight:600; border:1px solid var(--border); text-align:left; }
+    .journey-table td { padding:10px 12px; border:1px solid var(--border); color:var(--text2); vertical-align:top; }
+    .journey-table tr:hover td { background: color-mix(in srgb, var(--accent-bg) 40%, transparent); }
+
+    .feature-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .feature-table th { padding:8px 12px; background:var(--accent-bg); color:var(--accent); font-weight:600; border:1px solid var(--border); text-align:left; }
+    .feature-table td { padding:8px 12px; border:1px solid var(--border); color:var(--text2); vertical-align:top; }
+
+    .tag { display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600; }
+    .tag-p0 { color:var(--tag-p0); background:var(--tag-p0-bg); }
+    .tag-p1 { color:var(--tag-p1); background:var(--tag-p1-bg); }
+    .tag-p2 { color:var(--tag-p2); background:var(--tag-p2-bg); }
+    .tag-new { color:var(--tag-new); background:var(--tag-new-bg); }
+    .tag-existing { color:var(--text3); background:var(--border); }
+
+    .goal-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .goal-table th { padding:10px 12px; background:var(--accent-bg); color:var(--accent); font-weight:600; border:1px solid var(--border); text-align:left; }
+    .goal-table td { padding:10px 12px; border:1px solid var(--border); color:var(--text2); vertical-align:top; }
+
+    .pending-badge { display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:8px; font-size:13px; color:var(--text3); border:1px dashed var(--border); }
+    .version-record { width:100%; border-collapse:collapse; font-size:13px; }
+    .version-record th { padding:8px 12px; background:var(--accent-bg); color:var(--accent); font-weight:600; border:1px solid var(--border); text-align:left; }
+    .version-record td { padding:8px 12px; border:1px solid var(--border); color:var(--text2); }
+
+    @media (max-width:900px) { :root { --sidebar-w:0; } #toc-sidebar { display:none; } }
+  </style>
+</head>
+<body class="min-h-screen flex">
+
+  <!-- ========== TOC Sidebar ========== -->
+  <aside id="toc-sidebar" class="fixed top-0 left-0 bottom-0 z-30 border-r overflow-y-auto"
+    style="width:var(--sidebar-w); background:var(--bg-sidebar); border-color:var(--border);">
+    <div class="px-4 pt-6 pb-3">
+      <div class="text-xs font-bold uppercase tracking-widest mb-1" style="color:var(--text3);">PRD v1.0</div>
+      <div class="text-sm font-semibold" style="color:var(--text);">Forsion AI Studio</div>
+    </div>
+    <nav class="px-2 pb-6 space-y-0.5" id="toc-nav">
+      <a href="#info" class="toc-link" data-section="info">项目信息</a>
+      <a href="#ch1" class="toc-link" data-section="ch1">一、需求背景</a>
+      <a href="#ch2" class="toc-link" data-section="ch2">二、需求目标</a>
+      <a href="#ch3" class="toc-link" data-section="ch3">三、用户与使用场景</a>
+      <a href="#ch3-persona" class="toc-link toc-sub" data-section="ch3-persona">3.1 用户画像</a>
+      <a href="#ch3-journey" class="toc-link toc-sub" data-section="ch3-journey">3.2 用户旅程图</a>
+      <a href="#ch4" class="toc-link" data-section="ch4">四、需求功能清单</a>
+      <a href="#ch4-m1" class="toc-link toc-sub" data-section="ch4-m1">4.1 对话核心</a>
+      <a href="#ch4-m2" class="toc-link toc-sub" data-section="ch4-m2">4.2 Skills 体系</a>
+      <a href="#ch4-m3" class="toc-link toc-sub" data-section="ch4-m3">4.3 跨应用数据中枢</a>
+      <a href="#ch4-m4" class="toc-link toc-sub" data-section="ch4-m4">4.4 用户体验</a>
+      <a href="#ch4-m5" class="toc-link toc-sub" data-section="ch4-m5">4.5 后台管理</a>
+      <a href="#ch5" class="toc-link" data-section="ch5">五、详细方案</a>
+      <a href="#ch6" class="toc-link" data-section="ch6">六、业务流程图</a>
+      <a href="#ch7" class="toc-link" data-section="ch7">七、异常与边界</a>
+      <a href="#ch8" class="toc-link" data-section="ch8">八、数据埋点</a>
+      <a href="#ch9" class="toc-link" data-section="ch9">九、未来规划</a>
+      <a href="#ch10" class="toc-link" data-section="ch10">十、附件</a>
+    </nav>
+    <div class="px-4 py-3 border-t" style="border-color:var(--border);">
+      <button onclick="toggleTheme()" class="text-xs px-3 py-1.5 rounded-lg w-full text-left transition-colors" style="color:var(--text2); background:var(--bg);">
+        切换主题
+      </button>
+    </div>
+  </aside>
+
+  <!-- ========== Main Content ========== -->
+  <main class="flex-1 min-h-screen" style="margin-left:var(--sidebar-w);">
+
+    <!-- Top bar -->
+    <header class="sticky top-0 z-20 border-b px-6 lg:px-10 flex items-center justify-between h-12"
+      style="background:color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter:blur(8px); border-color:var(--border);">
+      <div class="text-sm font-medium" style="color:var(--text);">产品需求文档 (PRD)</div>
+      <div class="flex items-center gap-3">
+        <select id="version-switcher" onchange="switchVersion(this.value)"
+          class="text-xs px-2 py-1 rounded-lg border outline-none" style="background:var(--bg-card); border-color:var(--border); color:var(--text2);">
+          <option value="prd_v1.0.html" selected>v1.0 最新版</option>
+        </select>
+      </div>
+    </header>
+
+    <div class="px-6 lg:px-10 py-8 max-w-4xl">
+
+      <!-- ===== 项目信息 ===== -->
+      <section id="info" class="section">
+        <h1 class="text-2xl font-bold mb-6" style="color:var(--text);">Forsion AI Studio — 产品需求文档</h1>
+        <div class="card">
+          <table class="info-table">
+            <tr><th>产品名称</th><td>Forsion AI Studio</td></tr>
+            <tr><th>版本定义</th><td>v1.0 MVP — 智能对话 + Skills 体系 + 跨应用数据中枢</td></tr>
+            <tr><th>文档负责人</th><td>AI / Skyler</td></tr>
+            <tr><th>核心目标</th><td>打造 Forsion 生态的 AI 中枢，让非技术用户通过统一的 Agent 平台跨应用智能交互</td></tr>
+            <tr><th>全局原型</th><td><span class="pending-badge">待步骤四产出</span></td></tr>
+          </table>
+        </div>
+
+        <h3 class="text-sm font-semibold mt-6 mb-3" style="color:var(--text);">版本记录</h3>
+        <div class="card" style="padding:0; overflow:hidden;">
+          <table class="version-record">
+            <thead><tr><th>日期</th><th>版本号</th><th>修改内容</th><th>修改人</th></tr></thead>
+            <tbody>
+              <tr><td>2026-03-26</td><td>v1.0</td><td>初稿：需求背景、业务目标、用户旅程、功能清单与基础逻辑</td><td>AI</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ===== 一、需求背景 ===== -->
+      <section id="ch1" class="section">
+        <h2 class="section-title">一、需求背景</h2>
+
+        <h3 class="text-base font-semibold mb-3" style="color:var(--text);">1.1 现状问题</h3>
+        <div class="card space-y-3" style="color:var(--text2); font-size:14px;">
+          <p><strong style="color:var(--text);">问题一：AI 工具碎片化严重。</strong>用户需要在 ChatGPT、Claude、Gemini 等多个平台间反复切换，每个平台有独立的账号体系和对话历史，无法统一管理。非技术用户面临认知负担大、学习成本高的困境。</p>
+          <p><strong style="color:var(--text);">问题二：AI 能力止步于"对话"。</strong>主流 AI 工具以纯文本对话为主，缺乏可扩展的"行动能力"。用户无法让 AI 主动调用外部工具（如查日历、发邮件、搜索文件），只能手动复制粘贴信息。</p>
+          <p><strong style="color:var(--text);">问题三：应用间数据孤岛。</strong>用户在不同应用（日历、桌面、笔记）中产生的数据彼此隔离，AI 无法获得完整的用户上下文。例如日历中有明天的会议，但聊天 AI 无法主动提醒用户准备材料。</p>
+          <p><strong style="color:var(--text);">问题四：现有方案不支持自部署和自定义。</strong>企业和个人用户对数据隐私有顾虑，希望使用自有 API Key、部署在自己的服务器上，但现有 SaaS 产品无法满足这一需求。</p>
+        </div>
+
+        <h3 class="text-base font-semibold mt-6 mb-3" style="color:var(--text);">1.2 为什么现在做？</h3>
+        <div class="card space-y-2" style="color:var(--text2); font-size:14px;">
+          <p><strong>1) 技术窗口期成熟：</strong>多家 AI 厂商已提供稳定的 API（Gemini 2.x、GPT-4o、Claude 3.5、DeepSeek V3），SKILL.md 微型 Agent 架构已在 v0.4.4 中验证可行。</p>
+          <p><strong>2) Forsion 生态基础已建立：</strong>后端统一服务（forsion-backend-service）已完成用户认证、积分计费、多项目模型配置等基础能力，具备跨应用数据整合的技术条件。</p>
+          <p><strong>3) 用户需求明确：</strong>v0.4.x 实验版本的使用反馈表明，多模型切换和个性化主题是用户高频使用的功能，Skills 扩展能力是最期待的新方向。</p>
+        </div>
+      </section>
+
+      <!-- ===== 二、需求目标 ===== -->
+      <section id="ch2" class="section">
+        <h2 class="section-title">二、需求目标</h2>
+        <div class="card" style="padding:0; overflow:hidden;">
+          <table class="goal-table">
+            <thead>
+              <tr><th>目标类型</th><th>描述</th><th>衡量指标</th><th>目标值</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>核心业务目标</strong></td>
+                <td>提供统一的多模型 AI 对话入口，让用户无需在多个平台间切换</td>
+                <td>用户首选使用率（将 AI Studio 作为主要 AI 工具的用户比例）</td>
+                <td>&ge; 60%</td>
+              </tr>
+              <tr>
+                <td><strong>差异化目标</strong></td>
+                <td>通过 Skills 体系赋予 AI "行动能力"，超越纯对话</td>
+                <td>Skills 安装量 &amp; 使用频次（每用户平均启用 Skills 数）</td>
+                <td>&ge; 3 个/用户</td>
+              </tr>
+              <tr>
+                <td><strong>生态目标</strong></td>
+                <td>通过跨应用数据中枢打通 Forsion 生态，形成用户粘性</td>
+                <td>跨应用 Skill 调用率（涉及其他 App 数据的对话比例）</td>
+                <td>&ge; 20%</td>
+              </tr>
+              <tr>
+                <td><strong>用户体验目标</strong></td>
+                <td>非技术用户 5 分钟内完成首次对话 + Skill 启用</td>
+                <td>新用户 onboarding 完成率（从注册到首次成功使用 Skill）</td>
+                <td>&ge; 80%</td>
+              </tr>
+              <tr>
+                <td><strong>技术目标</strong></td>
+                <td>支持私有化部署，用户可使用自有 API Key</td>
+                <td>Docker 一键部署成功率</td>
+                <td>&ge; 95%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ===== 三、用户与使用场景 ===== -->
+      <section id="ch3" class="section">
+        <h2 class="section-title">三、用户与使用场景</h2>
+
+        <div id="ch3-persona">
+          <h3 class="text-base font-semibold mb-3" style="color:var(--text);">3.1 典型用户画像</h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="card">
+              <div class="text-sm font-bold mb-2" style="color:var(--accent);">小美 — 内容创作者</div>
+              <ul class="text-[13px] space-y-1" style="color:var(--text2);">
+                <li>28 岁，自媒体运营</li>
+                <li>每天需要写文章、翻译、做社交媒体文案</li>
+                <li>不懂技术，希望 AI 工具"开箱即用"</li>
+                <li><strong>核心诉求：</strong>一个地方搞定所有 AI 需求，不想来回切换平台</li>
+              </ul>
+            </div>
+            <div class="card">
+              <div class="text-sm font-bold mb-2" style="color:var(--accent);">阿杰 — 小型团队负责人</div>
+              <ul class="text-[13px] space-y-1" style="color:var(--text2);">
+                <li>35 岁，创业公司 CEO</li>
+                <li>需要团队统一使用 AI，控制成本</li>
+                <li>关心数据安全，希望自部署</li>
+                <li><strong>核心诉求：</strong>统一管理团队 AI 使用，积分计费透明可控</li>
+              </ul>
+            </div>
+            <div class="card">
+              <div class="text-sm font-bold mb-2" style="color:var(--accent);">老陈 — Forsion 生态深度用户</div>
+              <ul class="text-[13px] space-y-1" style="color:var(--text2);">
+                <li>42 岁，项目经理</li>
+                <li>同时使用 Forsion Desktop 和 Calendar</li>
+                <li>希望 AI 能理解自己的工作全貌</li>
+                <li><strong>核心诉求：</strong>AI 能自动关联日历日程，在聊天中提醒和辅助决策</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div id="ch3-journey">
+          <h3 class="text-base font-semibold mb-3" style="color:var(--text);">3.2 核心用户旅程图</h3>
+          <div class="card" style="padding:0; overflow-x:auto;">
+            <table class="journey-table">
+              <thead>
+                <tr>
+                  <th style="width:12%;">阶段</th>
+                  <th style="width:15%;">用户触点</th>
+                  <th style="width:20%;">用户行为</th>
+                  <th style="width:23%;">痛点 / 情绪</th>
+                  <th style="width:30%;">机会点 / 功能转化</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>1. 发现</strong></td>
+                  <td>官网 / 推荐链接</td>
+                  <td>了解产品，决定试用</td>
+                  <td>不确定是否又是一个普通 AI 工具</td>
+                  <td>首页突出"多模型 + Skills + 跨应用"差异化价值</td>
+                </tr>
+                <tr>
+                  <td><strong>2. 注册</strong></td>
+                  <td>登录/注册页</td>
+                  <td>使用邀请码注册账号</td>
+                  <td>注册流程繁琐则直接放弃</td>
+                  <td>极简注册（用户名 + 密码 + 邀请码），获赠初始积分</td>
+                </tr>
+                <tr>
+                  <td><strong>3. 首次对话</strong></td>
+                  <td>主聊天界面</td>
+                  <td>选择模型，发送第一条消息</td>
+                  <td>不知道选哪个模型好，怕选错浪费积分</td>
+                  <td>默认推荐最佳模型，首次对话 0 积分消耗（引导体验）</td>
+                </tr>
+                <tr>
+                  <td><strong>4. 探索 Skills</strong></td>
+                  <td>Settings &gt; Skills 市场</td>
+                  <td>浏览并安装感兴趣的 Skills</td>
+                  <td>不理解 Skill 是什么，概念模糊</td>
+                  <td>每个 Skill 卡片配有一句话描述 + 使用演示，安装即用</td>
+                </tr>
+                <tr>
+                  <td><strong>5. 深度使用</strong></td>
+                  <td>聊天中调用 Skill</td>
+                  <td>让 AI 联网搜索 / 读取日历 / 执行代码</td>
+                  <td>Skill 失败时不知道原因</td>
+                  <td>Skill 执行过程可视化，失败时给出清晰原因和重试引导</td>
+                </tr>
+                <tr>
+                  <td><strong>6. 跨应用联动</strong></td>
+                  <td>对话中涉及其他 App 数据</td>
+                  <td>问 AI "明天有什么安排" → AI 读取 Calendar 数据</td>
+                  <td>数据授权流程需要清晰，用户担心隐私</td>
+                  <td>首次跨应用访问弹出授权确认，一次授权永久有效（可撤销）</td>
+                </tr>
+                <tr>
+                  <td><strong>7. 持续留存</strong></td>
+                  <td>日常工作流</td>
+                  <td>将 AI Studio 作为日常工具，管理多个会话</td>
+                  <td>对话历史管理混乱，找不到之前的重要对话</td>
+                  <td>会话分类 + Emoji 标签 + 搜索 + 置顶功能</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== 四、需求功能清单 ===== -->
+      <section id="ch4" class="section">
+        <h2 class="section-title">四、需求功能清单</h2>
+
+        <!-- 模块 1: 对话核心 -->
+        <div id="ch4-m1">
+          <h3 class="text-base font-semibold mb-3 flex items-center gap-2" style="color:var(--text);">
+            <span class="w-2 h-2 rounded-full" style="background:var(--accent);"></span>
+            4.1 对话核心模块
+          </h3>
+          <div class="card" style="padding:0; overflow:hidden;">
+            <table class="feature-table">
+              <thead><tr><th>功能点</th><th>描述</th><th>优先级</th><th>状态</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><strong>多模型对话</strong></td>
+                  <td>支持 Gemini、GPT、Claude、DeepSeek 等模型，用户可在对话中随时切换模型</td>
+                  <td><span class="tag tag-p0">P0</span></td>
+                  <td><span class="tag tag-existing">已有</span></td>
+                </tr>
+                <tr>
+                  <td><strong>流式输出</strong></td>
+                  <td>SSE 实时逐字显示 AI 回复，类 ChatGPT 体验</td>
+                  <td><span class="tag tag-p0">P0</span></td>
+                  <td><span class="tag tag-existing">已有</span></td>
+                </tr>
+                <tr>
+                  <td><strong>思考过程折叠</strong></td>
+                  <td>AI 深度思考过程可折叠显示，一键展开查看推理链</td>
+                  <td><span class="tag tag-p1">P1</span></td>
+                  <td><span class="tag tag-existing">已有</span></td>
+                </tr>
+                <tr>
+                  <td><strong>富文本渲染</strong></td>
+                  <td>Markdown、LaTeX/KaTeX 数学公式、代码高亮（带语言标签 + 一键复制）</td>
+                  <td><span class="tag tag-p0">P0</span></td>
+                  <td><span class="tag tag-existing">已有</span></td>
+                </tr>
+                <tr>
+                  <td><strong>文件上传处理</strong></td>
+                  <td>支持图片、PDF、Word 文档上传，AI 可读取和分析文件内容</td>
+                  <td><span class="tag tag-p0">P0</span></td>
+                  <td><span class="tag tag-existing">已有</span></td>
+                </tr>
+                <tr>
+                  <td><strong>多会话管理</strong></td>
+                  <td>创建/切换/删除会话，支持 Emoji 标签、会话搜索</td>
+                  <td><span class="tag tag-p0">P0</span></td>
+                  <td><span class="tag tag-existing">已有</span></td>
+                </tr>
+                <tr>
+                  <td><strong>对话历史云同步</strong></td>
+                  <td>会话数据从纯 localStorage 迁移至后端数据库，支持跨设备同步</td>
+                  <td><span class="tag tag-p1">P1</span></td>
+                  <td><span class="tag tag-new">新增</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 模块 2: Skills 体系 -->
+        <div id="ch4-m2" class="mt-8">
+          <h3 class="text-base font-semibold mb-3 flex items-center gap-2" style="color:var(--text);">
+            <span class="w-2 h-2 rounded-full" style="background:var(--tag-new);"></span>
+            4.2 Skills 体系（核心差异化）
+          </h3>
+          <div class="card" style="padding:0; overflow:hidden;">
+            <table class="feature-table">
+              <thead><tr><th>功能点</th><th>描述</th><th>优先级</th><th>状态</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><strong>SKILL.md 标准格式</strong></td>
+                  <td>每个 Skill 由 YAML frontmatter（工具定义）+ Markdown body（Agent 提示词）组成，统一 Tools 和 Skills 概念</td>
+                  <td><span class="tag tag-p0">P0</span></td>
+                  <td><span class="tag tag-existing">已有</span></td>
+                </tr>
+                <tr>
+                  <td><strong>官方内置 Skills</strong></td>
+                  <td>
+                    预装核心 Skills：
+                    <ul class="mt-1 ml-4 text-[12px] list-disc">
+                      <li><strong>Web Access</strong> — 联网搜索 + URL 抓取</li>
+                      <li><strong>Code Execution</strong> — 代码运行沙盒</li>
+                      <li><strong>Productivity</strong> — 文件处理、格式转换</li>
+                      <li><strong>Workspace</strong> — 会话上下文管理（自动注入）</li>
+                    </ul>
+                  </td>
+                  <td><span class="tag tag-p0">P0</span></td>
+                  <td><span class="tag tag-existing">已有</span></td>
+                </tr>
+                <tr>
+                  <td><strong>Skills 市场页面</strong></td>
+                  <td>Settings 中新增 Skills 市场 Tab，展示所有可用 Skills 的卡片列表（图标 + 名称 + 一句话描述 + 安装/卸载按钮）</td>
+                  <td><span class="tag tag-p0">P0</span></td>
+                  <td><span class="tag tag-new">新增</span></td>
+                </tr>
+                <tr>
+                  <td><strong>Skill 作用域控制</strong></td>
+                  <td>用户可设置每个 Skill 的启用范围：全局生效（所有 Session 默认启用）或仅在指定 Session 中启用</td>
+                  <td><span class="tag tag-p0">P0</span></td>
+                  <td><span class="tag tag-new">新增</span></td>
+                </tr>
+                <tr>
+                  <td><strong>官方 Skills 文件夹管理</strong></td>
+                  <td>官方 Skills 以 <code>.skill.md</code> 文件形式存放在项目 <code>client/skills/</code> 目录，构建时打包</td>
+                  <td><span class="tag tag-p0">P0</span></td>
+                  <td><span class="tag tag-existing">已有</span></td>
+                </tr>
+                <tr>
+                  <td><strong>自定义 Skill 创建</strong></td>
+                  <td>用户可在 Skills 市场中创建自定义 Skill（填写名称、描述、工具配置、提示词），保存到 Session 级 IndexedDB</td>
+                  <td><span class="tag tag-p1">P1</span></td>
+                  <td><span class="tag tag-existing">已有</span></td>
+                </tr>
+                <tr>
+                  <td><strong>Skill 执行可视化</strong></td>
+                  <td>对话中 Skill 被调用时，在消息流中显示执行状态（调用中 → 成功/失败），可展开查看详细执行过程</td>
+                  <td><span class="tag tag-p1">P1</span></td>
+                  <td><span class="tag tag-new">新增</span></td>
+                </tr>
+                <tr>
+                  <td><strong>非官方 Skills 渠道（预留）</strong></td>
+                  <td>预留第三方 Skill 分发接口和安装机制，v1.0 不实现，v1.x 规划</td>
+                  <td><span class="tag tag-p2">P2</span></td>
+                  <td><span class="tag tag-new">预留</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 模块 3: 跨应用数据中枢 -->
+        <div id="ch4-m3" class="mt-8">
+          <h3 class="text-base font-semibold mb-3 flex items-center gap-2" style="color:var(--text);">
+            <span class="w-2 h-2 rounded-full" style="background:var(--tag-new);"></span>
+            4.3 跨应用数据中枢
+          </h3>
+          <div class="card" style="padding:0; overflow:hidden;">
+            <table class="feature-table">
+              <thead><tr><th>功能点</th><th>描述</th><th>优先级</th><th>状态</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><strong>用户级数据分区</strong></td>
+                  <td>后端按用户分区存储数据，每个用户拥有独立的数据空间；各 Forsion App 的数据按 App ID 归类存储在用户分区下</td>
+                  <td><span class="tag tag-p0">P0</span></td>
+                  <td><span class="tag tag-new">新增</span></td>
+                </tr>
+                <tr>
+                  <td><strong>统一用户画像</strong></td>
+                  <td>后端微型 Agent 维护每个用户的统一画像（偏好、使用习惯、常用关键词），所有 Forsion App 共享同一份画像</td>
+                  <td><span class="tag tag-p1">P1</span></td>
+                  <td><span class="tag tag-new">新增</span></td>
+                </tr>
+                <tr>
+                  <td><strong>跨应用 Skill 调用</strong></td>
+                  <td>通过特定 Skills（如 Calendar Skill）访问其他 App 数据。实现方式：Skill 定义 Tools 接口 + 提示词，调用后端数据中枢 API 读写对应 App 数据</td>
+                  <td><span class="tag tag-p0">P0</span></td>
+                  <td><span class="tag tag-new">新增</span></td>
+                </tr>
+                <tr>
+                  <td><strong>数据授权管理</strong></td>
+                  <td>用户首次跨应用访问时弹出授权确认弹窗，说明将访问哪个 App 的什么数据；用户可在 Settings 中查看和撤销已授权的 App</td>
+                  <td><span class="tag tag-p0">P0</span></td>
+                  <td><span class="tag tag-new">新增</span></td>
+                </tr>
+                <tr>
+                  <td><strong>App 数据同步接口</strong></td>
+                  <td>各 Forsion App 通过标准 API 将结构化数据推送到后端数据中枢（如 Calendar 推送日程、Desktop 推送文件索引）</td>
+                  <td><span class="tag tag-p1">P1</span></td>
+                  <td><span class="tag tag-new">新增</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 模块 4: 用户体验 -->
+        <div id="ch4-m4" class="mt-8">
+          <h3 class="text-base font-semibold mb-3 flex items-center gap-2" style="color:var(--text);">
+            <span class="w-2 h-2 rounded-full" style="background:var(--accent);"></span>
+            4.4 用户体验与界面
+          </h3>
+          <div class="card" style="padding:0; overflow:hidden;">
+            <table class="feature-table">
+              <thead><tr><th>功能点</th><th>描述</th><th>优先级</th><th>状态</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><strong>多主题风格</strong></td>
+                  <td>五种主题：Cyber Tech（渐变现代感）、Notion Style（极简单色）、<strong>Monet 2.0（清透水彩莫奈风 + 苹果玻璃质感）</strong>、Apple Glass（简约玻璃质感多彩风）、Forsion Theme 1（莫兰迪低饱和 + 苹果玻璃质感） + 亮/暗模式</td>
+                  <td><span class="tag tag-p0">P0</span></td>
+                  <td><span class="tag tag-new">升级</span></td>
+                </tr>
+                <tr>
+                  <td><strong>个人资料系统</strong></td>
+                  <td>自定义昵称 + 头像上传（最大 2MB），昵称优先显示</td>
+                  <td><span class="tag tag-p1">P1</span></td>
+                  <td><span class="tag tag-existing">已有</span></td>
+                </tr>
+                <tr>
+                  <td><strong>响应式布局</strong></td>
+                  <td>完美适配桌面端和移动端，侧边栏自动收起</td>
+                  <td><span class="tag tag-p0">P0</span></td>
+                  <td><span class="tag tag-existing">已有</span></td>
+                </tr>
+                <tr>
+                  <td><strong>新用户引导流程</strong></td>
+                  <td>首次登录后展示 3 步引导：选择模型 → 发送首条消息 → 探索 Skills。非侵入式，可跳过</td>
+                  <td><span class="tag tag-p1">P1</span></td>
+                  <td><span class="tag tag-new">新增</span></td>
+                </tr>
+                <tr>
+                  <td><strong>智能模型推荐</strong></td>
+                  <td>根据用户消息内容自动推荐最合适的模型（如代码问题推荐 DeepSeek，创意写作推荐 Claude），用户可选择接受或忽略</td>
+                  <td><span class="tag tag-p2">P2</span></td>
+                  <td><span class="tag tag-new">新增</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 模块 5: 后台管理 -->
+        <div id="ch4-m5" class="mt-8">
+          <h3 class="text-base font-semibold mb-3 flex items-center gap-2" style="color:var(--text);">
+            <span class="w-2 h-2 rounded-full" style="background:var(--accent);"></span>
+            4.5 后台管理与运营
+          </h3>
+          <div class="card" style="padding:0; overflow:hidden;">
+            <table class="feature-table">
+              <thead><tr><th>功能点</th><th>描述</th><th>优先级</th><th>状态</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><strong>用户管理</strong></td>
+                  <td>创建、编辑、禁用用户；角色分配（管理员/普通用户）</td>
+                  <td><span class="tag tag-p0">P0</span></td>
+                  <td><span class="tag tag-existing">已有</span></td>
+                </tr>
+                <tr>
+                  <td><strong>模型管理</strong></td>
+                  <td>添加自定义 AI 模型、配置 API Key 和 Base URL；项目级模型配置（控制每个 App 可用的模型）</td>
+                  <td><span class="tag tag-p0">P0</span></td>
+                  <td><span class="tag tag-existing">已有</span></td>
+                </tr>
+                <tr>
+                  <td><strong>积分管理</strong></td>
+                  <td>基于 Token 用量的积分计费、邀请码管理、积分余额和交易记录查看</td>
+                  <td><span class="tag tag-p0">P0</span></td>
+                  <td><span class="tag tag-existing">已有</span></td>
+                </tr>
+                <tr>
+                  <td><strong>使用统计</strong></td>
+                  <td>API 调用统计（按模型/日期/用户/项目来源聚合），支持 <code>X-Project-Source</code> 区分来源</td>
+                  <td><span class="tag tag-p1">P1</span></td>
+                  <td><span class="tag tag-existing">已有</span></td>
+                </tr>
+                <tr>
+                  <td><strong>官方 Skills 管理</strong></td>
+                  <td>管理员可在后台上架/下架官方 Skills，设置 Skill 的可见性和推荐排序</td>
+                  <td><span class="tag tag-p1">P1</span></td>
+                  <td><span class="tag tag-new">新增</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== 五、详细方案 ===== -->
+      <section id="ch5" class="section">
+        <h2 class="section-title">五、详细方案设计</h2>
+        <div class="card text-center py-12">
+          <div class="pending-badge mx-auto">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            待原型确认后补充 — 将包含每个功能模块的交互流程图 + 规则描述 + 专注模式沙盒切片
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== 六、业务流程图 ===== -->
+      <section id="ch6" class="section">
+        <h2 class="section-title">六、业务流程图</h2>
+        <div class="card text-center py-12">
+          <div class="pending-badge mx-auto">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            待原型跑通后产出 Mermaid 流程图（核心操作主线 + 异常分支）
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== 七、异常与边界 ===== -->
+      <section id="ch7" class="section">
+        <h2 class="section-title">七、异常与边界处理</h2>
+        <div class="card" style="padding:0; overflow:hidden;">
+          <table class="feature-table">
+            <thead><tr><th style="width:25%;">异常场景</th><th>系统处理 / 提示文案</th></tr></thead>
+            <tbody>
+              <tr><td><strong>网络断开</strong></td><td>"网络连接已断开，您的消息已保存为草稿，恢复网络后可继续发送。"</td></tr>
+              <tr><td><strong>API Key 失效</strong></td><td>"当前模型的 API 配置已过期，请联系管理员更新或切换其他模型。"</td></tr>
+              <tr><td><strong>积分不足</strong></td><td>"积分余额不足，无法完成本次对话。" + [查看余额] + [联系管理员] 按钮</td></tr>
+              <tr><td><strong>模型响应超时</strong></td><td>30s 无响应时显示"模型响应较慢，请稍候…" + [重试] + [切换模型] 按钮</td></tr>
+              <tr><td><strong>Skill 执行失败</strong></td><td>在消息流中标记 Skill 名称 + 失败原因（如"Web Access 失败：目标网站不可访问"），并提供 [重试] 按钮</td></tr>
+              <tr><td><strong>跨应用数据授权被拒</strong></td><td>AI 回复"我需要访问你的 [Calendar] 数据来回答这个问题，但尚未获得授权。" + [去授权] 按钮</td></tr>
+              <tr><td><strong>会话数据为空</strong></td><td>首屏居中展示欢迎语 + 3 个快捷 Prompt 建议卡片（如"帮我写一封邮件""总结这篇文章""今天有什么安排"）</td></tr>
+              <tr><td><strong>文件上传失败</strong></td><td>"文件上传失败（超过 2MB / 格式不支持），请检查文件大小和格式后重试。"</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-xs mt-3" style="color:var(--text3);">更多异常场景将在原型审查阶段补充。</p>
+      </section>
+
+      <!-- ===== 八、数据埋点 ===== -->
+      <section id="ch8" class="section">
+        <h2 class="section-title">八、数据追踪与埋点（可选）</h2>
+        <div class="card" style="padding:0; overflow:hidden;">
+          <table class="feature-table">
+            <thead><tr><th>埋点位置</th><th>触发时机</th><th>追踪指标</th><th>目的</th></tr></thead>
+            <tbody>
+              <tr><td>模型切换</td><td>用户切换 AI 模型</td><td>切换频次、偏好模型分布</td><td>优化默认模型推荐</td></tr>
+              <tr><td>Skill 安装</td><td>用户在 Skills 市场安装 Skill</td><td>各 Skill 安装率、启用率</td><td>评估 Skill 价值和排序</td></tr>
+              <tr><td>Skill 调用</td><td>对话中 Agent 调用 Skill</td><td>调用频次、成功率、耗时</td><td>优化 Skill 可靠性</td></tr>
+              <tr><td>跨应用访问</td><td>Agent 调用跨应用数据</td><td>访问的 App 分布、授权通过率</td><td>评估跨应用价值</td></tr>
+              <tr><td>新用户引导</td><td>引导步骤完成/跳过</td><td>每步完成率、跳过率</td><td>优化 onboarding 流程</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ===== 九、未来规划 ===== -->
+      <section id="ch9" class="section">
+        <h2 class="section-title">九、未来演进规划 (Roadmap)</h2>
+        <div class="card space-y-4" style="font-size:14px; color:var(--text2);">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="tag" style="color:var(--accent); background:var(--accent-bg);">v1.0 当前</span>
+              <strong style="color:var(--text);">MVP — 智能对话 + Skills 市场 + 跨应用数据基础</strong>
+            </div>
+            <p>稳定多模型对话 → 完善 Skills 市场和作用域控制 → 建立用户级数据分区和跨应用 Skill 调用框架 → 首批跨应用 Skill（Calendar）。</p>
+          </div>
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="tag" style="color:var(--tag-p1); background:var(--tag-p1-bg);">v1.5</span>
+              <strong style="color:var(--text);">深度 Agent — CLI 接入 + 统一画像</strong>
+            </div>
+            <p>接入本地/云端 CLI，让 Agent 能执行系统命令 → 后端微型 Agent 自动构建和维护用户统一画像 → 更多跨应用 Skills（Desktop 文件管理、笔记搜索）。</p>
+          </div>
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="tag" style="color:var(--tag-p2); background:var(--tag-p2-bg);">v2.0</span>
+              <strong style="color:var(--text);">开放平台 — 第三方 Skills 生态</strong>
+            </div>
+            <p>开放非官方 Skill 分发渠道 → Skill 开发者工具和文档 → Skills 审核与评分体系 → 多租户企业版。</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== 十、附件 ===== -->
+      <section id="ch10" class="section">
+        <h2 class="section-title">十、附件</h2>
+        <div class="card space-y-2" style="font-size:14px; color:var(--text2);">
+          <p>待补充：</p>
+          <ul class="list-disc ml-5 space-y-1">
+            <li>SKILL.md 标准格式规范（基于现有 v0.4.4 实现）</li>
+            <li>跨应用数据中枢 API 接口定义</li>
+            <li>用户数据分区存储方案技术设计文档</li>
+            <li>积分计费规则参考表</li>
+          </ul>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <script>
+    function toggleTheme() {
+      const html = document.documentElement;
+      const next = html.dataset.theme === 'dark' ? 'light' : 'dark';
+      html.dataset.theme = next;
+      localStorage.setItem('prd-theme', next);
+    }
+
+    function switchVersion(file) {
+      window.location.href = file;
+    }
+
+    (function init() {
+      const saved = localStorage.getItem('prd-theme');
+      if (saved === 'dark') document.documentElement.dataset.theme = 'dark';
+
+      const observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const id = entry.target.id;
+            document.querySelectorAll('.toc-link').forEach(a => {
+              a.classList.toggle('active', a.dataset.section === id);
+            });
+          }
+        });
+      }, { rootMargin: '-80px 0px -70% 0px' });
+
+      document.querySelectorAll('section[id]').forEach(s => observer.observe(s));
+    })();
+  </script>
+
+</body>
+</html>

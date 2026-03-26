@@ -1,6 +1,7 @@
 
-import { Attachment } from "../types";
+import { Attachment, ToolDefinition, ToolCall } from "../types";
 import { estimateMessageTokens, estimateTokens } from "./tokenUtils.js";
+import { buildOpenAIToolConfig, accumulateOpenAIToolCallChunks } from "./toolCallNormalizer";
 
 interface ExternalApiConfig {
   apiKey: string;
@@ -85,8 +86,9 @@ export const generateExternalResponseStream = async (
   attachments: Attachment[] = [],
   onChunk: (chunk: string, reasoning?: string) => void = () => {},
   enableThinking: boolean = false,
-  signal?: AbortSignal
-): Promise<{ content: string; reasoning?: string; usage?: { prompt_tokens: number; completion_tokens: number } }> => {
+  signal?: AbortSignal,
+  tools?: ToolDefinition[]
+): Promise<{ content: string; reasoning?: string; usage?: { prompt_tokens: number; completion_tokens: number }; toolCalls?: ToolCall[] }> => {
   console.log('[generateExternalResponseStream] Starting request for model:', modelId);
   // Modify the last user message if thinking is enabled
   let finalMessages = [...messages];
@@ -104,6 +106,16 @@ export const generateExternalResponseStream = async (
   const { primaryUrl, fallbackUrl, finalMessages: processedMessages } = prepareRequest(config, modelId, finalMessages, defaultBaseUrl, attachments);
 
   const performStreamRequest = async (url: string) => {
+    const body: Record<string, unknown> = {
+      model: modelId,
+      messages: processedMessages,
+      temperature: 0.7,
+      stream: true,
+    };
+    if (tools && tools.length > 0) {
+      body.tools = buildOpenAIToolConfig(tools);
+      body.tool_choice = 'auto';
+    }
     return fetch(url, {
       method: 'POST',
       credentials: 'omit',
@@ -112,12 +124,7 @@ export const generateExternalResponseStream = async (
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${config.apiKey}`
       },
-      body: JSON.stringify({
-        model: modelId,
-        messages: processedMessages,
-        temperature: 0.7,
-        stream: true
-      }),
+      body: JSON.stringify(body),
       signal
     });
   };
@@ -158,6 +165,8 @@ export const generateExternalResponseStream = async (
   let fullReasoning = '';
   let buffer = '';
   let usage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | undefined;
+  // Accumulate tool call fragments across SSE chunks
+  const toolCallChunks: Array<{ index: number; id?: string; type?: string; function?: { name?: string; arguments?: string } }> = [];
 
   while (true) {
     // Check if request was aborted
@@ -181,12 +190,19 @@ export const generateExternalResponseStream = async (
       try {
         const json = JSON.parse(trimmed.slice(6));
         const delta = json.choices?.[0]?.delta;
-        
+
         // Extract usage information if available (usually in the last chunk)
         if (json.usage) {
           usage = json.usage;
         }
-        
+
+        // Accumulate tool call fragments
+        if (delta?.tool_calls) {
+          for (const tc of delta.tool_calls) {
+            toolCallChunks.push(tc);
+          }
+        }
+
         if (delta?.content) {
           fullContent += delta.content;
           // Check for <think> tags in progress
@@ -243,10 +259,16 @@ export const generateExternalResponseStream = async (
     completion_tokens: estimateTokens(fullContent)
   };
 
-  return { 
-    content: fullContent, 
+  // Resolve tool calls from accumulated fragments
+  const toolCalls = toolCallChunks.length > 0
+    ? accumulateOpenAIToolCallChunks(toolCallChunks)
+    : undefined;
+
+  return {
+    content: fullContent,
     reasoning: fullReasoning || undefined,
-    usage: finalUsage
+    usage: finalUsage,
+    toolCalls,
   };
 };
 
