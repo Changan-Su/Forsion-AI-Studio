@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, User, Monitor, Code, ToggleLeft, ToggleRight, Plus, Trash2, Box } from 'lucide-react';
-import { AppSettings, UserRole, AIModel } from '../types';
+import { X, Save, User, Monitor, Code, ToggleLeft, ToggleRight, Plus, Trash2, Box, Puzzle, Bot, RefreshCw, Globe, Code2, Zap, Wrench, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { AppSettings, UserRole, AIModel, AgentDefaults, McpServerConfig, SkillDefinition, CustomSkillDefinition } from '../types';
 import { BUILTIN_MODELS, DEFAULT_MODEL_ID } from '../constants';
 import { changePassword } from '../services/authService';
 import { backendService } from '../services/backendService';
+import { getAllBuiltinSkills } from '../services/skillsRegistry';
+import SkillsMarket from './SkillsMarket';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -11,15 +13,18 @@ interface SettingsModalProps {
   user: import('../types').User; // User object with nickname and avatar
   currentTheme: 'light' | 'dark';
   onThemeChange: (theme: 'light' | 'dark') => void;
-  currentPreset: 'default' | 'notion' | 'monet';
-  onPresetChange: (preset: 'default' | 'notion' | 'monet') => void;
+  currentPreset: string;
+  onPresetChange: (preset: string) => void;
+  currentSessionId?: string;
   onModelsChange: () => void; // Callback to refresh app models
   onUpdateSettings: (settings: Partial<import('../types').AppSettings>) => Promise<void>; // Update settings function
   isOffline: boolean;
   onReconnect: () => Promise<boolean>;
 }
 
-type TabType = 'general' | 'account' | 'developer';
+type TabType = 'general' | 'agent' | 'skills' | 'account' | 'developer';
+
+const SKILL_ICONS: Record<string, React.ElementType> = { Globe, Code2, Zap, Wrench };
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ 
   onClose, 
@@ -32,7 +37,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   onModelsChange,
   onUpdateSettings,
   isOffline,
-  onReconnect
+  onReconnect,
+  currentSessionId
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('general');
   const [configs, setConfigs] = useState<AppSettings['externalApiConfigs']>({});
@@ -57,6 +63,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [passwordMsg, setPasswordMsg] = useState({ text: '', type: '' });
   const [reconnectStatus, setReconnectStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
+  // Agent Defaults State
+  const [agentSystemPrompt, setAgentSystemPrompt] = useState('');
+  const [agentMaxIterations, setAgentMaxIterations] = useState(10);
+  const [agentEnabledSkillIds, setAgentEnabledSkillIds] = useState<string[]>([]);
+  const [agentMcpServers, setAgentMcpServers] = useState<McpServerConfig[]>([]);
+  const [newMcpName, setNewMcpName] = useState('');
+  const [newMcpUrl, setNewMcpUrl] = useState('');
+  const [agentChanged, setAgentChanged] = useState(false);
+  const builtinSkills = getAllBuiltinSkills();
+
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
@@ -66,6 +82,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         setConfigs(settings.externalApiConfigs || {});
         setCustomModels(loadedCustomModels);
         setDeveloperMode(settings.developerMode || false);
+        // Load agent defaults
+        const ad = settings.agentDefaults;
+        if (ad) {
+          setAgentSystemPrompt(ad.systemPrompt || '');
+          setAgentMaxIterations(ad.maxIterations || 10);
+          setAgentEnabledSkillIds(ad.enabledSkillIds || []);
+          setAgentMcpServers((ad.mcpServers || []).map((s: any) => ({ ...s, status: 'disconnected' as const })));
+        }
+        setAgentChanged(false);
         // Load nickname and avatar from user prop or settings
         setNickname(user.nickname || settings.nickname || '');
         setAvatarData(user.avatar || settings.avatar || null);
@@ -311,6 +336,28 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               General
             </button>
             <button
+              onClick={() => setActiveTab('skills')}
+              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === 'skills' 
+                  ? isMonet ? 'bg-white/20 text-white shadow-sm' : 'bg-forsion-100 text-forsion-700 dark:bg-forsion-900/20 dark:text-forsion-400' 
+                  : 'text-gray-600 dark:text-dark-muted hover:bg-gray-100 dark:hover:bg-zinc-800'
+              }`}
+            >
+              <Puzzle size={18} />
+              Skills
+            </button>
+            <button
+              onClick={() => setActiveTab('agent')}
+              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === 'agent' 
+                  ? isMonet ? 'bg-white/20 text-white shadow-sm' : 'bg-forsion-100 text-forsion-700 dark:bg-forsion-900/20 dark:text-forsion-400' 
+                  : 'text-gray-600 dark:text-dark-muted hover:bg-gray-100 dark:hover:bg-zinc-800'
+              }`}
+            >
+              <Bot size={18} />
+              Agent
+            </button>
+            <button
               onClick={() => setActiveTab('account')}
               className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 activeTab === 'account' 
@@ -495,7 +542,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 {/* Theme Preset */}
                 <div>
                   <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Theme Style</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <button
                       onClick={() => onPresetChange('default')}
                       className={`p-4 border rounded-xl text-left transition-all ${
@@ -505,7 +552,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       }`}
                     >
                       <div className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-forsion-600 to-indigo-600 mb-1">Cyber Tech</div>
-                      <div className="text-xs text-gray-500 dark:text-dark-muted">Vibrant gradients, modern sans-serif.</div>
+                      <div className="text-xs text-gray-500 dark:text-dark-muted">Vibrant gradients, modern feel.</div>
                     </button>
 
                     <button
@@ -517,7 +564,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       }`}
                     >
                       <div className="font-bold font-serif text-gray-900 dark:text-white mb-1">Notion Style</div>
-                      <div className="text-xs text-gray-500 dark:text-dark-muted">Minimalist, monochrome, serif fonts.</div>
+                      <div className="text-xs text-gray-500 dark:text-dark-muted">Minimalist, monochrome, serif.</div>
                     </button>
 
                     <button
@@ -528,11 +575,253 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                           : 'border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-zinc-800'
                       }`}
                     >
-                      <div className="font-bold font-cursive text-purple-700 dark:text-purple-300 mb-1 text-lg">Monet Cliffs</div>
-                      <div className="text-xs text-gray-500 dark:text-dark-muted">Impressionist colors, glassmorphism, soft gradients.</div>
+                      <div className="font-bold font-cursive text-purple-700 dark:text-purple-300 mb-1 text-lg">Monet 2.0</div>
+                      <div className="text-xs text-gray-500 dark:text-dark-muted">Watercolor, glassmorphism.</div>
+                    </button>
+
+                    <button
+                      onClick={() => onPresetChange('apple')}
+                      className={`p-4 border rounded-xl text-left transition-all ${
+                        currentPreset === 'apple'
+                          ? 'border-blue-400 bg-gray-50 dark:bg-zinc-800 ring-2 ring-blue-400/20'
+                          : 'border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-zinc-800'
+                      }`}
+                    >
+                      <div className="font-bold text-gray-800 dark:text-white mb-1" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>Apple Glass</div>
+                      <div className="text-xs text-gray-500 dark:text-dark-muted">Frosted glass, colorful icons.</div>
+                    </button>
+
+                    <button
+                      onClick={() => onPresetChange('forsion1')}
+                      className={`p-4 border rounded-xl text-left transition-all ${
+                        currentPreset === 'forsion1'
+                          ? 'border-amber-400 ring-2 ring-amber-400/20'
+                          : 'border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-zinc-800'
+                      }`}
+                      style={currentPreset === 'forsion1' ? { background: '#f5f0ea' } : undefined}
+                    >
+                      <div className="font-bold mb-1" style={{ color: '#8e8578' }}>Forsion Theme 1</div>
+                      <div className="text-xs text-gray-500 dark:text-dark-muted">Morandi colors, warm glass.</div>
                     </button>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* --- SKILLS TAB --- */}
+            {activeTab === 'skills' && (
+              <SkillsMarket
+                themePreset={currentPreset}
+                sessionId={currentSessionId || ''}
+              />
+            )}
+
+            {/* --- AGENT TAB --- */}
+            {activeTab === 'agent' && (
+              <div className="space-y-8">
+                <div>
+                  <h3 className={`text-lg font-medium mb-2 flex items-center gap-2 ${isMonet ? 'text-[#4A4B6A]' : 'text-gray-900 dark:text-white'}`}>
+                    <Bot size={20} className={isMonet ? 'text-[#4A4B6A]' : 'text-gray-500'} />
+                    Agent Global Defaults
+                  </h3>
+                  <p className={`text-sm mb-6 ${isMonet ? 'text-[#4A4B6A]/70' : 'text-gray-500 dark:text-dark-muted'}`}>
+                    These defaults are applied to all new sessions. Each session can override them individually.
+                  </p>
+                </div>
+
+                {/* Default System Prompt */}
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${isMonet ? 'text-[#4A4B6A]' : 'text-gray-700 dark:text-gray-300'}`}>
+                    Default System Prompt
+                  </label>
+                  <textarea
+                    value={agentSystemPrompt}
+                    onChange={(e) => { setAgentSystemPrompt(e.target.value); setAgentChanged(true); }}
+                    placeholder="Default instructions for the agent across all sessions…"
+                    rows={3}
+                    className={`w-full px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-forsion-500 resize-none ${
+                      isMonet
+                        ? 'bg-white/30 border border-white/30 text-[#4A4B6A] placeholder-[#4A4B6A]/50'
+                        : 'bg-gray-50 dark:bg-zinc-900 border border-gray-300 dark:border-dark-border text-gray-900 dark:text-white'
+                    }`}
+                  />
+                </div>
+
+                {/* Default Max Iterations */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className={`text-sm font-medium ${isMonet ? 'text-[#4A4B6A]' : 'text-gray-700 dark:text-gray-300'}`}>
+                      Default Max Iterations
+                    </label>
+                    <span className="text-sm font-mono font-medium text-gray-900 dark:text-white">{agentMaxIterations}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={20}
+                    value={agentMaxIterations}
+                    onChange={(e) => { setAgentMaxIterations(parseInt(e.target.value)); setAgentChanged(true); }}
+                    className="w-full accent-forsion-500"
+                  />
+                  <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                    <span>1</span>
+                    <span>20</span>
+                  </div>
+                </div>
+
+                {/* Default Skills */}
+                <div>
+                  <label className={`block text-sm font-medium mb-3 ${isMonet ? 'text-[#4A4B6A]' : 'text-gray-700 dark:text-gray-300'}`}>
+                    Default Skills
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {builtinSkills.map((skill) => {
+                      const enabled = agentEnabledSkillIds.includes(skill.id);
+                      const Icon = SKILL_ICONS[skill.icon] ?? Wrench;
+                      return (
+                        <button
+                          key={skill.id}
+                          onClick={() => {
+                            setAgentEnabledSkillIds(prev =>
+                              prev.includes(skill.id) ? prev.filter(id => id !== skill.id) : [...prev, skill.id]
+                            );
+                            setAgentChanged(true);
+                          }}
+                          className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border text-xs transition-all ${
+                            enabled
+                              ? isMonet
+                                ? 'border-[#4A4B6A] bg-[#4A4B6A]/10 text-[#4A4B6A]'
+                                : 'border-forsion-500 bg-forsion-50 dark:bg-forsion-900/20 text-forsion-700 dark:text-forsion-400'
+                              : 'border-gray-200 dark:border-dark-border opacity-60 hover:opacity-100'
+                          }`}
+                        >
+                          <Icon size={16} />
+                          <span className="font-medium">{skill.name}</span>
+                          <span className="opacity-60 text-[10px] text-center leading-tight">{skill.description}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Default MCP Servers */}
+                <div>
+                  <label className={`block text-sm font-medium mb-3 ${isMonet ? 'text-[#4A4B6A]' : 'text-gray-700 dark:text-gray-300'}`}>
+                    Default MCP Servers
+                  </label>
+                  <div className="space-y-2 mb-3">
+                    {agentMcpServers.map((server) => (
+                      <div
+                        key={server.id}
+                        className={`flex items-center justify-between p-3 rounded-lg border text-sm ${
+                          isMonet ? 'border-white/30 bg-white/20' : 'border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-zinc-900'
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-gray-900 dark:text-white">{server.name}</div>
+                          <div className="text-xs text-gray-500 dark:text-dark-muted truncate">{server.url}</div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setAgentMcpServers(prev => prev.filter(s => s.id !== server.id));
+                            setAgentChanged(true);
+                          }}
+                          className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-md transition-colors ml-2"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      value={newMcpName}
+                      onChange={(e) => setNewMcpName(e.target.value)}
+                      placeholder="Server name"
+                      className={`flex-shrink-0 w-32 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-forsion-500 ${
+                        isMonet
+                          ? 'bg-white/30 border border-white/30 text-[#4A4B6A]'
+                          : 'bg-gray-50 dark:bg-zinc-900 border border-gray-300 dark:border-dark-border text-gray-900 dark:text-white'
+                      }`}
+                    />
+                    <input
+                      value={newMcpUrl}
+                      onChange={(e) => setNewMcpUrl(e.target.value)}
+                      placeholder="https://… (SSE endpoint)"
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-forsion-500 ${
+                        isMonet
+                          ? 'bg-white/30 border border-white/30 text-[#4A4B6A]'
+                          : 'bg-gray-50 dark:bg-zinc-900 border border-gray-300 dark:border-dark-border text-gray-900 dark:text-white'
+                      }`}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newMcpName.trim() && newMcpUrl.trim()) {
+                          setAgentMcpServers(prev => [...prev, {
+                            id: `mcp_${Date.now()}`, name: newMcpName.trim(), url: newMcpUrl.trim(),
+                            enabled: true, status: 'disconnected' as const,
+                          }]);
+                          setNewMcpName(''); setNewMcpUrl(''); setAgentChanged(true);
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        if (!newMcpName.trim() || !newMcpUrl.trim()) return;
+                        setAgentMcpServers(prev => [...prev, {
+                          id: `mcp_${Date.now()}`, name: newMcpName.trim(), url: newMcpUrl.trim(),
+                          enabled: true, status: 'disconnected' as const,
+                        }]);
+                        setNewMcpName(''); setNewMcpUrl(''); setAgentChanged(true);
+                      }}
+                      disabled={!newMcpName.trim() || !newMcpUrl.trim()}
+                      className={`px-3 py-2 rounded-lg transition-colors disabled:opacity-30 ${
+                        isMonet
+                          ? 'bg-[#4A4B6A] hover:bg-[#3E406F] text-white'
+                          : 'bg-forsion-600 hover:bg-forsion-500 text-white'
+                      }`}
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Save Agent Defaults */}
+                {agentChanged && (
+                  <div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const agentDefaults: AgentDefaults = {
+                            systemPrompt: agentSystemPrompt,
+                            maxIterations: agentMaxIterations,
+                            enabledSkillIds: agentEnabledSkillIds,
+                            mcpServers: agentMcpServers.map(s => ({
+                              ...s,
+                              status: 'disconnected' as const,
+                              discoveredTools: undefined,
+                              lastConnectedAt: undefined,
+                              errorMessage: undefined,
+                            })),
+                          };
+                          await onUpdateSettings({ agentDefaults });
+                          setAgentChanged(false);
+                          alert('Agent defaults saved successfully!');
+                          onModelsChange();
+                        } catch (error) {
+                          console.error('Failed to save agent defaults:', error);
+                          alert('Failed to save agent defaults. Please try again.');
+                        }
+                      }}
+                      className={`px-6 py-2.5 rounded-lg font-medium transition-all hover:shadow-lg ${
+                        isMonet
+                          ? 'bg-[#4A4B6A] hover:bg-[#3E406F] text-white'
+                          : 'bg-forsion-600 hover:bg-forsion-500 text-white'
+                      }`}
+                    >
+                      <Save size={16} className="inline mr-2" />
+                      Save Agent Defaults
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

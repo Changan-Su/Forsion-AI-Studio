@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { User, ChatSession, Message, AIModel, AppSettings, UserRole, Attachment, AgentConfig, AgentStatusEvent } from './types';
+import { User, ChatSession, Message, AIModel, AppSettings, UserRole, Attachment, AgentConfig, AgentDefaults, AgentStatusEvent } from './types';
 import { backendService, API_ROOT } from './services/backendService'; // New backend
 import { generateGeminiResponse, generateGeminiResponseStream } from './services/geminiService';
 import { generateExternalResponse, generateExternalResponseStream } from './services/externalApiService';
@@ -17,6 +17,7 @@ import AgentStatusBar from './components/AgentStatusBar';
 import WorkspacePanel from './components/WorkspacePanel';
 import { runAgentLoop } from './services/agentRuntime';
 import { workspaceService } from './services/workspaceService';
+import { chatSyncService } from './services/chatSyncService';
 
 const App: React.FC = () => {
   // Auth State
@@ -49,7 +50,7 @@ const App: React.FC = () => {
 
   // Theme & Settings
   const [theme, setTheme] = useState<'light' | 'dark'>('dark'); // Default to Dark
-  const [themePreset, setThemePreset] = useState<'default' | 'notion' | 'monet'>('default');
+  const [themePreset, setThemePreset] = useState<'default' | 'notion' | 'monet' | 'apple' | 'forsion1'>('default');
   const [customModels, setCustomModels] = useState<AIModel[]>([]);
   const [globalModels, setGlobalModels] = useState<AIModel[]>([]); // Models from backend admin
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
@@ -66,7 +67,9 @@ const App: React.FC = () => {
   const [cursorPosition, setCursorPosition] = useState(0);
 
   // Media Upload State
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [fileSizeError, setFileSizeError] = useState<{ name: string; size: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Drag and Drop State for Input Area
@@ -233,23 +236,37 @@ const App: React.FC = () => {
         }
       }
       
+      const defaultAgentConfig: AgentConfig = {
+        systemPrompt: '',
+        enabledSkillIds: [],
+        mcpServers: [],
+        maxIterations: 10,
+      };
+      const normalizeSessions = (list: ChatSession[]) => list.map(s => ({
+        ...s,
+        agentConfig: s.agentConfig ? {
+          ...s.agentConfig,
+          mcpServers: (s.agentConfig.mcpServers || []).map(srv => ({ ...srv, status: 'disconnected' as const })),
+        } : defaultAgentConfig,
+      }));
+
+      let localSessions: ChatSession[] = [];
       const storedSessions = localStorage.getItem(STORAGE_KEYS.SESSIONS);
       if (storedSessions) {
-        const parsed: ChatSession[] = JSON.parse(storedSessions);
-        // Reset MCP server connection status on load (connections don't survive reloads)
-        const normalized = parsed.map(s => ({
-          ...s,
-          agentConfig: s.agentConfig ? {
-            ...s.agentConfig,
-            mcpServers: s.agentConfig.mcpServers.map(srv => ({ ...srv, status: 'disconnected' as const })),
-          } : undefined,
-        }));
-        setSessions(normalized);
+        localSessions = normalizeSessions(JSON.parse(storedSessions));
+      }
 
-        const storedSessionId = localStorage.getItem(STORAGE_KEYS.CURRENT_SESSION_ID);
-        if (storedSessionId && normalized.find(s => s.id === storedSessionId)) {
-          setCurrentSessionId(storedSessionId);
-        }
+      const remoteSessions = await chatSyncService.fetchSessionList();
+      const merged = chatSyncService.mergeSessionLists(localSessions, normalizeSessions(remoteSessions));
+      setSessions(merged);
+
+      if (localSessions.length > 0 && remoteSessions.length === 0) {
+        chatSyncService.bulkUpload(localSessions).catch(() => {});
+      }
+
+      const storedSessionId = localStorage.getItem(STORAGE_KEYS.CURRENT_SESSION_ID);
+      if (storedSessionId && merged.find(s => s.id === storedSessionId)) {
+        setCurrentSessionId(storedSessionId);
       }
 
       await syncSettingsFromBackend();
@@ -287,11 +304,14 @@ const App: React.FC = () => {
     }
 
     // Update body class for seamless backgrounds (dragging areas etc)
-    const bodyClass = themePreset === 'monet'
-      ? 'bg-desktop-surface'
-      : theme === 'dark' 
-        ? (themePreset === 'notion' ? 'bg-notion-darkbg' : 'bg-dark-bg')
-        : (themePreset === 'notion' ? 'bg-notion-bg' : 'bg-white');
+    const bodyClassMap: Record<string, string> = {
+      monet: 'bg-desktop-surface',
+      apple: theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100',
+      forsion1: theme === 'dark' ? 'bg-zinc-900' : 'bg-[#edeae5]',
+      notion: theme === 'dark' ? 'bg-notion-darkbg' : 'bg-notion-bg',
+      default: theme === 'dark' ? 'bg-dark-bg' : 'bg-white',
+    };
+    const bodyClass = bodyClassMap[themePreset] || bodyClassMap.default;
       
     document.body.className = `${bodyClass} transition-colors duration-300`;
 
@@ -303,13 +323,45 @@ const App: React.FC = () => {
   useEffect(() => {
     if (sessions.length === 0 && !sessionsInitialized.current) return;
     sessionsInitialized.current = true;
-    localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessions));
+
+    // Strip large base64 data from attachments to avoid localStorage quota (~5MB).
+    // Images have already been sent to the model; only metadata is needed for history display.
+    const sanitized = sessions.map(s => ({
+      ...s,
+      messages: s.messages.map(m => ({
+        ...m,
+        attachments: m.attachments?.map(a => ({
+          ...a,
+          url: a.url && a.url.startsWith('data:') ? '' : a.url,
+          extractedText: a.extractedText && a.extractedText.length > 10000
+            ? a.extractedText.substring(0, 10000) + '\n...(truncated)'
+            : a.extractedText,
+        })),
+      })),
+    }));
+
+    try {
+      localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sanitized));
+    } catch (e) {
+      console.warn('Failed to save sessions to localStorage:', e);
+    }
   }, [sessions]);
 
-  // Persist current session ID so it can be restored on page refresh
+  // Persist current session ID and lazy-load messages from server if needed
   useEffect(() => {
     if (currentSessionId) {
       localStorage.setItem(STORAGE_KEYS.CURRENT_SESSION_ID, currentSessionId);
+
+      const session = sessions.find(s => s.id === currentSessionId);
+      if (session && session.messages.length === 0) {
+        chatSyncService.fetchSessionMessages(currentSessionId).then(messages => {
+          if (messages.length > 0) {
+            setSessions(prev => prev.map(s =>
+              s.id === currentSessionId ? { ...s, messages } : s
+            ));
+          }
+        }).catch(() => {});
+      }
     }
   }, [currentSessionId]);
 
@@ -403,17 +455,24 @@ const App: React.FC = () => {
 
   // Chat Handlers
   const createNewSession = useCallback(() => {
+    const defaults = appSettings?.agentDefaults;
     const newSession: ChatSession = {
       id: Date.now().toString(),
       title: 'New Chat',
       modelId: selectedModelId,
       messages: [],
       updatedAt: Date.now(),
+      agentConfig: {
+        systemPrompt: defaults?.systemPrompt ?? '',
+        enabledSkillIds: [...(defaults?.enabledSkillIds ?? [])],
+        mcpServers: (defaults?.mcpServers ?? []).map(s => ({ ...s, status: 'disconnected' as const })),
+        maxIterations: defaults?.maxIterations ?? 10,
+      },
     };
     setSessions((prev) => [newSession, ...prev]);
     setCurrentSessionId(newSession.id);
     return newSession.id;
-  }, [selectedModelId]);
+  }, [selectedModelId, appSettings]);
 
   // File Handler with support for documents
   // Helper to check if provider supports native document upload (PDF/Word)
@@ -441,136 +500,88 @@ const App: React.FC = () => {
   };
 
   const processFile = async (file: File) => {
-    const reader = new FileReader();
-    
-    // Determine file type
+    if (file.size > MAX_FILE_SIZE) {
+      setFileSizeError({
+        name: file.name,
+        size: (file.size / (1024 * 1024)).toFixed(1),
+      });
+      return;
+    }
+
+    // Ensure a session exists so we can write to workspace
+    let sessionId = currentSessionId;
+    if (!sessionId) {
+      sessionId = createNewSession();
+    }
+
+    const wsPath = `uploads/${Date.now()}-${file.name}`;
     const isImage = file.type.startsWith('image/');
     const isPdf = file.type === 'application/pdf';
     const isWord = file.type === 'application/msword' || 
                    file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
     const isText = file.type === 'text/plain' || file.type === 'text/markdown';
-    
-    // Check if model supports this file type for native upload
-    const supportsNativeUpload = modelSupportsFileType(file.type);
+
+    // Save file to workspace (IndexedDB)
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      await workspaceService.writeFile(sessionId, wsPath, arrayBuffer, file.type);
+    } catch (error) {
+      console.warn('[processFile] Failed to write to workspace:', error);
+    }
+
+    // Read data URL for in-memory use (display + API calls)
+    const readAsDataUrl = (): Promise<string> => new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = (e) => resolve(e.target!.result as string);
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
     
     if (isImage) {
-      // Handle image files - always send as base64 for models that support it
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setAttachments(prev => [...prev, {
-            type: 'image',
-            url: event.target!.result as string,
-            mimeType: file.type,
-            name: file.name
-          }]);
-        }
-      };
-      reader.readAsDataURL(file);
+      const dataUrl = await readAsDataUrl();
+      setAttachments(prev => [...prev, {
+        type: 'image', url: dataUrl, workspacePath: wsPath, mimeType: file.type, name: file.name,
+      }]);
     } else if (isText) {
-      // Handle text files - read as text
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          const textContent = event.target.result as string;
-          setAttachments(prev => [...prev, {
-            type: 'document',
-            url: '', // No preview URL for text
-            mimeType: file.type,
-            name: file.name,
-            extractedText: textContent
-          }]);
-        }
-      };
-      reader.readAsText(file);
+      const textContent = await file.text();
+      setAttachments(prev => [...prev, {
+        type: 'document', url: '', workspacePath: wsPath, mimeType: file.type, name: file.name,
+        extractedText: textContent,
+      }]);
     } else if (isPdf || isWord) {
-      // Handle PDF and Word files
-      // Strategy: Check provider to determine if native document upload is supported
-      // - gemini provider: natively supports PDF/Word, use native upload
-      // - Other providers (openai, anthropic, etc.): don't support documents natively, extract text
       const model = allModels.find(m => m.id === selectedModelId);
       const provider = model?.provider || 'external';
       const providerSupportsDocUpload = providerSupportsDocuments(provider);
       const modelSupportsFileUpload = model?.supportsFileUpload ?? false;
-      
-      // Use native upload only if:
-      // 1. Provider supports documents (e.g., gemini), OR
-      // 2. Model explicitly supports this file type via supportedFileTypes
       const shouldUseNativeUpload = providerSupportsDocUpload || (modelSupportsFileUpload && modelSupportsFileType(file.type));
       
-      console.log('[processFile] PDF/Word file upload decision:', {
-        fileType: file.type,
-        fileName: file.name,
-        modelId: model?.id,
-        provider,
-        providerSupportsDocUpload,
-        modelSupportsFileUpload,
-        shouldUseNativeUpload
-      });
-      
       if (shouldUseNativeUpload) {
-        // Model/backend supports native file upload - always use native upload for PDF/Word
-        // Don't extract text, let the backend/model handle the file directly
-        // Backend will convert format based on provider (Gemini format for gemini, OpenAI format for others)
-        reader.onload = (event) => {
-          if (event.target?.result) {
-            setAttachments(prev => [...prev, {
-              type: 'document',
-              url: event.target!.result as string,
-              mimeType: file.type,
-              name: file.name
-              // No extractedText - let backend/model handle it natively
-            }]);
-          }
-        };
-        reader.readAsDataURL(file);
+        const dataUrl = await readAsDataUrl();
+        setAttachments(prev => [...prev, {
+          type: 'document', url: dataUrl, workspacePath: wsPath, mimeType: file.type, name: file.name,
+        }]);
       } else {
-        // Model doesn't support native upload - extract text as fallback
+        let extractedText = '';
+        let dataUrl = '';
         try {
           const result = await backendService.parseFile(file);
-          if (result.text) {
-            setAttachments(prev => [...prev, {
-              type: 'document',
-              url: result.base64 ? `data:${file.type};base64,${result.base64}` : '',
-              mimeType: file.type,
-              name: file.name,
-              extractedText: result.text
-            }]);
-            return;
+          if (result.text) extractedText = result.text;
+          if (result.base64) dataUrl = `data:${file.type};base64,${result.base64}`;
+        } catch {
+          dataUrl = await readAsDataUrl();
+          try {
+            const result = await backendService.parseBase64(dataUrl, file.name, file.type);
+            if (result.text) extractedText = result.text;
+          } catch {
+            extractedText = isPdf
+              ? `[PDF Document: ${file.name}]\n\nNote: Text extraction requires backend support.`
+              : `[Word Document: ${file.name}]\n\nNote: Text extraction requires backend support.`;
           }
-        } catch (error) {
-          console.warn('Backend file parsing failed, using fallback', error);
         }
-        
-        // Fallback: read as base64 with hint text
-        reader.onload = async (event) => {
-          if (event.target?.result) {
-            const base64 = event.target.result as string;
-            let extractedText = '';
-            
-            // Try backend parsing with base64
-            try {
-              const result = await backendService.parseBase64(base64, file.name, file.type);
-              if (result.text) {
-                extractedText = result.text;
-              }
-            } catch {
-              // Use placeholder if backend fails
-              if (isPdf) {
-                extractedText = `[PDF Document: ${file.name}]\n\nNote: The document has been attached. Text extraction requires backend support.`;
-              } else if (isWord) {
-                extractedText = `[Word Document: ${file.name}]\n\nNote: The document has been attached. Text extraction requires backend support.`;
-              }
-            }
-            
-            setAttachments(prev => [...prev, {
-              type: 'document',
-              url: base64,
-              mimeType: file.type,
-              name: file.name,
-              extractedText: extractedText
-            }]);
-          }
-        };
-        reader.readAsDataURL(file);
+        setAttachments(prev => [...prev, {
+          type: 'document', url: dataUrl, workspacePath: wsPath, mimeType: file.type, name: file.name,
+          extractedText,
+        }]);
       }
     } else {
       alert('Unsupported file type. Please upload images, PDFs, Word documents, or text files.');
@@ -658,6 +669,37 @@ const App: React.FC = () => {
     }
   };
 
+  // Paste Handler for file attachments (images, documents)
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    const supportedTypes = [
+      'image/',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+      'text/markdown'
+    ];
+
+    const files: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.kind === 'file') {
+        const file = item.getAsFile();
+        if (file && supportedTypes.some(type => file.type.startsWith(type) || file.type === type)) {
+          files.push(file);
+        }
+      }
+    }
+
+    if (files.length > 0) {
+      e.preventDefault();
+      files.forEach(file => processFile(file));
+    }
+  };
+
   // Stop generation handler
   const handleStopGeneration = () => {
     if (abortControllerRef.current) {
@@ -684,7 +726,17 @@ const App: React.FC = () => {
     }
 
     const currentModel = allModels.find(m => m.id === selectedModelId) || allModels[0];
-    const currentAttachments = [...attachments];
+
+    // Resolve workspace paths to data URLs for API consumption
+    const currentAttachments = await Promise.all(
+      attachments.map(async (a) => {
+        if (!a.url && a.workspacePath && sessionId) {
+          const dataUrl = await workspaceService.readFileAsDataUrl(sessionId, a.workspacePath);
+          return { ...a, url: dataUrl || '' };
+        }
+        return { ...a };
+      })
+    );
     
     // 处理 /dt 命令（深度思考）
     let finalInput = input;
@@ -698,22 +750,17 @@ const App: React.FC = () => {
       shouldUseDeepThinking = true;
     }
     
-    // If there's a document attachment with extracted text (fallback for models that don't support native upload), include it in the message
-    // Note: Documents uploaded natively (without extractedText) are sent directly to the model and should not be included as text
-    let messageContent = finalInput;
+    // Build the user-visible message (clean, without extracted document text)
+    const messageContent = finalInput;
+    
+    // Build the API-facing content (includes extracted text for models that need it)
     const documentAttachments = currentAttachments.filter(a => a.type === 'document' && a.extractedText);
-    
-    console.log('[handleSendMessage] Attachment check:', {
-      allAttachments: currentAttachments.map(a => ({ type: a.type, name: a.name, hasExtractedText: !!a.extractedText, hasUrl: !!a.url })),
-      documentAttachmentsWithText: documentAttachments.map(a => a.name),
-      willAddToMessage: documentAttachments.length > 0
-    });
-    
+    let apiContent = finalInput;
     if (documentAttachments.length > 0) {
       const docsText = documentAttachments.map(a => 
         `📄 Attached Document: ${a.name}\n\n${a.extractedText}`
       ).join('\n\n---\n');
-      messageContent = `${finalInput}\n\n---\n${docsText}`;
+      apiContent = `${finalInput}\n\n---\n${docsText}`;
     }
     
     const userMessage: Message = {
@@ -884,6 +931,12 @@ const App: React.FC = () => {
       } finally {
         setIsProcessing(false);
         setStreamingMessageId(null);
+
+        setSessions(prev => {
+          const updated = prev.find(s => s.id === sessionId);
+          if (updated) chatSyncService.uploadSession(updated).catch(() => {});
+          return prev;
+        });
       }
       return;
     }
@@ -1065,6 +1118,12 @@ const App: React.FC = () => {
       } finally {
         setIsProcessing(false);
         abortControllerRef.current = null;
+
+        setSessions(prev => {
+          const updated = prev.find(s => s.id === sessionId);
+          if (updated) chatSyncService.uploadSession(updated).catch(() => {});
+          return prev;
+        });
       }
       
       return; // 图像生成请求处理完毕，不继续执行聊天逻辑
@@ -1117,12 +1176,12 @@ const App: React.FC = () => {
 
       let usage: { prompt_tokens: number; completion_tokens: number } | undefined;
 
-      // ── Agentic path (when agent mode is enabled for this session) ──
-      if (session?.agentConfig?.enabled) {
+      // ── Agentic path (agent mode is always on) ──
+      if (session?.agentConfig) {
         setAgentStatus({ type: 'iteration_start', iteration: 0 });
         const agentOutput = await runAgentLoop({
           sessionId: sessionId,
-          userMessage: userMessage.content,
+          userMessage: apiContent,
           attachments: currentAttachments,
           history: (session.messages || []).filter(m => m.id !== botMessageId),
           model: currentModel,
@@ -1158,7 +1217,7 @@ const App: React.FC = () => {
 
          const result = await generateGeminiResponseStream(
            currentModel.id,
-           userMessage.content,
+           apiContent,
            history,
            config?.apiKey,
            currentAttachments,
@@ -1193,7 +1252,7 @@ const App: React.FC = () => {
             role: m.role === 'model' ? 'assistant' : m.role === 'user' ? 'user' : 'system',
             content: m.content
         }));
-        history.push({ role: 'user', content: userMessage.content });
+        history.push({ role: 'user', content: apiContent });
 
         // Check if this is a global model (uses backend proxy) - now with streaming support
         // Note: gemini-2.5-flash-image should always use direct Gemini API, not backend proxy
@@ -1289,6 +1348,12 @@ const App: React.FC = () => {
       setIsProcessing(false);
       setStreamingMessageId(null);
       abortControllerRef.current = null;
+
+      setSessions(prev => {
+        const updated = prev.find(s => s.id === sessionId);
+        if (updated) chatSyncService.uploadSession(updated).catch(() => {});
+        return prev;
+      });
     }
   };
 
@@ -1314,8 +1379,7 @@ const App: React.FC = () => {
     const userMessage = session.messages[userMessageIndex];
     const userAttachments = userMessage.attachments || [];
     
-    // Extract the original input (without document attachment text)
-    const originalInput = userMessage.content.split('\n\n---\n📄')[0];
+    const originalInput = userMessage.content;
     
     // Remove all messages from the model response onwards
     const messagesBeforeRegenerate = session.messages.slice(0, messageIndex);
@@ -1396,12 +1460,19 @@ const App: React.FC = () => {
         }));
       };
       
-      // Build history from the messages before regeneration (excluding the user message we're regenerating from)
+      // Inject extracted text for models that don't support native document upload
+      const docAtts = attachments.filter(a => a.type === 'document' && a.extractedText);
+      let apiContentForRegen = content;
+      if (docAtts.length > 0) {
+        const docsText = docAtts.map(a => `📄 Attached Document: ${a.name}\n\n${a.extractedText}`).join('\n\n---\n');
+        apiContentForRegen = `${content}\n\n---\n${docsText}`;
+      }
+
       const historyForApi = historyMessages.slice(0, -1).map(m => ({
         role: m.role === 'model' ? 'assistant' : m.role === 'user' ? 'user' : 'system',
         content: m.content
       }));
-      historyForApi.push({ role: 'user', content });
+      historyForApi.push({ role: 'user', content: apiContentForRegen });
       
       let usage: { prompt_tokens: number; completion_tokens: number } | undefined;
 
@@ -1411,7 +1482,7 @@ const App: React.FC = () => {
         
         const result = await generateGeminiResponseStream(
           currentModel.id, 
-          content, 
+          apiContentForRegen, 
           geminiHistory, 
           config?.apiKey, 
           attachments,
@@ -1546,14 +1617,20 @@ const App: React.FC = () => {
       setIsProcessing(false);
       setStreamingMessageId(null);
       abortControllerRef.current = null;
+
+      setSessions(prev => {
+        const updated = prev.find(s => s.id === sessionId);
+        if (updated) chatSyncService.uploadSession(updated).catch(() => {});
+        return prev;
+      });
     }
   };
 
   const deleteSession = (id: string) => {
     setSessions(prev => prev.filter(s => s.id !== id));
     if (currentSessionId === id) setCurrentSessionId(null);
-    // Clean up workspace files for this session
     workspaceService.deleteAllFiles(id).catch(() => {});
+    chatSyncService.deleteSession(id).catch(() => {});
   };
 
   const renameSession = (id: string, newTitle: string) => {
@@ -1780,7 +1857,7 @@ const App: React.FC = () => {
           onFileUpload={processFile}
           onRegenerateMessage={handleRegenerateMessage}
           user={user ? { username: user.username, nickname: user.nickname, avatar: user.avatar } : undefined}
-          sessionId={currentSession?.agentConfig?.enabled ? currentSessionId ?? undefined : undefined}
+          sessionId={currentSessionId ?? undefined}
         />
 
         {/* Input Area */}
@@ -1961,47 +2038,39 @@ const App: React.FC = () => {
                  </span>
                )}
 
-               {/* Agent Mode Toggle Button */}
+               {/* Agent Settings Button */}
                <button
                  type="button"
                  onClick={() => setShowAgentConfig(true)}
                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                   sessions.find(s => s.id === currentSessionId)?.agentConfig?.enabled
-                     ? isNotion
-                       ? 'bg-gray-800 text-white'
-                       : isMonet
-                         ? 'bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/40'
-                         : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
-                     : isNotion
-                       ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800'
-                       : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                   isNotion
+                     ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800'
+                     : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                  }`}
-                 title="Configure agent mode for this session"
+                 title="Session agent settings"
                >
                  <Bot size={14} />
                  <span>Agent</span>
                </button>
 
                {/* Workspace Panel Toggle */}
-               {sessions.find(s => s.id === currentSessionId)?.agentConfig?.enabled && (
-                 <button
-                   type="button"
-                   onClick={() => setShowWorkspacePanel(!showWorkspacePanel)}
-                   className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                     showWorkspacePanel
-                       ? isNotion
-                         ? 'bg-gray-800 text-white'
-                         : isMonet
-                           ? 'bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/40'
-                           : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
-                       : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                   }`}
-                   title="Toggle workspace file browser"
-                 >
-                   <FolderOpen size={14} />
-                   <span>Files</span>
-                 </button>
-               )}
+               <button
+                 type="button"
+                 onClick={() => setShowWorkspacePanel(!showWorkspacePanel)}
+                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                   showWorkspacePanel
+                     ? isNotion
+                       ? 'bg-gray-800 text-white'
+                       : isMonet
+                         ? 'bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/40'
+                         : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
+                     : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                 }`}
+                 title="Toggle workspace file browser"
+               >
+                 <FolderOpen size={14} />
+                 <span>Files</span>
+               </button>
              </div>
 
              {/* Agent Status Bar */}
@@ -2040,6 +2109,7 @@ const App: React.FC = () => {
                  <textarea
                    ref={textareaRef}
                    value={input}
+                   onPaste={handlePaste}
                    onChange={(e) => {
                      setInput(e.target.value);
                      // Update cursor position for command autocomplete
@@ -2196,13 +2266,13 @@ const App: React.FC = () => {
          <AgentConfigPanel
            sessionId={currentSessionId}
            agentConfig={sessions.find(s => s.id === currentSessionId)?.agentConfig}
+           globalDefaults={appSettings?.agentDefaults}
            onSave={(config) => {
              setSessions(prev => prev.map(s =>
                s.id === currentSessionId ? { ...s, agentConfig: config } : s
              ));
            }}
            onSkillsChanged={() => {
-             // Force re-render so the skill list updates
              setShowAgentConfig(false);
              setTimeout(() => setShowAgentConfig(true), 0);
            }}
@@ -2221,6 +2291,52 @@ const App: React.FC = () => {
        )}
 
       
+      {/* File Size Error Dialog */}
+      {fileSizeError && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4"
+          onClick={() => setFileSizeError(null)}
+        >
+          <div
+            className={`w-full max-w-sm rounded-2xl shadow-2xl p-6 text-center ${
+              isNotion
+                ? 'bg-notion-bg dark:bg-notion-darkbg border border-notion-border dark:border-notion-darkborder'
+                : 'bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4">
+              <svg className="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <h3 className={`text-lg font-bold mb-2 ${
+              isNotion ? 'text-gray-900 dark:text-white font-serif' : 'text-gray-900 dark:text-white'
+            }`}>
+              文件过大
+            </h3>
+            <p className={`text-sm mb-1 ${isNotion ? 'text-gray-600 dark:text-gray-400 font-serif' : 'text-gray-600 dark:text-gray-400'}`}>
+              <span className="font-medium text-gray-800 dark:text-gray-200">{fileSizeError.name}</span>
+            </p>
+            <p className={`text-sm mb-5 ${isNotion ? 'text-gray-500 dark:text-gray-400 font-serif' : 'text-gray-500 dark:text-gray-400'}`}>
+              文件大小 {fileSizeError.size}MB，超过 10MB 限制。请压缩后重试。
+            </p>
+            <button
+              onClick={() => setFileSizeError(null)}
+              className={`w-full py-2.5 rounded-xl font-semibold transition-all active:scale-95 ${
+                isNotion
+                  ? 'bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-100'
+                  : isMonet
+                    ? 'bg-[#3E406F] hover:bg-[#5A5C8A] text-white'
+                    : 'bg-gradient-to-r from-forsion-500 to-indigo-500 text-white hover:from-forsion-400 hover:to-indigo-400 shadow-lg'
+              }`}
+            >
+              我知道了
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Expanded Input Modal with bounce animation */}
       {isInputExpanded && (
         <div 

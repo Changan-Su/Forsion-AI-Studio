@@ -102,11 +102,17 @@ export interface McpServerConfig {
 }
 
 export interface AgentConfig {
-  enabled: boolean;
   systemPrompt?: string;
   enabledSkillIds: string[];
   mcpServers: McpServerConfig[];
   maxIterations: number;  // default 10
+}
+
+export interface AgentDefaults {
+  systemPrompt: string;
+  maxIterations: number;
+  enabledSkillIds: string[];
+  mcpServers: McpServerConfig[];
 }
 
 export interface AgentStatusEvent {
@@ -170,14 +176,13 @@ export interface AppSettings {
   nickname?: string;
   avatar?: string;
   theme?: 'light' | 'dark';
-  themePreset?: 'default' | 'notion' | 'monet'; // New: Theme Style
-  customModels?: AIModel[]; // New: List of user-added models
+  themePreset?: 'default' | 'notion' | 'monet' | 'apple' | 'forsion1';
+  customModels?: AIModel[];
   defaultModelId?: string;
-  developerMode?: boolean; // Developer mode allows users to add custom models
-  // Deprecated usage of simple key/value configs in favor of per-model full config for custom ones, 
-  // but kept for backward compat with built-ins
+  developerMode?: boolean;
+  agentDefaults?: AgentDefaults;
   externalApiConfigs: {
-    [key: string]: { // key is the configKey (e.g. 'openai')
+    [key: string]: {
       apiKey: string;
       baseUrl?: string;
     };
@@ -186,10 +191,11 @@ export interface AppSettings {
 
 export interface Attachment {
   type: 'image' | 'document';
-  url: string; // Base64 data string
+  url: string; // data URL (in-memory, stripped on localStorage persist)
+  workspacePath?: string; // workspace path for IndexedDB persistence
   mimeType: string;
   name?: string;
-  extractedText?: string; // For document files (PDF, Word, etc.)
+  extractedText?: string;
 }
 
 // ── Workspace types ──────────────────────────────────────────────────────────

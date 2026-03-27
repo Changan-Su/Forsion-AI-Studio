@@ -75,7 +75,23 @@
     .version-record td { padding:8px 12px; border:1px solid var(--border); color:var(--text2); }
 
     @media (max-width:900px) { :root { --sidebar-w:0; } #toc-sidebar { display:none; } }
+
+    .subsection-title { font-size:0.95rem; font-weight:600; color:var(--text); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem; }
+    .rule-list { list-style:none; padding:0; margin:0; font-size:13px; color:var(--text2); }
+    .rule-list li { padding:4px 0; padding-left:1.2em; position:relative; }
+    .rule-list li::before { content:"\2726"; position:absolute; left:0; color:var(--accent); font-size:11px; }
+    .ac-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .ac-table th { padding:8px 12px; background:var(--accent-bg); color:var(--accent); font-weight:600; border:1px solid var(--border); text-align:left; }
+    .ac-table td { padding:8px 12px; border:1px solid var(--border); color:var(--text2); vertical-align:top; }
+    .ac-id { font-weight:700; color:var(--text); white-space:nowrap; }
+    .flow-ref { display:inline-flex; align-items:center; gap:4px; font-size:13px; padding:6px 12px; border-radius:8px; background:var(--accent-bg); color:var(--accent); text-decoration:none; transition:opacity .15s; }
+    .flow-ref:hover { opacity:.8; }
+    .mermaid { background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:1rem; margin-bottom:0.5rem; }
+    .task-table { width:100%; border-collapse:collapse; font-size:12px; }
+    .task-table th { padding:8px 10px; background:var(--accent-bg); color:var(--accent); font-weight:600; border:1px solid var(--border); text-align:left; white-space:nowrap; }
+    .task-table td { padding:8px 10px; border:1px solid var(--border); color:var(--text2); vertical-align:top; }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 </head>
 <body class="min-h-screen flex">
 
@@ -100,11 +116,22 @@
       <a href="#ch4-m4" class="toc-link toc-sub" data-section="ch4-m4">4.4 用户体验</a>
       <a href="#ch4-m5" class="toc-link toc-sub" data-section="ch4-m5">4.5 后台管理</a>
       <a href="#ch5" class="toc-link" data-section="ch5">五、详细方案</a>
+      <a href="#ch5-s1" class="toc-link toc-sub" data-section="ch5-s1">5.1 Skills 市场</a>
+      <a href="#ch5-s2" class="toc-link toc-sub" data-section="ch5-s2">5.2 Skill 作用域</a>
+      <a href="#ch5-s3" class="toc-link toc-sub" data-section="ch5-s3">5.3 执行可视化</a>
+      <a href="#ch5-s4" class="toc-link toc-sub" data-section="ch5-s4">5.4 跨应用数据中枢</a>
+      <a href="#ch5-s5" class="toc-link toc-sub" data-section="ch5-s5">5.5 多主题风格</a>
+      <a href="#ch5-s6" class="toc-link toc-sub" data-section="ch5-s6">5.6 云同步</a>
+      <a href="#ch5-s7" class="toc-link toc-sub" data-section="ch5-s7">5.7 新用户引导</a>
+      <a href="#ch5-s8" class="toc-link toc-sub" data-section="ch5-s8">5.8 用户画像</a>
+      <a href="#ch5-s9" class="toc-link toc-sub" data-section="ch5-s9">5.9 数据同步 API</a>
+      <a href="#ch5-s10" class="toc-link toc-sub" data-section="ch5-s10">5.10 Skills 管理</a>
       <a href="#ch6" class="toc-link" data-section="ch6">六、业务流程图</a>
       <a href="#ch7" class="toc-link" data-section="ch7">七、异常与边界</a>
       <a href="#ch8" class="toc-link" data-section="ch8">八、数据埋点</a>
       <a href="#ch9" class="toc-link" data-section="ch9">九、未来规划</a>
       <a href="#ch10" class="toc-link" data-section="ch10">十、附件</a>
+      <a href="#ch11" class="toc-link" data-section="ch11">十一、开发任务清单</a>
     </nav>
     <div class="px-4 py-3 border-t" style="border-color:var(--border);">
       <button onclick="toggleTheme()" class="text-xs px-3 py-1.5 rounded-lg w-full text-left transition-colors" style="color:var(--text2); background:var(--bg);">
@@ -133,6 +160,33 @@
 
     <div class="px-6 lg:px-10 py-8 max-w-4xl">
 
+      <!-- forsion-dev 进度看板，自动维护 -->
+      <div id="dev-progress-board" class="mb-6 rounded-xl border p-4" style="background:#f0fdf4; border-color:#bbf7d0;">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-semibold text-green-800">开发进度</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700" id="dev-mode-badge">Full Auto</span>
+          </div>
+          <span class="text-xs text-green-600" id="dev-last-updated">最后更新：2026-03-26</span>
+        </div>
+        <div class="w-full bg-green-100 rounded-full h-2 mb-3">
+          <div class="bg-green-500 h-2 rounded-full transition-all" id="dev-progress-bar" style="width:100%"></div>
+        </div>
+        <div class="flex items-center justify-between text-xs text-green-700">
+          <span id="dev-progress-text">35 / 35 任务已完成</span>
+          <span id="dev-progress-pct">100%</span>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-1.5" id="dev-task-chips">
+          <span class="text-[11px] px-2 py-0.5 rounded-full bg-green-100 text-green-700">T-001 已完成</span>
+          <span class="text-[11px] px-2 py-0.5 rounded-full bg-green-100 text-green-700">T-002 已完成</span>
+          <span class="text-[11px] px-2 py-0.5 rounded-full bg-green-100 text-green-700">T-003 已完成</span>
+          <span class="text-[11px] px-2 py-0.5 rounded-full bg-green-100 text-green-700">T-004 已完成</span>
+          <span class="text-[11px] px-2 py-0.5 rounded-full bg-green-100 text-green-700">T-005 已完成</span>
+          <span class="text-[11px] px-2 py-0.5 rounded-full bg-green-100 text-green-700">T-006 已完成</span>
+          <span class="text-[11px] px-2 py-0.5 rounded-full bg-green-100 text-green-700">T-007~T-035 已完成</span>
+        </div>
+      </div>
+
       <!-- ===== 项目信息 ===== -->
       <section id="info" class="section">
         <h1 class="text-2xl font-bold mb-6" style="color:var(--text);">Forsion AI Studio — 产品需求文档</h1>
@@ -142,7 +196,7 @@
             <tr><th>版本定义</th><td>v1.0 MVP — 智能对话 + Skills 体系 + 跨应用数据中枢</td></tr>
             <tr><th>文档负责人</th><td>AI / Skyler</td></tr>
             <tr><th>核心目标</th><td>打造 Forsion 生态的 AI 中枢，让非技术用户通过统一的 Agent 平台跨应用智能交互</td></tr>
-            <tr><th>全局原型</th><td><span class="pending-badge">待步骤四产出</span></td></tr>
+            <tr><th>全局原型</th><td><a href="./prototype_v1.0.html" style="color:var(--accent);">prototype_v1.0.html</a>（5 个新功能模块 + 5 套主题）</td></tr>
           </table>
         </div>
 
@@ -152,6 +206,7 @@
             <thead><tr><th>日期</th><th>版本号</th><th>修改内容</th><th>修改人</th></tr></thead>
             <tbody>
               <tr><td>2026-03-26</td><td>v1.0</td><td>初稿：需求背景、业务目标、用户旅程、功能清单与基础逻辑</td><td>AI</td></tr>
+              <tr><td>2026-03-26</td><td>v1.0</td><td>步骤六定稿：§五 详细方案（10 个功能模块 × 流程图+规则+AC）、§十一 开发任务清单（8 Epic / 35 Task）</td><td>AI</td></tr>
             </tbody>
           </table>
         </div>
@@ -598,12 +653,609 @@
       <!-- ===== 五、详细方案 ===== -->
       <section id="ch5" class="section">
         <h2 class="section-title">五、详细方案设计</h2>
-        <div class="card text-center py-12">
-          <div class="pending-badge mx-auto">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            待原型确认后补充 — 将包含每个功能模块的交互流程图 + 规则描述 + 专注模式沙盒切片
+        <p class="text-sm mb-6" style="color:var(--text2);">
+          每个功能模块采用统一结构：交互流程图（Mermaid）&rarr; 业务规则清单 &rarr; 原型链接 &rarr; 验收标准（AC）。
+          完整系统级流程图见 <a href="flowcharts/v1.0-core-flows.md" style="color:var(--accent);">v1.0-core-flows.md</a>。
+        </p>
+
+        <!-- ────── 5.1 Skills 市场页面 ────── -->
+        <div id="ch5-s1" class="mb-10">
+          <h3 class="subsection-title"><span class="tag tag-p0">P0</span> 5.1 Skills 市场页面</h3>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">交互流程</h4>
+            <pre class="mermaid">
+flowchart TD
+  openSettings["用户打开 Settings"] --> clickTab["点击 Skills Tab"]
+  clickTab --> showMarket["展示 Skills 市场"]
+  showMarket --> action{用户操作}
+  action --> search["搜索关键词"]
+  action --> filterBtn["筛选: 全部/官方/已安装"]
+  action --> viewCard["查看 Skill 卡片"]
+  action --> createBtn["创建自定义 Skill"]
+  search --> filtered["实时过滤列表"]
+  filterBtn --> filtered
+  filtered --> viewCard
+  viewCard --> isInstalled{已安装?}
+  isInstalled -- 否 --> install["点击安装"]
+  isInstalled -- 是 --> scope["管理作用域"]
+  install --> isCross{跨应用?}
+  isCross -- 否 --> done["安装成功 · 全局启用"]
+  isCross -- 是 --> authTag["安装成功 · 标记需授权"]
+  done --> scope
+  authTag --> scope
+  createBtn --> editor["打开 SkillEditor"]
+  editor --> saveDone["保存 → 安装"]
+            </pre>
+          </div>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">业务规则</h4>
+            <ul class="rule-list">
+              <li>Skills 市场作为 SettingsModal 的第 4 个 Tab（<code>skills</code>），位于 <code>general</code> 和 <code>account</code> 之间</li>
+              <li>卡片展示字段：图标、名称、一句话描述、工具数量、官方 / 跨应用 / 已安装徽章</li>
+              <li>搜索支持名称和描述的模糊匹配，实时过滤（debounce 300ms）</li>
+              <li>三个筛选条件互斥：全部（默认）/ 仅官方 / 已安装</li>
+              <li>安装操作将 Skill 加入用户已激活列表，默认作用域为全局</li>
+              <li>卸载操作将 Skill 从已激活列表移除，IndexedDB 中的自定义 Skill 数据保留 30 天</li>
+              <li>跨应用 Skill 安装后显示&ldquo;需授权&rdquo;徽章，实际授权延迟到首次调用时触发</li>
+              <li>每个用户最多创建 20 个自定义 Skill</li>
+              <li>官方 Skill 列表优先从后端 <code>GET /api/skills/catalog</code> 获取；离线时降级为本地 <code>skillsRegistry</code></li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">原型参考</h4>
+            <a href="./prototype_v1.0.html#skills-market" class="flow-ref">查看交互原型 &rarr; Skills 市场</a>
+          </div>
+
+          <div class="card" style="padding:0; overflow:hidden;">
+            <h4 class="text-sm font-semibold px-4 pt-3 pb-2" style="color:var(--accent);">验收标准</h4>
+            <table class="ac-table">
+              <thead><tr><th style="width:80px;">AC&nbsp;ID</th><th>验收条件</th></tr></thead>
+              <tbody>
+                <tr><td class="ac-id">AC-101</td><td>用户打开 Settings，可见 Skills Tab；点击后展示所有可用 Skill 的卡片网格</td></tr>
+                <tr><td class="ac-id">AC-102</td><td>搜索框输入关键词，列表实时过滤至名称或描述匹配的 Skills</td></tr>
+                <tr><td class="ac-id">AC-103</td><td>点击&ldquo;仅官方&rdquo;筛选按钮，列表仅显示官方 Skills；点击&ldquo;已安装&rdquo;仅显示已安装 Skills</td></tr>
+                <tr><td class="ac-id">AC-104</td><td>点击非跨应用 Skill 的&ldquo;安装&rdquo;按钮，按钮变为&ldquo;已安装&rdquo;，Skill 出现在 Agent 配置面板的可用列表</td></tr>
+                <tr><td class="ac-id">AC-105</td><td>点击跨应用 Skill（如 Calendar）的&ldquo;安装&rdquo;，Skill 显示&ldquo;需授权&rdquo;徽章，授权延迟到首次调用时弹出</td></tr>
+                <tr><td class="ac-id">AC-106</td><td>点击&ldquo;卸载&rdquo;，Skill 移出已激活列表，显示卸载成功 Toast</td></tr>
+                <tr><td class="ac-id">AC-107</td><td>点击&ldquo;创建自定义 Skill&rdquo;卡片，打开 SkillEditor 空表单，可填写名称、描述、工具和提示词</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
+
+        <!-- ────── 5.2 Skill 作用域控制 ────── -->
+        <div id="ch5-s2" class="mb-10">
+          <h3 class="subsection-title"><span class="tag tag-p0">P0</span> 5.2 Skill 作用域控制</h3>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">交互流程</h4>
+            <pre class="mermaid">
+flowchart TD
+  installed["已安装 Skill"] --> scopeUI["作用域管理面板"]
+  scopeUI --> choice{选择作用域}
+  choice --> global["全局启用"]
+  choice --> session["仅当前 Session"]
+  choice --> disabled["已禁用"]
+  global --> save["保存到 localStorage"]
+  session --> save
+  disabled --> save
+  save --> effect["立即生效于后续消息"]
+  global -.- noteG["所有新 Session 自动注入该 Skill"]
+  session -.- noteS["仅在当前 Session Agent 配置中启用"]
+  disabled -.- noteD["所有 Session 均不可用"]
+            </pre>
+          </div>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">业务规则</h4>
+            <ul class="rule-list">
+              <li>三个作用域级别：全局（所有 Session 默认启用）、仅当前 Session、已禁用</li>
+              <li>安装后默认作用域：全局</li>
+              <li>作用域变更仅影响后续新消息，不回溯修改已有消息</li>
+              <li>全局作用域：Skill 的 System Prompt 自动注入每个新 Session</li>
+              <li>Session 作用域：仅当用户在该 Session 的 AgentConfigPanel 中手动启用时注入</li>
+              <li>Workspace Skill（会话上下文管理）始终自动注入，不允许设置作用域</li>
+              <li>作用域设置存储在 localStorage（以 Skill ID 为 key），后续云同步版本将迁移到后端</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">原型参考</h4>
+            <a href="./prototype_v1.0.html#skill-scope" class="flow-ref">查看交互原型 &rarr; Skill 作用域</a>
+          </div>
+
+          <div class="card" style="padding:0; overflow:hidden;">
+            <h4 class="text-sm font-semibold px-4 pt-3 pb-2" style="color:var(--accent);">验收标准</h4>
+            <table class="ac-table">
+              <thead><tr><th style="width:80px;">AC&nbsp;ID</th><th>验收条件</th></tr></thead>
+              <tbody>
+                <tr><td class="ac-id">AC-201</td><td>将 Skill 设为&ldquo;全局&rdquo;，创建新 Session 时该 Skill 自动出现在 Agent 已启用列表</td></tr>
+                <tr><td class="ac-id">AC-202</td><td>将 Skill 设为&ldquo;仅当前 Session&rdquo;，其他 Session 不受影响，新 Session 不自动包含该 Skill</td></tr>
+                <tr><td class="ac-id">AC-203</td><td>将 Skill 设为&ldquo;已禁用&rdquo;，所有 Session 均不可使用该 Skill</td></tr>
+                <tr><td class="ac-id">AC-204</td><td>Workspace Skill 的作用域开关不可见或置灰，始终保持自动注入状态</td></tr>
+                <tr><td class="ac-id">AC-205</td><td>作用域设置在浏览器刷新后保持不变</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ────── 5.3 Skill 执行可视化 ────── -->
+        <div id="ch5-s3" class="mb-10">
+          <h3 class="subsection-title"><span class="tag tag-p1">P1</span> 5.3 Skill 执行可视化</h3>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">交互流程</h4>
+            <pre class="mermaid">
+flowchart TD
+  msg["用户发送消息"] --> ai["AI 分析意图"]
+  ai --> needTool{需要调用 Tool?}
+  needTool -- 否 --> textReply["直接生成文本回复"]
+  needTool -- 是 --> execState["显示执行中状态：Spinner + 工具名"]
+  execState --> result{执行结果}
+  result -- 成功 --> success["绿色对勾 + 工具名 + 耗时"]
+  result -- 失败 --> fail["红色叉 + 工具名 + 错误原因 + 重试按钮"]
+  result -- 超时 --> timeout["超时提示 + 重试/切换模型"]
+  success --> expand["可点击展开详细返回数据"]
+  expand --> combine["AI 结合结果生成回复"]
+  fail --> retry{用户点击重试?}
+  retry -- 是 --> execState
+  retry -- 否 --> textReply
+  timeout --> retry
+            </pre>
+          </div>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">业务规则</h4>
+            <ul class="rule-list">
+              <li>Tool Call 状态展示位于消息流中（inline），不使用独立面板</li>
+              <li>三种视觉状态：执行中（spinner + 工具名）、成功（绿色对勾 + 工具名 + 耗时）、失败（红色叉 + 工具名 + 错误信息 + 重试按钮）</li>
+              <li>成功状态默认折叠，点击可展开查看完整 Tool 返回的 JSON 数据</li>
+              <li>失败状态醒目展示错误原因，提供 [重试] 按钮</li>
+              <li>超时阈值 30 秒，超时后显示超时提示 + [重试] + [切换模型]</li>
+              <li>单条消息中多个 Tool Call 按执行顺序依次展示</li>
+              <li>基于现有 <code>ToolCallBlock</code> 组件增强，保持与现有代码架构一致</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">原型参考</h4>
+            <a href="./prototype_v1.0.html#skill-execution" class="flow-ref">查看交互原型 &rarr; Skill 执行可视化</a>
+          </div>
+
+          <div class="card" style="padding:0; overflow:hidden;">
+            <h4 class="text-sm font-semibold px-4 pt-3 pb-2" style="color:var(--accent);">验收标准</h4>
+            <table class="ac-table">
+              <thead><tr><th style="width:80px;">AC&nbsp;ID</th><th>验收条件</th></tr></thead>
+              <tbody>
+                <tr><td class="ac-id">AC-301</td><td>AI 调用 Tool 时，消息流中出现&ldquo;执行中&hellip;&rdquo;状态（含 Spinner 和工具名），位于回复文本之前</td></tr>
+                <tr><td class="ac-id">AC-302</td><td>Tool 执行成功后，状态变为绿色，显示工具名和执行耗时；点击可展开完整返回数据</td></tr>
+                <tr><td class="ac-id">AC-303</td><td>Tool 执行失败，状态变为红色，显示工具名 + 错误信息 + [重试] 按钮</td></tr>
+                <tr><td class="ac-id">AC-304</td><td>点击 [重试] 按钮，重新执行同一 Tool Call</td></tr>
+                <tr><td class="ac-id">AC-305</td><td>单条 AI 回复中包含多个 Tool Call 时，按执行顺序依次展示</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ────── 5.4 跨应用数据中枢 ────── -->
+        <div id="ch5-s4" class="mb-10">
+          <h3 class="subsection-title"><span class="tag tag-p0">P0</span> 5.4 跨应用数据中枢</h3>
+          <p class="text-sm mb-4" style="color:var(--text3);">包含：用户级数据分区、跨应用 Skill 调用、数据授权管理。三者紧密耦合，合并为一个详细方案。</p>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">交互流程（时序）</h4>
+            <pre class="mermaid">
+sequenceDiagram
+  participant U as 用户
+  participant AI as AI Agent
+  participant FE as 前端
+  participant BE as 后端数据中枢
+  participant APP as 目标App
+
+  U->>AI: 发送涉及其他 App 的问题
+  AI->>AI: 意图识别 → 需要跨应用 Skill
+  AI->>FE: 调用 Skill Tool
+  FE->>FE: 检查授权状态
+
+  alt 未授权
+    FE->>U: 弹出授权确认弹窗
+    alt 允许
+      U->>FE: 点击允许访问
+      FE->>BE: 保存授权记录
+    else 拒绝
+      U->>FE: 点击拒绝
+      FE->>AI: 授权被拒
+      AI->>U: 提示需授权 + Settings 链接
+    end
+  end
+
+  FE->>BE: 请求数据（user_id + auth_token）
+  BE->>BE: 验证授权 + 查询用户数据分区
+  BE->>APP: 读取对应 App 数据
+  APP-->>BE: 返回数据
+  BE-->>FE: 返回结构化数据
+  FE->>AI: Tool 执行结果
+  AI->>U: 基于数据生成回复
+            </pre>
+          </div>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">业务规则 — 用户级数据分区</h4>
+            <ul class="rule-list">
+              <li>后端在用户首次登录时创建数据分区（表 <code>user_data_partitions</code>）</li>
+              <li>每个分区按 App ID 划分命名空间（calendar、desktop、notes 等）</li>
+              <li>数据结构：<code>{ user_id, app_id, data_type, payload JSON, created_at, updated_at }</code></li>
+              <li>读写权限由授权记录控制，未授权的 App 无法读取其他 App 的数据</li>
+              <li>用户删除时级联清除所有分区数据</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">业务规则 — 跨应用 Skill 调用</h4>
+            <ul class="rule-list">
+              <li>跨应用 Skill 是标准 SKILL.md 文件，Tools 使用 <code>http</code> executor 调用后端数据中枢 API</li>
+              <li>Skill frontmatter 须声明所需 App 权限：<code>required_apps: [calendar]</code></li>
+              <li>v1.0 首批跨应用 Skill：Forsion Calendar Skill（<code>get_events</code>、<code>create_event</code>、<code>update_event</code>）</li>
+              <li>后端 API 模式：<code>GET/POST /api/data-hub/{app_id}/{resource}</code></li>
+              <li>Skill 调用时前端自动注入用户 auth_token，后端校验身份和授权</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">业务规则 — 数据授权管理</h4>
+            <ul class="rule-list">
+              <li>授权弹窗仅在用户首次访问某 App 数据时触发（每 App 每用户一次）</li>
+              <li>弹窗内容：App 名称 + App 图标 + 权限明细列表 + 隐私说明</li>
+              <li>用户选择：&ldquo;允许访问&rdquo;（永久有效直到撤销）或 &ldquo;拒绝&rdquo;</li>
+              <li>拒绝后：AI 收到拒绝信号，回复提示用户可在 Settings 中授权</li>
+              <li>撤销方式：Settings &gt; 数据授权管理（新增 Tab 或子页面），列出已授权 App，可逐个撤销</li>
+              <li>撤销后下次访问将重新弹出授权弹窗</li>
+              <li>授权记录存储在后端：<code>{ user_id, app_id, granted_scopes[], granted_at }</code></li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">原型参考</h4>
+            <a href="./prototype_v1.0.html#auth-dialog" class="flow-ref">查看交互原型 &rarr; 跨应用授权弹窗</a>
+          </div>
+
+          <div class="card" style="padding:0; overflow:hidden;">
+            <h4 class="text-sm font-semibold px-4 pt-3 pb-2" style="color:var(--accent);">验收标准</h4>
+            <table class="ac-table">
+              <thead><tr><th style="width:80px;">AC&nbsp;ID</th><th>验收条件</th></tr></thead>
+              <tbody>
+                <tr><td class="ac-id">AC-401</td><td>用户首次登录后，后端自动创建对应的数据分区记录</td></tr>
+                <tr><td class="ac-id">AC-402</td><td>通过数据同步 API 推送的 Calendar 数据，正确存储在用户的 calendar 命名空间下</td></tr>
+                <tr><td class="ac-id">AC-501</td><td>Calendar Skill 的 <code>get_events</code> 工具调用后端数据中枢，成功返回该用户的日程列表</td></tr>
+                <tr><td class="ac-id">AC-502</td><td>调用需要授权但尚未授权的跨应用 Skill 时，触发授权确认弹窗</td></tr>
+                <tr><td class="ac-id">AC-503</td><td>授权后同一 Skill 调用直接成功，不再弹出授权弹窗</td></tr>
+                <tr><td class="ac-id">AC-601</td><td>授权弹窗显示 App 名称、权限明细列表和隐私说明</td></tr>
+                <tr><td class="ac-id">AC-602</td><td>点击&ldquo;允许访问&rdquo;，授权保存到后端，Skill 立即执行</td></tr>
+                <tr><td class="ac-id">AC-603</td><td>点击&ldquo;拒绝&rdquo;，AI 回复提示需要授权并给出 Settings 链接</td></tr>
+                <tr><td class="ac-id">AC-604</td><td>用户在 Settings 撤销某 App 授权后，下次该 App 的 Skill 调用重新弹出授权弹窗</td></tr>
+                <tr><td class="ac-id">AC-605</td><td>Settings 数据授权管理页面显示所有已授权 App 列表，每项有&ldquo;撤销&rdquo;按钮</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ────── 5.5 多主题风格系统 ────── -->
+        <div id="ch5-s5" class="mb-10">
+          <h3 class="subsection-title"><span class="tag tag-p0">P0</span> 5.5 多主题风格系统</h3>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">交互流程</h4>
+            <pre class="mermaid">
+flowchart TD
+  openSettings["Settings > General"] --> themeSection["主题风格区域"]
+  themeSection --> presetCards["5 个预设卡片"]
+  presetCards --> selectPreset{选择预设}
+  selectPreset --> cyber["Cyber Tech"]
+  selectPreset --> notion["Notion Style"]
+  selectPreset --> monet["Monet 2.0"]
+  selectPreset --> apple["Apple Glass"]
+  selectPreset --> forsion1["Forsion Theme 1"]
+  cyber --> applyTheme["CSS 变量切换 + 存储到后端"]
+  notion --> applyTheme
+  monet --> applyTheme
+  apple --> applyTheme
+  forsion1 --> applyTheme
+  applyTheme --> darkToggle["亮/暗模式开关独立切换"]
+            </pre>
+          </div>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">业务规则</h4>
+            <ul class="rule-list">
+              <li>5 套主题预设：Cyber Tech（默认，渐变现代感）、Notion Style（极简单色）、Monet 2.0（清透水彩 + 玻璃质感）、Apple Glass（多彩玻璃质感）、Forsion Theme 1（莫兰迪低饱和色系）</li>
+              <li>每套主题通过 CSS 变量定义完整色彩体系：<code>[data-theme-preset="xxx"]</code></li>
+              <li>亮/暗模式开关独立于主题预设，每个预设有对应的亮版和暗版</li>
+              <li>主题切换在 Settings &gt; General &gt; 主题风格区域，展示 5 个可点击的预设卡片</li>
+              <li>主题选择通过 <code>backendService.updateSettings</code> 持久化到后端</li>
+              <li>Monet 2.0 详细规范见 <code>.cursor/skills/forsion-monet2-theme/SKILL.md</code></li>
+              <li>Apple Glass：浅灰底 + 毛玻璃卡片 + 多彩渐变图标 + 全圆角按钮</li>
+              <li>Forsion Theme 1：暖灰底 <code>#edeae5</code> + 莫兰迪低饱和色调 + 苹果级毛玻璃（<code>blur(24px) saturate(140%)</code>，62% 透明暖白卡片）</li>
+              <li>所有页面（聊天、侧边栏、Settings、Agent 配置、弹窗）必须在 5 套主题下正确渲染</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">原型参考</h4>
+            <a href="./prototype_v1.0.html" class="flow-ref">查看交互原型（右上角主题切换器可切换全部 5 套主题）</a>
+            &nbsp;
+            <a href="../Function/v1.0-func-monet2-theme.md" class="flow-ref">Monet 2.0 Function Review</a>
+          </div>
+
+          <div class="card" style="padding:0; overflow:hidden;">
+            <h4 class="text-sm font-semibold px-4 pt-3 pb-2" style="color:var(--accent);">验收标准</h4>
+            <table class="ac-table">
+              <thead><tr><th style="width:80px;">AC&nbsp;ID</th><th>验收条件</th></tr></thead>
+              <tbody>
+                <tr><td class="ac-id">AC-701</td><td>Settings 主题风格区域展示 5 个预设卡片，点击任一卡片立即切换全局主题</td></tr>
+                <tr><td class="ac-id">AC-702</td><td>Monet 2.0 主题：背景渐变 <code>#b8e6f2&rarr;#f2d4e2&rarr;#a8c4eb</code>，毛玻璃 <code>blur(24px) saturate(200%)</code></td></tr>
+                <tr><td class="ac-id">AC-703</td><td>Apple Glass 主题：浅灰底、毛玻璃卡片、多彩渐变图标、全圆角按钮</td></tr>
+                <tr><td class="ac-id">AC-704</td><td>Forsion Theme 1：暖灰底 <code>#edeae5</code>、莫兰迪低饱和色调、苹果级毛玻璃</td></tr>
+                <tr><td class="ac-id">AC-705</td><td>主题选择持久化，关闭浏览器重新打开后保持上次选择的主题</td></tr>
+                <tr><td class="ac-id">AC-706</td><td>亮/暗模式开关在每个主题预设下独立工作</td></tr>
+                <tr><td class="ac-id">AC-707</td><td>聊天页、侧边栏、Settings 弹窗、Agent 配置面板在全部 5 套主题 &times; 2 种模式下渲染正确</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ────── 5.6 对话历史云同步 ────── -->
+        <div id="ch5-s6" class="mb-10">
+          <h3 class="subsection-title"><span class="tag tag-p1">P1</span> 5.6 对话历史云同步</h3>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">交互流程</h4>
+            <pre class="mermaid">
+flowchart TD
+  appLoad["应用加载"] --> checkLocal{本地有 localStorage 会话?}
+  checkLocal -- 是 --> checkBackend{后端可达?}
+  checkBackend -- 是 --> migrate["上传本地会话到后端"]
+  migrate --> mergeComplete["合并完成 · 清除本地缓存标记"]
+  checkBackend -- 否 --> offlineMode["离线模式 · 使用 localStorage"]
+  checkLocal -- 否 --> fetchBackend["从后端拉取会话列表"]
+  fetchBackend --> showSessions["展示会话"]
+  mergeComplete --> showSessions
+  offlineMode --> showSessions
+  showSessions --> userChat["用户发送/接收消息"]
+  userChat --> autoSave["自动保存到后端（2s 内）"]
+  autoSave --> syncOK{保存成功?}
+  syncOK -- 是 --> userChat
+  syncOK -- 否 --> queue["加入离线队列"]
+  queue --> reconnect["网络恢复后批量同步"]
+  reconnect --> userChat
+            </pre>
+          </div>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">业务规则</h4>
+            <ul class="rule-list">
+              <li>迁移策略：首次连接后端时，将现有 localStorage 中的会话批量上传；成功后标记迁移完成（不删除本地，仅标记）</li>
+              <li>后端 API：会话和消息的 CRUD 端点（<code>/api/chat/sessions</code>、<code>/api/chat/messages</code>）</li>
+              <li>冲突解决：Last-Write-Wins（以服务端时间戳为准）</li>
+              <li>自动保存：每条消息发送/接收后 2 秒内触发后端保存（debounce 合并）</li>
+              <li>离线支持：网络不可用时继续使用 localStorage，变更加入队列，重连后批量同步</li>
+              <li>同步数据范围：消息内容、会话标题、emoji 标签、Agent 配置、归档状态</li>
+              <li>会话上限：保留最近 100 个活跃会话，超出自动归档最早的</li>
+              <li>消息分页：每个会话默认加载最近 50 条消息，上滑加载更多</li>
+            </ul>
+          </div>
+
+          <div class="card" style="padding:0; overflow:hidden;">
+            <h4 class="text-sm font-semibold px-4 pt-3 pb-2" style="color:var(--accent);">验收标准</h4>
+            <table class="ac-table">
+              <thead><tr><th style="width:80px;">AC&nbsp;ID</th><th>验收条件</th></tr></thead>
+              <tbody>
+                <tr><td class="ac-id">AC-801</td><td>首次连接后端时，现有 localStorage 会话自动上传到后端，无需用户操作</td></tr>
+                <tr><td class="ac-id">AC-802</td><td>在新设备打开应用，登录后可看到所有之前保存的会话和消息</td></tr>
+                <tr><td class="ac-id">AC-803</td><td>发送一条消息后，2 秒内消息保存到后端数据库</td></tr>
+                <tr><td class="ac-id">AC-804</td><td>断网后继续对话，消息暂存本地；恢复网络后自动同步到后端</td></tr>
+                <tr><td class="ac-id">AC-805</td><td>在设备 A 删除某会话，设备 B 同步后该会话消失</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ────── 5.7 新用户引导流程 ────── -->
+        <div id="ch5-s7" class="mb-10">
+          <h3 class="subsection-title"><span class="tag tag-p1">P1</span> 5.7 新用户引导流程</h3>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">交互流程（状态图）</h4>
+            <pre class="mermaid">
+stateDiagram-v2
+  [*] --> Step1: 首次登录触发
+  Step1: Step 1 · 选择 AI 模型
+  Step1 --> Step2: 下一步
+  Step1 --> Done: 跳过
+  Step2: Step 2 · 发送第一条消息
+  Step2 --> Step3: 下一步
+  Step2 --> Step1: 上一步
+  Step2 --> Done: 跳过
+  Step3: Step 3 · 探索 Skills 市场
+  Step3 --> Done: 完成
+  Step3 --> Step2: 上一步
+  Done: 引导完成
+  Done --> [*]: onboarding_completed = true
+            </pre>
+          </div>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">业务规则</h4>
+            <ul class="rule-list">
+              <li>触发条件：用户 <code>onboarding_completed</code> 字段为 <code>false</code>（首次登录）</li>
+              <li>3 步引导：Step 1（选择模型）&rarr; Step 2（发送消息）&rarr; Step 3（探索 Skills）</li>
+              <li>展示形式：非侵入式 Tooltip 覆盖层，不使用全屏模态框</li>
+              <li>每步高亮对应 UI 元素（模型选择器 / 输入框 / Skills 入口），配合脉冲边框</li>
+              <li>每步均提供&ldquo;跳过&rdquo;按钮，Step 2 和 3 提供&ldquo;上一步&rdquo;按钮</li>
+              <li>完成或跳过均设置 <code>onboarding_completed: true</code>，写入后端用户设置</li>
+              <li>引导中途离开页面，下次加载从当前步恢复（步骤存 localStorage）</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">原型参考</h4>
+            <a href="./prototype_v1.0.html#onboarding" class="flow-ref">查看交互原型 &rarr; 新用户引导</a>
+          </div>
+
+          <div class="card" style="padding:0; overflow:hidden;">
+            <h4 class="text-sm font-semibold px-4 pt-3 pb-2" style="color:var(--accent);">验收标准</h4>
+            <table class="ac-table">
+              <thead><tr><th style="width:80px;">AC&nbsp;ID</th><th>验收条件</th></tr></thead>
+              <tbody>
+                <tr><td class="ac-id">AC-901</td><td>新用户登录后立即看到 Step 1 Tooltip 指向模型选择器</td></tr>
+                <tr><td class="ac-id">AC-902</td><td>点击&ldquo;下一步&rdquo;进入 Step 2，Tooltip 移动到输入框区域</td></tr>
+                <tr><td class="ac-id">AC-903</td><td>Step 2 展示 3 个快捷 Prompt 建议卡片</td></tr>
+                <tr><td class="ac-id">AC-904</td><td>点击&ldquo;下一步&rdquo;进入 Step 3，Tooltip 指向 Skills/Settings 入口</td></tr>
+                <tr><td class="ac-id">AC-905</td><td>点击&ldquo;完成&rdquo;或任意步骤的&ldquo;跳过&rdquo;，引导永久关闭</td></tr>
+                <tr><td class="ac-id">AC-906</td><td>老用户（<code>onboarding_completed = true</code>）永远不再看到引导流程</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ────── 5.8 统一用户画像 ────── -->
+        <div id="ch5-s8" class="mb-10">
+          <h3 class="subsection-title"><span class="tag tag-p1">P1</span> 5.8 统一用户画像</h3>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">业务规则</h4>
+            <ul class="rule-list">
+              <li>后端微型 Agent 基于用户交互数据自动维护画像，存储在用户数据分区的 <code>app_id: _profile</code> 命名空间</li>
+              <li>v1.0 画像字段（基础版）：偏好模型、使用频率、已激活 Skills 列表、常用话题分类</li>
+              <li>画像更新策略：每 10 次对话后触发一次画像重算（异步后台任务）</li>
+              <li>所有 Forsion App 可通过数据中枢 API 读取画像（只读），不允许直接写入</li>
+              <li>画像不覆盖用户显式设置（如用户手动选择的模型优先于画像推荐）</li>
+              <li>完整智能画像（含行为预测、个性化推荐）推迟到 v1.5</li>
+            </ul>
+          </div>
+
+          <div class="card" style="padding:0; overflow:hidden;">
+            <h4 class="text-sm font-semibold px-4 pt-3 pb-2" style="color:var(--accent);">验收标准</h4>
+            <table class="ac-table">
+              <thead><tr><th style="width:80px;">AC&nbsp;ID</th><th>验收条件</th></tr></thead>
+              <tbody>
+                <tr><td class="ac-id">AC-1001</td><td>用户使用 10 次对话后，后端画像记录中正确记录偏好模型</td></tr>
+                <tr><td class="ac-id">AC-1002</td><td>画像数据可通过数据中枢 API 被其他已授权 App 读取</td></tr>
+                <tr><td class="ac-id">AC-1003</td><td>用户手动选择模型时，不受画像中的偏好模型影响</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ────── 5.9 App 数据同步接口 ────── -->
+        <div id="ch5-s9" class="mb-10">
+          <h3 class="subsection-title"><span class="tag tag-p1">P1</span> 5.9 App 数据同步接口</h3>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">交互流程</h4>
+            <pre class="mermaid">
+flowchart TD
+  app["Forsion App（如 Calendar）"] --> pushData["POST /api/data-hub/sync"]
+  pushData --> authCheck{Token 有效?}
+  authCheck -- 否 --> reject401["401 Unauthorized"]
+  authCheck -- 是 --> rateCheck{频率限制?}
+  rateCheck -- 超限 --> reject429["429 Too Many Requests"]
+  rateCheck -- 正常 --> validate{数据格式校验}
+  validate -- 失败 --> reject400["400 Bad Request"]
+  validate -- 通过 --> syncMode{同步模式}
+  syncMode --> full["full：替换该 App 全部数据"]
+  syncMode --> incremental["incremental：增量更新"]
+  full --> store["写入用户数据分区"]
+  incremental --> store
+  store --> success["200 OK + 同步摘要"]
+            </pre>
+          </div>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">业务规则</h4>
+            <ul class="rule-list">
+              <li>标准 REST API：<code>POST /api/data-hub/sync</code>，请求体 <code>{ app_id, data_type, sync_mode, payload }</code></li>
+              <li>鉴权：使用用户的 auth_token（从前端传递），后端校验身份</li>
+              <li>每个 App 自定义数据 Schema（Calendar: events，Desktop: file_index 等）</li>
+              <li>两种同步模式：<code>full</code>（替换全部数据）、<code>incremental</code>（新增/更新指定记录）</li>
+              <li>频率限制：每用户每 App 每分钟最多 100 次同步请求</li>
+              <li>后端按已注册的 App Schema 校验 payload 格式</li>
+            </ul>
+          </div>
+
+          <div class="card" style="padding:0; overflow:hidden;">
+            <h4 class="text-sm font-semibold px-4 pt-3 pb-2" style="color:var(--accent);">验收标准</h4>
+            <table class="ac-table">
+              <thead><tr><th style="width:80px;">AC&nbsp;ID</th><th>验收条件</th></tr></thead>
+              <tbody>
+                <tr><td class="ac-id">AC-1101</td><td>Calendar App 通过同步 API 推送日程数据，数据正确存储在用户的 calendar 命名空间</td></tr>
+                <tr><td class="ac-id">AC-1102</td><td>无有效 auth_token 的同步请求返回 401</td></tr>
+                <tr><td class="ac-id">AC-1103</td><td>incremental 模式：更新已有记录不会丢失其他记录</td></tr>
+                <tr><td class="ac-id">AC-1104</td><td>超出频率限制的请求返回 429 + <code>Retry-After</code> 头</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ────── 5.10 官方 Skills 管理（后台） ────── -->
+        <div id="ch5-s10" class="mb-10">
+          <h3 class="subsection-title"><span class="tag tag-p1">P1</span> 5.10 官方 Skills 管理（后台）</h3>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">交互流程</h4>
+            <pre class="mermaid">
+flowchart TD
+  admin["管理员登录后台"] --> skillsSection["进入 Skills 管理"]
+  skillsSection --> action{操作}
+  action --> addSkill["添加新 Skill"]
+  action --> editSkill["编辑 Skill 元数据"]
+  action --> toggleVis["切换可见性"]
+  action --> setOrder["设置推荐排序"]
+  addSkill --> fillMeta["填写：名称/描述/图标/Tools/版本/分类"]
+  fillMeta --> saveDB["保存到 skills_catalog 表"]
+  editSkill --> saveDB
+  toggleVis --> visChoice{可见性}
+  visChoice --> public["公开（市场可见）"]
+  visChoice --> hidden["隐藏（仅已安装可见）"]
+  visChoice --> deprecated["已弃用"]
+  public --> saveDB
+  hidden --> saveDB
+  deprecated --> saveDB
+  setOrder --> saveDB
+  saveDB --> syncMarket["Skills 市场自动同步最新目录"]
+            </pre>
+          </div>
+
+          <div class="card">
+            <h4 class="text-sm font-semibold mb-3" style="color:var(--accent);">业务规则</h4>
+            <ul class="rule-list">
+              <li>管理后台新增&ldquo;Skills 管理&rdquo;模块，仅管理员角色可访问</li>
+              <li>CRUD 操作：添加、编辑元数据、切换可见性、设置展示顺序、移除 Skill</li>
+              <li>Skill 元数据存储在后端数据库 <code>skills_catalog</code> 表，非 SKILL.md 文件</li>
+              <li>后端通过 <code>GET /api/skills/catalog</code> 向前端提供官方 Skill 目录</li>
+              <li>可见性三级：公开（市场可见）、隐藏（仅已安装用户可见）、已弃用（逐步下线）</li>
+              <li>推荐排序：管理员设置的 <code>sort_order</code> 决定 Skills 市场的展示顺序</li>
+              <li>Skill 元数据字段：name, description, icon, tools[], version, author, category, visibility, sort_order</li>
+            </ul>
+          </div>
+
+          <div class="card" style="padding:0; overflow:hidden;">
+            <h4 class="text-sm font-semibold px-4 pt-3 pb-2" style="color:var(--accent);">验收标准</h4>
+            <table class="ac-table">
+              <thead><tr><th style="width:80px;">AC&nbsp;ID</th><th>验收条件</th></tr></thead>
+              <tbody>
+                <tr><td class="ac-id">AC-1201</td><td>管理员在后台可看到&ldquo;Skills 管理&rdquo;入口和 Skill 列表</td></tr>
+                <tr><td class="ac-id">AC-1202</td><td>管理员可添加新的官方 Skill（填写完整元数据）并成功保存</td></tr>
+                <tr><td class="ac-id">AC-1203</td><td>管理员可将 Skill 在 公开/隐藏/已弃用 三个可见性之间切换</td></tr>
+                <tr><td class="ac-id">AC-1204</td><td>管理员设置展示顺序后，前端 Skills 市场按该顺序排列</td></tr>
+                <tr><td class="ac-id">AC-1205</td><td>非管理员用户无法访问 Skills 管理功能（API 返回 403）</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </section>
 
       <!-- ===== 六、业务流程图 ===== -->
@@ -706,6 +1358,410 @@
         </div>
       </section>
 
+      <!-- ===== 十一、开发任务清单 ===== -->
+      <section id="ch11" class="section">
+        <h2 class="section-title">十一、开发任务清单</h2>
+        <p class="text-sm mb-6" style="color:var(--text2);">
+          以下任务从 &sect;五 详细方案中拆解而来，供 AI Coding Agent（<code>forsion-dev</code>）逐条执行。
+          每个 Task 关联 &sect;五 中的 AC 验收标准，确保可独立验证。
+        </p>
+        <p class="text-xs mb-6" style="color:var(--text3);">
+          类型：前端 / 后端 / 全栈 &nbsp;|&nbsp; 优先级：P0（必须）/ P1（重要）/ P2（可选）&nbsp;|&nbsp; 预估：XS / S / M / L（相对工作量）
+        </p>
+
+        <!-- Epic 1: Skills 市场与作用域管理 -->
+        <div class="mb-8">
+          <h3 class="text-base font-semibold mb-3 flex items-center gap-2" style="color:var(--text);">
+            <span class="tag tag-p0">P0</span> Epic 1: Skills 市场与作用域管理
+          </h3>
+          <div class="card" style="padding:0; overflow-x:auto;">
+            <table class="task-table">
+              <thead>
+                <tr><th>Task ID</th><th>描述</th><th>类型</th><th>优先级</th><th>AC 关联</th><th>预估</th><th>状态</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>T-001</strong></td>
+                  <td>创建 SkillsMarket 组件 &mdash; SettingsModal 新增 Skills Tab，实现 Skill 卡片网格布局、图标/名称/描述/徽章展示</td>
+                  <td>前端</td><td><span class="tag tag-p0">P0</span></td>
+                  <td>AC-101</td><td>M</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-002</strong></td>
+                  <td>实现 Skills 搜索与筛选功能 &mdash; 搜索框模糊匹配（debounce 300ms）+ 全部/官方/已安装筛选按钮</td>
+                  <td>前端</td><td><span class="tag tag-p0">P0</span></td>
+                  <td>AC-102, AC-103</td><td>S</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-003</strong></td>
+                  <td>实现 Skill 安装/卸载交互与状态管理 &mdash; 安装按钮状态切换、已激活列表维护、跨应用 Skill 标记&ldquo;需授权&rdquo;</td>
+                  <td>前端</td><td><span class="tag tag-p0">P0</span></td>
+                  <td>AC-104, AC-105, AC-106</td><td>M</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-004</strong></td>
+                  <td>自定义 Skill 创建入口集成 &mdash; &ldquo;创建自定义 Skill&rdquo;卡片连接现有 SkillEditor 组件</td>
+                  <td>前端</td><td><span class="tag tag-p1">P1</span></td>
+                  <td>AC-107</td><td>S</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-005</strong></td>
+                  <td>实现 Skill 作用域控制 UI &mdash; 全局/仅当前 Session/已禁用三档切换，Workspace Skill 锁定</td>
+                  <td>前端</td><td><span class="tag tag-p0">P0</span></td>
+                  <td>AC-201, AC-202, AC-203, AC-204</td><td>M</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-006</strong></td>
+                  <td>作用域持久化与 Agent Runtime 注入逻辑 &mdash; localStorage 存储 + agentRuntime 根据作用域过滤 Skills 注入</td>
+                  <td>前端</td><td><span class="tag tag-p0">P0</span></td>
+                  <td>AC-201, AC-205</td><td>M</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Epic 2: Skill 执行可视化 -->
+        <div class="mb-8">
+          <h3 class="text-base font-semibold mb-3 flex items-center gap-2" style="color:var(--text);">
+            <span class="tag tag-p1">P1</span> Epic 2: Skill 执行可视化
+          </h3>
+          <div class="card" style="padding:0; overflow-x:auto;">
+            <table class="task-table">
+              <thead>
+                <tr><th>Task ID</th><th>描述</th><th>类型</th><th>优先级</th><th>AC 关联</th><th>预估</th><th>状态</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>T-007</strong></td>
+                  <td>增强 ToolCallBlock 组件 &mdash; 三态视觉展示（执行中 Spinner / 成功绿勾+耗时 / 失败红叉+错误信息）</td>
+                  <td>前端</td><td><span class="tag tag-p1">P1</span></td>
+                  <td>AC-301, AC-302, AC-303</td><td>M</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-008</strong></td>
+                  <td>实现 Tool Call 展开详情与重试功能 &mdash; 成功态可展开 JSON 详情，失败态提供 [重试] 按钮触发重新执行</td>
+                  <td>前端</td><td><span class="tag tag-p1">P1</span></td>
+                  <td>AC-302, AC-304</td><td>S</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-009</strong></td>
+                  <td>多 Tool Call 顺序展示与超时处理 &mdash; 单消息多 Tool 依序渲染，30s 超时状态切换</td>
+                  <td>前端</td><td><span class="tag tag-p1">P1</span></td>
+                  <td>AC-305</td><td>S</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Epic 3: 跨应用数据中枢 -->
+        <div class="mb-8">
+          <h3 class="text-base font-semibold mb-3 flex items-center gap-2" style="color:var(--text);">
+            <span class="tag tag-p0">P0</span> Epic 3: 跨应用数据中枢
+          </h3>
+          <div class="card" style="padding:0; overflow-x:auto;">
+            <table class="task-table">
+              <thead>
+                <tr><th>Task ID</th><th>描述</th><th>类型</th><th>优先级</th><th>AC 关联</th><th>预估</th><th>状态</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>T-010</strong></td>
+                  <td>设计并创建 user_data_partitions 数据表 &mdash; 含 user_id, app_id, data_type, payload JSON, timestamps；编写 migration 脚本</td>
+                  <td>后端</td><td><span class="tag tag-p0">P0</span></td>
+                  <td>AC-401</td><td>L</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-011</strong></td>
+                  <td>实现数据中枢 CRUD API &mdash; <code>GET/POST /api/data-hub/{app_id}/{resource}</code>，含鉴权和数据分区路由</td>
+                  <td>后端</td><td><span class="tag tag-p0">P0</span></td>
+                  <td>AC-402, AC-501</td><td>L</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-012</strong></td>
+                  <td>创建 Forsion Calendar Skill &mdash; <code>.skill.md</code> 定义 + http executor tools（get_events, create_event, update_event）</td>
+                  <td>全栈</td><td><span class="tag tag-p0">P0</span></td>
+                  <td>AC-501, AC-502, AC-503</td><td>M</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-013</strong></td>
+                  <td>实现授权检查中间件与授权记录存储 &mdash; 后端 <code>app_authorizations</code> 表 + 中间件校验 + 前端授权状态查询</td>
+                  <td>后端</td><td><span class="tag tag-p0">P0</span></td>
+                  <td>AC-502, AC-503, AC-604</td><td>M</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-014</strong></td>
+                  <td>实现前端授权确认弹窗组件 &mdash; App 名称/图标/权限明细/隐私说明 + 允许/拒绝按钮 + 后端授权记录写入</td>
+                  <td>前端</td><td><span class="tag tag-p0">P0</span></td>
+                  <td>AC-601, AC-602, AC-603</td><td>M</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-015</strong></td>
+                  <td>Settings 数据授权管理页面 &mdash; 展示已授权 App 列表 + 逐项撤销功能</td>
+                  <td>前端</td><td><span class="tag tag-p0">P0</span></td>
+                  <td>AC-604, AC-605</td><td>S</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Epic 4: 多主题风格系统 -->
+        <div class="mb-8">
+          <h3 class="text-base font-semibold mb-3 flex items-center gap-2" style="color:var(--text);">
+            <span class="tag tag-p0">P0</span> Epic 4: 多主题风格系统
+          </h3>
+          <div class="card" style="padding:0; overflow-x:auto;">
+            <table class="task-table">
+              <thead>
+                <tr><th>Task ID</th><th>描述</th><th>类型</th><th>优先级</th><th>AC 关联</th><th>预估</th><th>状态</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>T-016</strong></td>
+                  <td>扩展 themePreset 状态与类型定义 &mdash; 新增 <code>'apple'</code> 和 <code>'forsion1'</code> 预设值，更新 AppSettings 类型</td>
+                  <td>前端</td><td><span class="tag tag-p0">P0</span></td>
+                  <td>AC-701</td><td>S</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-017</strong></td>
+                  <td>实现 Apple Glass 主题 CSS &mdash; 浅灰底 + 毛玻璃卡片 + 多彩渐变图标 + 全圆角按钮 + 亮暗双版本</td>
+                  <td>前端</td><td><span class="tag tag-p0">P0</span></td>
+                  <td>AC-703</td><td>M</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-018</strong></td>
+                  <td>实现 Forsion Theme 1 CSS &mdash; 莫兰迪色系 + 暖灰底 #edeae5 + 苹果级毛玻璃 + 亮暗双版本</td>
+                  <td>前端</td><td><span class="tag tag-p0">P0</span></td>
+                  <td>AC-704</td><td>M</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-019</strong></td>
+                  <td>Settings 主题选择器扩展 &mdash; 5 个预设卡片 UI + 后端持久化 + 亮暗模式独立切换</td>
+                  <td>前端</td><td><span class="tag tag-p0">P0</span></td>
+                  <td>AC-701, AC-705, AC-706</td><td>S</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-020</strong></td>
+                  <td>全页面主题兼容性验证与修复 &mdash; 5 主题 &times; 2 模式 全页面渲染测试，修复样式问题</td>
+                  <td>前端</td><td><span class="tag tag-p0">P0</span></td>
+                  <td>AC-707</td><td>M</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Epic 5: 对话历史云同步 -->
+        <div class="mb-8">
+          <h3 class="text-base font-semibold mb-3 flex items-center gap-2" style="color:var(--text);">
+            <span class="tag tag-p1">P1</span> Epic 5: 对话历史云同步
+          </h3>
+          <div class="card" style="padding:0; overflow-x:auto;">
+            <table class="task-table">
+              <thead>
+                <tr><th>Task ID</th><th>描述</th><th>类型</th><th>优先级</th><th>AC 关联</th><th>预估</th><th>状态</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>T-021</strong></td>
+                  <td>设计 chat_sessions / chat_messages 数据表与 migration 脚本</td>
+                  <td>后端</td><td><span class="tag tag-p1">P1</span></td>
+                  <td>AC-801</td><td>M</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-022</strong></td>
+                  <td>实现会话与消息 CRUD API &mdash; <code>/api/chat/sessions</code> + <code>/api/chat/messages</code>，含分页和批量操作</td>
+                  <td>后端</td><td><span class="tag tag-p1">P1</span></td>
+                  <td>AC-802, AC-803, AC-805</td><td>L</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-023</strong></td>
+                  <td>前端 localStorage &rarr; 后端迁移逻辑 &mdash; 首次连接时批量上传本地会话，标记迁移完成</td>
+                  <td>前端</td><td><span class="tag tag-p1">P1</span></td>
+                  <td>AC-801</td><td>M</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-024</strong></td>
+                  <td>实现实时自动保存与冲突解决 &mdash; 消息发送后 2s 内保存到后端，Last-Write-Wins 策略</td>
+                  <td>全栈</td><td><span class="tag tag-p1">P1</span></td>
+                  <td>AC-803, AC-804</td><td>L</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-025</strong></td>
+                  <td>离线队列与重连同步机制 &mdash; 断网时变更入队列，重连后批量同步 + 冲突提示</td>
+                  <td>前端</td><td><span class="tag tag-p1">P1</span></td>
+                  <td>AC-804</td><td>M</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Epic 6: 新用户引导 -->
+        <div class="mb-8">
+          <h3 class="text-base font-semibold mb-3 flex items-center gap-2" style="color:var(--text);">
+            <span class="tag tag-p1">P1</span> Epic 6: 新用户引导
+          </h3>
+          <div class="card" style="padding:0; overflow-x:auto;">
+            <table class="task-table">
+              <thead>
+                <tr><th>Task ID</th><th>描述</th><th>类型</th><th>优先级</th><th>AC 关联</th><th>预估</th><th>状态</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>T-026</strong></td>
+                  <td>创建 OnboardingFlow 组件 &mdash; 3 步 Tooltip 覆盖层，高亮对应 UI 元素（模型选择器/输入框/Skills 入口）+ 脉冲边框</td>
+                  <td>前端</td><td><span class="tag tag-p1">P1</span></td>
+                  <td>AC-901, AC-902, AC-904</td><td>M</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-027</strong></td>
+                  <td>实现引导步骤快捷 Prompt 建议卡片 &mdash; Step 2 展示 3 个点击即发送的场景化建议</td>
+                  <td>前端</td><td><span class="tag tag-p1">P1</span></td>
+                  <td>AC-903</td><td>S</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-028</strong></td>
+                  <td>引导状态持久化 &mdash; <code>onboarding_completed</code> 写入后端用户设置 + localStorage 步骤暂存</td>
+                  <td>全栈</td><td><span class="tag tag-p1">P1</span></td>
+                  <td>AC-905, AC-906</td><td>S</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Epic 7: 官方 Skills 管理（后台） -->
+        <div class="mb-8">
+          <h3 class="text-base font-semibold mb-3 flex items-center gap-2" style="color:var(--text);">
+            <span class="tag tag-p1">P1</span> Epic 7: 官方 Skills 管理（后台）
+          </h3>
+          <div class="card" style="padding:0; overflow-x:auto;">
+            <table class="task-table">
+              <thead>
+                <tr><th>Task ID</th><th>描述</th><th>类型</th><th>优先级</th><th>AC 关联</th><th>预估</th><th>状态</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>T-029</strong></td>
+                  <td>设计 skills_catalog 数据表与 migration &mdash; 含 name, description, icon, tools, version, author, category, visibility, sort_order</td>
+                  <td>后端</td><td><span class="tag tag-p1">P1</span></td>
+                  <td>AC-1201</td><td>S</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-030</strong></td>
+                  <td>实现 Skills Catalog CRUD API &mdash; <code>/api/admin/skills</code> + <code>GET /api/skills/catalog</code>（公开只读）</td>
+                  <td>后端</td><td><span class="tag tag-p1">P1</span></td>
+                  <td>AC-1202, AC-1203, AC-1204</td><td>M</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-031</strong></td>
+                  <td>管理后台 Skills Management 页面 &mdash; Skill 列表 + 添加/编辑元数据弹窗 + 可见性切换 + 拖拽排序</td>
+                  <td>前端</td><td><span class="tag tag-p1">P1</span></td>
+                  <td>AC-1201, AC-1202, AC-1203, AC-1204</td><td>M</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-032</strong></td>
+                  <td>权限控制 &mdash; adminMiddleware 限制 Skills 管理 API，非管理员返回 403</td>
+                  <td>后端</td><td><span class="tag tag-p1">P1</span></td>
+                  <td>AC-1205</td><td>S</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-033</strong></td>
+                  <td>Skills 市场对接后端 Catalog API &mdash; 前端从 <code>/api/skills/catalog</code> 获取官方 Skill 列表，替代本地 registry</td>
+                  <td>前端</td><td><span class="tag tag-p1">P1</span></td>
+                  <td>AC-1204</td><td>M</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Epic 8: 统一用户画像与数据同步 -->
+        <div class="mb-8">
+          <h3 class="text-base font-semibold mb-3 flex items-center gap-2" style="color:var(--text);">
+            <span class="tag tag-p1">P1</span> Epic 8: 统一用户画像与数据同步
+          </h3>
+          <div class="card" style="padding:0; overflow-x:auto;">
+            <table class="task-table">
+              <thead>
+                <tr><th>Task ID</th><th>描述</th><th>类型</th><th>优先级</th><th>AC 关联</th><th>预估</th><th>状态</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>T-034</strong></td>
+                  <td>实现 App 数据同步 API &mdash; <code>POST /api/data-hub/sync</code>，含 full/incremental 模式 + 频率限制 + Schema 校验</td>
+                  <td>后端</td><td><span class="tag tag-p1">P1</span></td>
+                  <td>AC-1101, AC-1102, AC-1103, AC-1104</td><td>M</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+                <tr>
+                  <td><strong>T-035</strong></td>
+                  <td>实现统一用户画像基础功能 &mdash; 偏好模型追踪 + 画像数据存储在 <code>_profile</code> 命名空间 + 数据中枢 API 只读暴露</td>
+                  <td>后端</td><td><span class="tag tag-p1">P1</span></td>
+                  <td>AC-1001, AC-1002, AC-1003</td><td>M</td>
+                  <td class="text-green-600 font-medium">已完成</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 任务汇总 -->
+        <div class="card" style="background:var(--accent-bg); border-color:var(--accent-border);">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-sm font-semibold" style="color:var(--accent);">任务汇总</div>
+              <div class="text-xs mt-1" style="color:var(--text2);">
+                共 <strong>35</strong> 个 Task &nbsp;|&nbsp;
+                P0: <strong>17</strong> 个 &nbsp;|&nbsp;
+                P1: <strong>18</strong> 个 &nbsp;|&nbsp;
+                8 个 Epic
+              </div>
+            </div>
+            <div class="text-xs" style="color:var(--text3);">
+              前端: 20 &nbsp;|&nbsp; 后端: 11 &nbsp;|&nbsp; 全栈: 4
+            </div>
+          </div>
+        </div>
+
+      </section>
+
     </div>
   </main>
 
@@ -724,6 +1780,10 @@
     (function init() {
       const saved = localStorage.getItem('prd-theme');
       if (saved === 'dark') document.documentElement.dataset.theme = 'dark';
+
+      if (typeof mermaid !== 'undefined') {
+        mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });
+      }
 
       const observer = new IntersectionObserver(entries => {
         entries.forEach(entry => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Bot, Trash2, Plus, RefreshCw, Globe, Code2, Zap, CheckCircle2, XCircle, Loader2, Wrench, Pencil } from 'lucide-react';
-import { AgentConfig, McpServerConfig, SkillDefinition, CustomSkillDefinition } from '../types'; // SkillDefinition used for workspaceSkills state type
+import { X, Bot, Trash2, Plus, RefreshCw, Globe, Code2, Zap, CheckCircle2, XCircle, Loader2, Wrench, Pencil, RotateCcw } from 'lucide-react';
+import { AgentConfig, AgentDefaults, McpServerConfig, SkillDefinition, CustomSkillDefinition } from '../types';
 import { connectMcpServer, disconnectMcpServer } from '../services/mcpClient';
 import { getAllBuiltinSkills } from '../services/skillsRegistry';
 import { listWorkspaceSkills, saveWorkspaceSkill, deleteWorkspaceSkill, migrateLocalStorageSkills } from '../services/agentWorkspace';
@@ -10,6 +10,7 @@ import SkillEditor from './SkillEditor';
 interface AgentConfigPanelProps {
   sessionId: string;
   agentConfig: AgentConfig | undefined;
+  globalDefaults?: AgentDefaults;
   onSave: (config: AgentConfig) => void;
   onSkillsChanged?: () => void;
   onClose: () => void;
@@ -17,7 +18,6 @@ interface AgentConfigPanelProps {
 }
 
 const DEFAULT_CONFIG: AgentConfig = {
-  enabled: false,
   systemPrompt: '',
   enabledSkillIds: [],
   mcpServers: [],
@@ -34,6 +34,7 @@ const SKILL_ICONS: Record<string, React.ElementType> = {
 const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
   sessionId,
   agentConfig,
+  globalDefaults,
   onSave,
   onClose,
   themePreset,
@@ -46,7 +47,6 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
   const [editingSkill, setEditingSkill] = useState<CustomSkillDefinition | null>(null);
   const [showSkillEditor, setShowSkillEditor] = useState(false);
 
-  // Combined skills: builtin + workspace session skills
   const [workspaceSkills, setWorkspaceSkills] = useState<SkillDefinition[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(true);
 
@@ -55,7 +55,6 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
   useEffect(() => {
     let cancelled = false;
     setLoadingSkills(true);
-    // Run migration first, then load workspace skills
     migrateLocalStorageSkills(sessionId)
       .then(() => listWorkspaceSkills(sessionId))
       .then((skills) => {
@@ -78,6 +77,55 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
     : isMonet
       ? 'text-rose-600 dark:text-rose-300'
       : 'text-cyan-400';
+
+  const isInherited = (field: 'systemPrompt' | 'maxIterations' | 'enabledSkillIds' | 'mcpServers'): boolean => {
+    if (!globalDefaults) return false;
+    switch (field) {
+      case 'systemPrompt':
+        return (config.systemPrompt ?? '') === (globalDefaults.systemPrompt ?? '');
+      case 'maxIterations':
+        return config.maxIterations === globalDefaults.maxIterations;
+      case 'enabledSkillIds':
+        return JSON.stringify([...config.enabledSkillIds].sort()) === JSON.stringify([...globalDefaults.enabledSkillIds].sort());
+      case 'mcpServers':
+        return config.mcpServers.length === globalDefaults.mcpServers.length &&
+          config.mcpServers.every((s, i) => s.url === globalDefaults.mcpServers[i]?.url && s.name === globalDefaults.mcpServers[i]?.name);
+    }
+  };
+
+  const resetToGlobal = (field: 'systemPrompt' | 'maxIterations' | 'enabledSkillIds' | 'mcpServers') => {
+    if (!globalDefaults) return;
+    switch (field) {
+      case 'systemPrompt':
+        setConfig(prev => ({ ...prev, systemPrompt: globalDefaults.systemPrompt }));
+        break;
+      case 'maxIterations':
+        setConfig(prev => ({ ...prev, maxIterations: globalDefaults.maxIterations }));
+        break;
+      case 'enabledSkillIds':
+        setConfig(prev => ({ ...prev, enabledSkillIds: [...globalDefaults.enabledSkillIds] }));
+        break;
+      case 'mcpServers':
+        setConfig(prev => ({ ...prev, mcpServers: globalDefaults.mcpServers.map(s => ({ ...s, status: 'disconnected' as const })) }));
+        break;
+    }
+  };
+
+  const inheritedBadge = (field: 'systemPrompt' | 'maxIterations' | 'enabledSkillIds' | 'mcpServers') => {
+    if (!globalDefaults) return null;
+    if (isInherited(field)) {
+      return <span className="text-[10px] opacity-40 ml-2">from global</span>;
+    }
+    return (
+      <button
+        onClick={() => resetToGlobal(field)}
+        className="text-[10px] opacity-40 hover:opacity-80 ml-2 flex items-center gap-0.5 transition-opacity"
+        title="Reset to global default"
+      >
+        <RotateCcw size={9} /> reset
+      </button>
+    );
+  };
 
   const toggleSkill = (skillId: string) => {
     setConfig((prev) => ({
@@ -128,13 +176,7 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
         ...prev,
         mcpServers: prev.mcpServers.map((s) =>
           s.id === server.id
-            ? {
-                ...s,
-                status: 'connected',
-                discoveredTools: tools,
-                lastConnectedAt: Date.now(),
-                errorMessage: undefined,
-              }
+            ? { ...s, status: 'connected', discoveredTools: tools, lastConnectedAt: Date.now(), errorMessage: undefined }
             : s
         ),
       }));
@@ -168,7 +210,7 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2">
             <Bot size={18} className={accentClass} />
-            <h2 className="font-semibold text-sm">Session Agent Config</h2>
+            <h2 className="font-semibold text-sm">Session Settings</h2>
           </div>
           <button onClick={onClose} className="opacity-60 hover:opacity-100 transition-opacity">
             <X size={18} />
@@ -176,25 +218,12 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
         </div>
 
         <div className="p-4 space-y-4">
-          {/* Enable toggle */}
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">Enable Agent Mode</p>
-              <p className="text-xs opacity-60 mt-0.5">Allow this session to call tools autonomously</p>
-            </div>
-            <button
-              onClick={() => setConfig((prev) => ({ ...prev, enabled: !prev.enabled }))}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${config.enabled ? (isNotion ? 'bg-gray-800' : isMonet ? 'bg-rose-500' : 'bg-cyan-500') : 'bg-gray-300 dark:bg-gray-600'}`}
-            >
-              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${config.enabled ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
-            </button>
-          </div>
-
-          <div className={divider} />
-
           {/* System Prompt */}
           <div>
-            <p className={sectionTitle}>System Prompt</p>
+            <div className="flex items-center">
+              <p className={sectionTitle}>System Prompt</p>
+              {inheritedBadge('systemPrompt')}
+            </div>
             <textarea
               value={config.systemPrompt ?? ''}
               onChange={(e) => setConfig((prev) => ({ ...prev, systemPrompt: e.target.value }))}
@@ -209,7 +238,10 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
           {/* Skills */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <p className={sectionTitle}>Skills</p>
+              <div className="flex items-center">
+                <p className={sectionTitle}>Skills</p>
+                {inheritedBadge('enabledSkillIds')}
+              </div>
               <button
                 onClick={() => { setEditingSkill(null); setShowSkillEditor(true); }}
                 className="flex items-center gap-1 text-[10px] opacity-50 hover:opacity-100 transition-opacity"
@@ -244,7 +276,6 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
                       <span className="opacity-60 text-[10px] text-center leading-tight">{skill.description}</span>
                       {isCustom && <span className="text-[8px] opacity-40 mt-0.5">{(skill as CustomSkillDefinition).tools.length} tools</span>}
                     </button>
-                    {/* Edit / Delete buttons for custom skills */}
                     {isCustom && (
                       <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover/skill:opacity-100 transition-opacity">
                         <button
@@ -280,7 +311,10 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
 
           {/* MCP Servers */}
           <div>
-            <p className={sectionTitle}>MCP Servers</p>
+            <div className="flex items-center">
+              <p className={sectionTitle}>MCP Servers</p>
+              {inheritedBadge('mcpServers')}
+            </div>
             <div className="space-y-2 mb-3">
               {config.mcpServers.map((server) => {
                 const isConnecting = connectingId === server.id;
@@ -336,7 +370,6 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
               })}
             </div>
 
-            {/* Add server */}
             <div className="flex gap-2">
               <input
                 value={newMcpName}
@@ -366,7 +399,10 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
           {/* Max Iterations */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <p className={sectionTitle}>Max Iterations</p>
+              <div className="flex items-center">
+                <p className={sectionTitle}>Max Iterations</p>
+                {inheritedBadge('maxIterations')}
+              </div>
               <span className="text-xs font-mono font-medium">{config.maxIterations}</span>
             </div>
             <input
@@ -401,7 +437,6 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
         </div>
       </div>
 
-      {/* Skill Editor modal */}
       {showSkillEditor && (
         <SkillEditor
           skill={editingSkill ?? undefined}
