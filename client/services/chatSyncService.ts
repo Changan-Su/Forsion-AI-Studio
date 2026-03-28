@@ -1,7 +1,5 @@
 import { ChatSession, Message } from '../types';
-import { API_BASE_URL } from '../config';
-
-const APP_ID = 'ai-studio';
+import { API_BASE_URL, APP_ID } from '../config';
 
 const getHeaders = (): HeadersInit => {
   const token = localStorage.getItem('auth_token');

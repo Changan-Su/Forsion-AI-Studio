@@ -2,12 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, FolderOpen, FileText, FileImage, FileCode, Trash2, Download, Eye, RefreshCw } from 'lucide-react';
 import { WorkspaceFileMetadata } from '../types';
 import { workspaceService } from '../services/workspaceService';
+import { AnimatedPanel } from './AnimatedUI';
 
 interface WorkspacePanelProps {
   sessionId: string;
   isOpen: boolean;
   onClose: () => void;
-  themePreset: 'default' | 'notion' | 'monet';
+  themePreset: 'default' | 'notion' | 'monet' | 'apple' | 'forsion1';
 }
 
 function formatSize(bytes: number): string {
@@ -29,6 +30,8 @@ const WorkspacePanel: React.FC<WorkspacePanelProps> = ({ sessionId, isOpen, onCl
 
   const isNotion = themePreset === 'notion';
   const isMonet = themePreset === 'monet';
+  const isApple = themePreset === 'apple';
+  const isForsion1 = themePreset === 'forsion1';
 
   const refresh = useCallback(async () => {
     if (!sessionId) return;
@@ -81,29 +84,41 @@ const WorkspacePanel: React.FC<WorkspacePanelProps> = ({ sessionId, isOpen, onCl
     ? 'bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700'
     : isMonet
       ? 'bg-rose-50/95 dark:bg-gray-900/95 border-l border-rose-200/50 dark:border-rose-800/30 backdrop-blur-xl'
-      : 'bg-gray-900/95 border-l border-gray-700 backdrop-blur-xl';
+      : isApple
+        ? 'apple-glass border-l border-gray-200 dark:border-gray-700'
+        : isForsion1
+          ? 'forsion1-glass border-l border-[#d5d0c8] dark:border-gray-700'
+          : 'bg-white/95 dark:bg-gray-900/95 border-l border-gray-200 dark:border-gray-700 backdrop-blur-xl';
 
-  const accentText = isNotion ? 'text-gray-800 dark:text-gray-200' : isMonet ? 'text-rose-600 dark:text-rose-300' : 'text-cyan-400';
+  const accentText = isNotion
+    ? 'text-gray-800 dark:text-gray-200'
+    : isMonet
+      ? 'text-rose-600 dark:text-rose-300'
+      : isApple
+        ? 'text-blue-600 dark:text-blue-400'
+        : isForsion1
+          ? 'text-amber-700 dark:text-amber-400'
+          : 'text-forsion-600 dark:text-cyan-400';
 
   return (
-    <div className={`fixed top-0 right-0 h-full w-80 z-40 shadow-2xl flex flex-col ${bgClass}`}>
+    <AnimatedPanel side="right" className={`fixed top-0 right-0 h-full w-80 z-40 shadow-2xl flex flex-col ${bgClass}`}>
       {/* Header */}
       <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-2">
           <FolderOpen size={16} className={accentText} />
-          <span className="text-sm font-semibold">Workspace</span>
-          <span className="text-[10px] opacity-50">{files.length} files</span>
+          <span className="text-sm font-semibold text-gray-900 dark:text-white">Workspace</span>
+          <span className="text-[10px] text-gray-500 dark:text-gray-400">{files.length} files</span>
         </div>
         <div className="flex gap-1">
-          <button onClick={refresh} className="opacity-50 hover:opacity-100 p-1"><RefreshCw size={14} /></button>
-          <button onClick={onClose} className="opacity-50 hover:opacity-100 p-1"><X size={16} /></button>
+          <button onClick={refresh} className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white p-1 transition-colors"><RefreshCw size={14} /></button>
+          <button onClick={onClose} className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white p-1 transition-colors"><X size={16} /></button>
         </div>
       </div>
 
       {/* File list */}
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
         {files.length === 0 && (
-          <div className="text-center py-8 opacity-40 text-xs">
+          <div className="text-center py-8 text-gray-400 dark:text-gray-500 text-xs">
             <FolderOpen size={32} className="mx-auto mb-2 opacity-30" />
             <p>No files in workspace</p>
             <p className="mt-1">Upload files or let the agent create them</p>
@@ -118,8 +133,8 @@ const WorkspacePanel: React.FC<WorkspacePanelProps> = ({ sessionId, isOpen, onCl
             >
               <Icon size={14} className={`shrink-0 ${accentText}`} />
               <div className="flex-1 min-w-0">
-                <div className="font-medium truncate">{f.path}</div>
-                <div className="opacity-40">{formatSize(f.size)} &middot; {new Date(f.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                <div className="font-medium truncate text-gray-900 dark:text-gray-100">{f.path}</div>
+                <div className="text-gray-500 dark:text-gray-400">{formatSize(f.size)} &middot; {new Date(f.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
               </div>
               <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                 <button onClick={() => handlePreview(f.path, f.mimeType)} className="p-1 hover:text-blue-400" title="Preview">
@@ -155,7 +170,7 @@ const WorkspacePanel: React.FC<WorkspacePanelProps> = ({ sessionId, isOpen, onCl
           </div>
         </div>
       )}
-    </div>
+    </AnimatedPanel>
   );
 };
 

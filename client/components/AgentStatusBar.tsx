@@ -6,7 +6,7 @@ interface AgentStatusBarProps {
   currentIteration: number;
   maxIterations: number;
   currentToolName?: string;
-  themePreset: 'default' | 'notion' | 'monet';
+  themePreset: 'default' | 'notion' | 'monet' | 'apple' | 'forsion1';
 }
 
 const AgentStatusBar: React.FC<AgentStatusBarProps> = ({

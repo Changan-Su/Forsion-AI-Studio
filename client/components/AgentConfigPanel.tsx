@@ -6,6 +6,7 @@ import { getAllBuiltinSkills } from '../services/skillsRegistry';
 import { listWorkspaceSkills, saveWorkspaceSkill, deleteWorkspaceSkill, migrateLocalStorageSkills } from '../services/agentWorkspace';
 import { parsedToCustomSkill, customSkillToParsed } from '../services/skillParser';
 import SkillEditor from './SkillEditor';
+import { AnimatedModalBackdrop, AnimatedModalContent } from './AnimatedUI';
 
 interface AgentConfigPanelProps {
   sessionId: string;
@@ -14,7 +15,7 @@ interface AgentConfigPanelProps {
   onSave: (config: AgentConfig) => void;
   onSkillsChanged?: () => void;
   onClose: () => void;
-  themePreset: 'default' | 'notion' | 'monet';
+  themePreset: 'default' | 'notion' | 'monet' | 'apple' | 'forsion1';
 }
 
 const DEFAULT_CONFIG: AgentConfig = {
@@ -76,7 +77,7 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
     ? 'text-gray-800 dark:text-gray-200'
     : isMonet
       ? 'text-rose-600 dark:text-rose-300'
-      : 'text-cyan-400';
+      : 'text-forsion-600 dark:text-cyan-400';
 
   const isInherited = (field: 'systemPrompt' | 'maxIterations' | 'enabledSkillIds' | 'mcpServers'): boolean => {
     if (!globalDefaults) return false;
@@ -195,24 +196,24 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
   };
 
   const inputClass = isNotion
-    ? 'w-full border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-400'
+    ? 'w-full border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-gray-400'
     : isMonet
-      ? 'w-full border border-rose-200/50 dark:border-rose-800/30 rounded-lg px-3 py-2 text-sm bg-white/50 dark:bg-gray-900/50 focus:outline-none focus:ring-1 focus:ring-rose-400'
-      : 'w-full border border-gray-700 rounded-lg px-3 py-2 text-sm bg-gray-900 focus:outline-none focus:ring-1 focus:ring-cyan-500 text-gray-100';
+      ? 'w-full border border-rose-200/50 dark:border-rose-800/30 rounded-lg px-3 py-2 text-sm bg-white/50 dark:bg-gray-900/50 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-rose-400'
+      : 'w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-forsion-500 dark:focus:ring-cyan-500';
 
-  const sectionTitle = 'text-xs font-semibold uppercase tracking-wider opacity-60 mb-2';
+  const sectionTitle = 'text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2';
   const divider = 'border-t border-gray-200 dark:border-gray-700 my-4';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className={`w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl shadow-2xl ${isNotion ? 'bg-white dark:bg-gray-900' : isMonet ? 'bg-rose-50 dark:bg-gray-900' : 'bg-gray-900 border border-gray-700'}`}>
+    <AnimatedModalBackdrop onClose={onClose} className="bg-black/40 backdrop-blur-sm" zIndex={50}>
+      <AnimatedModalContent className={`w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-[var(--radius-xl)] shadow-2xl ${isNotion ? 'bg-white dark:bg-gray-900' : isMonet ? 'bg-rose-50 dark:bg-gray-900' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700'}`}>
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2">
             <Bot size={18} className={accentClass} />
-            <h2 className="font-semibold text-sm">Session Settings</h2>
+            <h2 className="font-semibold text-sm text-gray-900 dark:text-white">Session Settings</h2>
           </div>
-          <button onClick={onClose} className="opacity-60 hover:opacity-100 transition-opacity">
+          <button onClick={onClose} className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
             <X size={18} />
           </button>
         </div>
@@ -387,7 +388,7 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
               <button
                 onClick={addMcpServer}
                 disabled={!newMcpName.trim() || !newMcpUrl.trim()}
-                className={`shrink-0 p-2 rounded-lg border transition-all disabled:opacity-30 ${isNotion ? 'border-gray-300 hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800' : isMonet ? 'border-rose-300 hover:bg-rose-100 dark:border-rose-700' : 'border-gray-600 hover:bg-gray-800'}`}
+                className={`shrink-0 p-2 rounded-lg border transition-all disabled:opacity-30 text-gray-700 dark:text-gray-300 ${isNotion ? 'border-gray-300 hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800' : isMonet ? 'border-rose-300 hover:bg-rose-100 dark:border-rose-700' : 'border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
               >
                 <Plus size={16} />
               </button>
@@ -430,12 +431,12 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
           </button>
           <button
             onClick={() => { onSave(config); onClose(); }}
-            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${isNotion ? 'bg-gray-800 text-white hover:bg-gray-700' : isMonet ? 'bg-rose-500 text-white hover:bg-rose-600' : 'bg-cyan-500 text-gray-900 hover:bg-cyan-400'}`}
+            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${isNotion ? 'bg-gray-800 text-white hover:bg-gray-700' : isMonet ? 'bg-rose-500 text-white hover:bg-rose-600' : 'bg-forsion-500 text-white hover:bg-forsion-400'}`}
           >
             Save
           </button>
         </div>
-      </div>
+      </AnimatedModalContent>
 
       {showSkillEditor && (
         <SkillEditor
@@ -463,7 +464,7 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
           themePreset={themePreset}
         />
       )}
-    </div>
+    </AnimatedModalBackdrop>
   );
 };
 

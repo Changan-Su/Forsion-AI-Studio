@@ -1,5 +1,6 @@
 import React from 'react';
 import { Image as ImageIcon, BrainCircuit, Sparkles, Edit, RefreshCw } from 'lucide-react';
+import { motion } from './AnimatedUI';
 
 export interface Command {
   command: string;
@@ -122,13 +123,17 @@ const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
 
   // Calculate position (above the input)
   return (
-    <div
-      className={`absolute bottom-full left-0 mb-2 w-64 rounded-xl shadow-xl border z-50 max-h-64 overflow-y-auto ${
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95, y: 4 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95, y: 4 }}
+      transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+      style={{ transformOrigin: '50% 100%', maxHeight: '256px' }}
+      className={`absolute bottom-full left-0 mb-2 w-64 rounded-xl shadow-xl border z-50 overflow-y-auto ${
         isNotion
           ? 'bg-white dark:bg-notion-darksidebar border-notion-border dark:border-notion-darkborder'
           : 'bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border'
       }`}
-      style={{ maxHeight: '256px' }}
     >
       <div className={`px-3 py-2 text-xs font-semibold ${
         isNotion
@@ -179,7 +184,7 @@ const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
           </div>
         </button>
       ))}
-    </div>
+    </motion.div>
   );
 };
 

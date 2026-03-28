@@ -1,5 +1,6 @@
 import React from 'react';
 import { Shield, X, Check, AlertTriangle } from 'lucide-react';
+import { AnimatedModalBackdrop, AnimatedModalContent } from './AnimatedUI';
 
 interface AuthorizationDialogProps {
   appId: string;
@@ -21,8 +22,8 @@ const AuthorizationDialog: React.FC<AuthorizationDialogProps> = ({
   const isMonet = themePreset === 'monet';
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-      <div className={`w-full max-w-md rounded-2xl shadow-2xl overflow-hidden ${
+    <AnimatedModalBackdrop onClose={onDeny} className="bg-black/50 backdrop-blur-sm" zIndex={60}>
+      <AnimatedModalContent className={`w-full max-w-md rounded-[var(--radius-xl)] shadow-2xl overflow-hidden ${
         isMonet ? 'glass-dark' : 'bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700'
       }`}>
         <div className={`p-6 ${isMonet ? '' : 'border-b border-gray-100 dark:border-zinc-800'}`}>
@@ -95,8 +96,8 @@ const AuthorizationDialog: React.FC<AuthorizationDialogProps> = ({
             Allow Access
           </button>
         </div>
-      </div>
-    </div>
+      </AnimatedModalContent>
+    </AnimatedModalBackdrop>
   );
 };
 

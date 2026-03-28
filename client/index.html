@@ -59,6 +59,14 @@
                 '0%': { opacity: '0', transform: 'translateY(10px)' },
                 '100%': { opacity: '1', transform: 'translateY(0)' },
               }
+            },
+            borderRadius: {
+              'token-xs': '8px',
+              'token-sm': '12px',
+              'token-md': '16px',
+              'token-lg': '22px',
+              'token-xl': '28px',
+              'token-pill': '9999px',
             }
           },
         },
@@ -73,6 +81,14 @@
         --color-text: #4A4B6A;
         --glass-surface: rgba(255, 255, 255, 0.65);
         --bg-desktop: linear-gradient(135deg, #A8C5D0 0%, #D4B5C8 50%, #5A5C8A 100%);
+
+        /* Border-radius token system */
+        --radius-xs: 8px;
+        --radius-sm: 12px;
+        --radius-md: 16px;
+        --radius-lg: 22px;
+        --radius-xl: 28px;
+        --radius-pill: 9999px;
       }
 
       body {
@@ -90,7 +106,10 @@
         backdrop-filter: blur(24px);
         -webkit-backdrop-filter: blur(24px);
         border: 1px solid rgba(255, 255, 255, 0.3);
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        box-shadow:
+          0 4px 6px -1px rgba(0, 0, 0, 0.05),
+          0 2px 4px -1px rgba(0, 0, 0, 0.03),
+          inset 0 1px 0 rgba(255, 255, 255, 0.35);
       }
 
       .glass-dark {
@@ -98,7 +117,9 @@
         backdrop-filter: blur(40px);
         -webkit-backdrop-filter: blur(40px);
         border: 1px solid rgba(255, 255, 255, 0.4);
-        box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.15);
+        box-shadow:
+          0 20px 40px -10px rgba(0, 0, 0, 0.15),
+          inset 0 1px 0 rgba(255, 255, 255, 0.4);
       }
 
       .bg-desktop-surface {
@@ -113,11 +134,16 @@
         backdrop-filter: blur(20px) saturate(180%);
         -webkit-backdrop-filter: blur(20px) saturate(180%);
         border: 1px solid rgba(255, 255, 255, 0.5);
-        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.06);
+        box-shadow:
+          0 4px 30px rgba(0, 0, 0, 0.06),
+          inset 0 1px 0 rgba(255, 255, 255, 0.4);
       }
       .dark .apple-glass {
         background: rgba(30, 30, 30, 0.75);
         border-color: rgba(255, 255, 255, 0.08);
+        box-shadow:
+          0 4px 30px rgba(0, 0, 0, 0.2),
+          inset 0 1px 0 rgba(255, 255, 255, 0.06);
       }
       .bg-apple-surface { background: #f5f5f7; }
       .dark .bg-apple-surface { background: #1c1c1e; }
@@ -128,11 +154,16 @@
         backdrop-filter: blur(24px) saturate(140%);
         -webkit-backdrop-filter: blur(24px) saturate(140%);
         border: 1px solid rgba(142, 133, 120, 0.15);
-        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+        box-shadow:
+          0 4px 24px rgba(0, 0, 0, 0.04),
+          inset 0 1px 0 rgba(255, 255, 255, 0.3);
       }
       .dark .forsion1-glass {
         background: rgba(40, 38, 36, 0.7);
         border-color: rgba(255, 255, 255, 0.06);
+        box-shadow:
+          0 4px 24px rgba(0, 0, 0, 0.15),
+          inset 0 1px 0 rgba(255, 255, 255, 0.04);
       }
       .bg-forsion1-surface { background: #edeae5; }
       .dark .bg-forsion1-surface { background: #1a1918; }
@@ -145,21 +176,33 @@
         text-shadow: 0 2px 4px rgba(0,0,0,0.2);
       }
       ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
+        width: 6px;
+        height: 6px;
       }
       ::-webkit-scrollbar-track {
         background: transparent; 
       }
       ::-webkit-scrollbar-thumb {
-        background: #cbd5e1; 
-        border-radius: 4px;
-      }
-      .dark ::-webkit-scrollbar-thumb {
-        background: #3f3f46;
+        background: rgba(148, 163, 184, 0.4);
+        border-radius: 3px;
+        transition: background 0.2s;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8; 
+        background: rgba(148, 163, 184, 0.7);
+      }
+      .dark ::-webkit-scrollbar-thumb {
+        background: rgba(63, 63, 70, 0.5);
+      }
+      .dark ::-webkit-scrollbar-thumb:hover {
+        background: rgba(63, 63, 70, 0.8);
+      }
+
+      * {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+      }
+      .dark * {
+        scrollbar-color: rgba(63, 63, 70, 0.5) transparent;
       }
     </style>
   <script type="importmap">

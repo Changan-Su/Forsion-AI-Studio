@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { backendService } from '../services/backendService';
 import { User } from '../types';
+import { AnimatedModalBackdrop, AnimatedModalContent } from './AnimatedUI';
 
 interface RegisterModalProps {
   onClose: () => void;
@@ -49,8 +50,8 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ onClose, onSuccess }) => 
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
+    <AnimatedModalBackdrop onClose={onClose} className="bg-black/50 backdrop-blur-sm">
+      <AnimatedModalContent className="bg-white dark:bg-gray-800 rounded-[var(--radius-xl)] shadow-xl w-full max-w-md p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Register</h2>
           <button
@@ -145,8 +146,8 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ onClose, onSuccess }) => 
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </AnimatedModalContent>
+    </AnimatedModalBackdrop>
   );
 };
 

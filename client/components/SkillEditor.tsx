@@ -12,7 +12,7 @@ interface SkillEditorProps {
   skill?: CustomSkillDefinition;
   onSave: (skill: CustomSkillDefinition) => void;
   onClose: () => void;
-  themePreset: 'default' | 'notion' | 'monet';
+  themePreset: 'default' | 'notion' | 'monet' | 'apple' | 'forsion1';
 }
 
 // ── Defaults ──────────────────────────────────────────────────────────────────

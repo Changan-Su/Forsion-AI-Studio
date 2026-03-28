@@ -6,6 +6,7 @@ import { changePassword } from '../services/authService';
 import { backendService } from '../services/backendService';
 import { getAllBuiltinSkills } from '../services/skillsRegistry';
 import SkillsMarket from './SkillsMarket';
+import { AnimatedModalBackdrop, AnimatedModalContent } from './AnimatedUI';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -289,15 +290,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   if (isLoading) {
     return (
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+      <AnimatedModalBackdrop className="bg-black/50 backdrop-blur-sm">
         <div className="text-white">Loading settings...</div>
-      </div>
+      </AnimatedModalBackdrop>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className={`w-full max-w-4xl shadow-2xl flex flex-col h-[90vh] overflow-hidden rounded-[32px] ${
+    <AnimatedModalBackdrop onClose={onClose} className="bg-black/50 backdrop-blur-sm">
+      <AnimatedModalContent className={`w-full max-w-4xl shadow-2xl flex flex-col h-[90vh] overflow-hidden rounded-[var(--radius-xl)] ${
         isMonet 
           ? 'glass-dark' 
           : 'bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border'
@@ -995,8 +996,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             )}
           </div>
         </div>
-      </div>
-    </div>
+      </AnimatedModalContent>
+    </AnimatedModalBackdrop>
   );
 };
 

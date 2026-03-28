@@ -18,6 +18,7 @@ import WorkspacePanel from './components/WorkspacePanel';
 import { runAgentLoop } from './services/agentRuntime';
 import { workspaceService } from './services/workspaceService';
 import { chatSyncService } from './services/chatSyncService';
+import { AnimatePresence, AnimatedModalBackdrop, AnimatedModalContent, AnimatedDropdown, motion } from './components/AnimatedUI';
 
 const App: React.FC = () => {
   // Auth State
@@ -78,7 +79,6 @@ const App: React.FC = () => {
   
   // Expanded Input Modal State
   const [isInputExpanded, setIsInputExpanded] = useState(false);
-  const [expandedInput, setExpandedInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Agent State
@@ -1741,17 +1741,23 @@ const App: React.FC = () => {
   };
   const isNotion = themePreset === 'notion';
   const isMonet = themePreset === 'monet';
+  const isApple = themePreset === 'apple';
+  const isForsion1 = themePreset === 'forsion1';
   const appBackground = isNotion
     ? 'bg-notion-bg dark:bg-notion-darkbg'
     : isMonet
       ? 'bg-desktop-surface'
-      : theme === 'dark'
-        ? 'bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.25),_rgba(2,6,23,0.95))]'
-        : 'bg-[radial-gradient(140%_140%_at_50%_-10%,_rgba(255,255,255,0.98),_rgba(231,238,255,0.9)_45%,_rgba(214,234,255,0.92)_65%,_rgba(247,250,255,0.95))]';
+      : isApple
+        ? 'bg-apple-surface'
+        : isForsion1
+          ? 'bg-forsion1-surface'
+          : theme === 'dark'
+            ? 'bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.25),_rgba(2,6,23,0.95))]'
+            : 'bg-[radial-gradient(140%_140%_at_50%_-10%,_rgba(255,255,255,0.98),_rgba(231,238,255,0.9)_45%,_rgba(214,234,255,0.92)_65%,_rgba(247,250,255,0.95))]';
 
   return (
     <div className={`relative flex h-screen overflow-hidden font-sans transition-colors duration-500 ${appBackground}`}>
-      {!isNotion && !isMonet && theme === 'light' && (
+      {!isNotion && !isMonet && !isApple && !isForsion1 && theme === 'light' && (
         <>
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.95),_transparent)] opacity-80 blur-3xl z-0" />
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,_rgba(255,182,193,0.25),_transparent)_0_0/50%_50%,_radial-gradient(circle_at_80%_0%,_rgba(147,197,253,0.3),_transparent)_0_0/60%_60%] opacity-70 blur-2xl z-0" />
@@ -1778,12 +1784,16 @@ const App: React.FC = () => {
 
       <div className={`relative z-10 flex-1 flex flex-col w-full transition-colors duration-300 ${isNotion ? 'bg-notion-bg dark:bg-notion-darkbg' : 'bg-transparent'}`}>
         {/* Header */}
-        <header className={`h-16 border-b flex items-center justify-between px-4 md:px-6 z-10 gap-3 backdrop-blur ${
+        <header className={`h-[52px] border-b flex items-center justify-between px-4 md:px-6 z-10 gap-3 backdrop-blur ${
            isNotion 
              ? 'bg-notion-bg/80 dark:bg-notion-darkbg/95 border-notion-border dark:border-notion-darkborder'
              : isMonet
                ? 'bg-white/10 border-b border-white/10 shadow-sm'
-               : 'bg-gradient-to-r from-white/80 via-slate-50/70 to-white/80 dark:from-[#0f172a]/70 dark:via-[#0b1120]/70 dark:to-[#020617]/70 border-white/10 dark:border-slate-800'
+               : isApple
+                 ? 'apple-glass border-gray-200 dark:border-gray-700/50'
+                 : isForsion1
+                   ? 'forsion1-glass border-[#d5d0c8] dark:border-gray-700/50'
+                   : 'bg-gradient-to-r from-white/80 via-slate-50/70 to-white/80 dark:from-[#0f172a]/70 dark:via-[#0b1120]/70 dark:to-[#020617]/70 border-white/10 dark:border-slate-800'
         }`}>
           <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 text-gray-500 dark:text-dark-muted hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-dark-card rounded-lg">
              <Menu size={20} />
@@ -1797,52 +1807,62 @@ const App: React.FC = () => {
                    ? 'hover:bg-white/40 text-[#4A4B6A]'
                    : 'hover:bg-slate-100 dark:hover:bg-dark-card text-gray-900 dark:text-white'
              }`}>
-                <span className={`truncate font-semibold ${isNotion ? 'font-serif' : isMonet ? 'font-cursive text-xl' : 'text-forsion-600 dark:text-forsion-400'}`}>{currentModel.name}</span>
+                <span className={`truncate font-semibold ${isNotion ? 'font-serif' : isMonet ? 'font-cursive text-xl' : isApple ? 'text-blue-600 dark:text-blue-400' : isForsion1 ? 'text-amber-800 dark:text-amber-300' : 'text-forsion-600 dark:text-forsion-400'}`}>{currentModel.name}</span>
                 <ChevronDown size={14} className={`transition-transform flex-shrink-0 text-[#4A4B6A]/80 ${modelDropdownOpen ? 'rotate-180' : ''}`} />
              </button>
 
-             {modelDropdownOpen && (
-               <div className={`absolute top-full left-0 mt-2 w-72 rounded-xl shadow-xl py-2 z-50 max-h-[80vh] overflow-y-auto ring-1 ring-black/5 ${
-                 isNotion
-                   ? 'bg-white dark:bg-notion-darksidebar border border-notion-border dark:border-notion-darkborder'
-                   : isMonet
-                     ? 'glass-dark backdrop-blur-xl'
-                     : 'bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border'
-               }`}>
-                  <div className="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-dark-muted uppercase tracking-wider">Select Model</div>
-                   {allModels.length === 0 ? (
-                     <div className="px-4 py-6 text-center">
-                       <div className="text-gray-400 dark:text-dark-muted text-sm mb-2">No models configured</div>
-                       <div className="text-xs text-gray-500 dark:text-gray-500">
-                         Enable Developer Mode in Settings to add models, or contact admin.
+             <AnimatePresence>
+               {modelDropdownOpen && (
+                 <AnimatedDropdown
+                   key="model-dropdown"
+                   origin="top-left"
+                   className={`absolute top-full left-0 mt-2 w-72 rounded-xl shadow-xl py-2 z-50 max-h-[80vh] overflow-y-auto ring-1 ring-black/5 ${
+                     isNotion
+                       ? 'bg-white dark:bg-notion-darksidebar border border-notion-border dark:border-notion-darkborder'
+                       : isMonet
+                         ? 'glass-dark backdrop-blur-xl'
+                         : isApple
+                           ? 'apple-glass border-gray-200 dark:border-gray-700/50'
+                           : isForsion1
+                             ? 'forsion1-glass border-[#d5d0c8] dark:border-gray-700/50'
+                             : 'bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border'
+                   }`}
+                 >
+                    <div className="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-dark-muted uppercase tracking-wider">Select Model</div>
+                     {allModels.length === 0 ? (
+                       <div className="px-4 py-6 text-center">
+                         <div className="text-gray-400 dark:text-dark-muted text-sm mb-2">No models configured</div>
+                         <div className="text-xs text-gray-500 dark:text-gray-500">
+                           Enable Developer Mode in Settings to add models, or contact admin.
+                         </div>
                        </div>
-                     </div>
-                   ) : (
-                     allModels.map(model => (
-                       <button key={model.id} onClick={() => { hasManualModelSelection.current = true; setSelectedModelId(model.id); setModelDropdownOpen(false); }} className={`w-full text-left px-4 py-3 flex items-start gap-3 transition-colors ${
-                         selectedModelId === model.id 
-                           ? (isNotion ? 'bg-gray-100 dark:bg-black/30' : 'bg-slate-100 dark:bg-white/5')
-                           : 'hover:bg-gray-50 dark:hover:bg-white/5'
-                      }`}>
-                        <div className="mt-1">
-                          <ModelAvatarIcon model={model} />
-                        </div>
-                        <div className="overflow-hidden">
-                          <div className={`text-sm font-medium truncate ${
-                             selectedModelId === model.id 
-                               ? (isNotion ? 'text-black dark:text-white font-bold' : 'text-forsion-600 dark:text-forsion-400')
-                               : 'text-gray-900 dark:text-dark-text'
-                          }`}>{model.name}</div>
-                          <div className="text-xs text-gray-500 truncate">{model.description}</div>
-                        </div>
-                      </button>
-                     ))
-                   )}
-               </div>
-             )}
+                     ) : (
+                       allModels.map(model => (
+                         <button key={model.id} onClick={() => { hasManualModelSelection.current = true; setSelectedModelId(model.id); setModelDropdownOpen(false); }} className={`w-full text-left px-4 py-3 flex items-start gap-3 transition-colors duration-200 ${
+                           selectedModelId === model.id 
+                             ? (isNotion ? 'bg-gray-100 dark:bg-black/30' : isApple ? 'bg-blue-50 dark:bg-blue-900/20' : isForsion1 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-slate-100 dark:bg-white/5')
+                             : 'hover:bg-gray-50 dark:hover:bg-white/5'
+                        }`}>
+                          <div className="mt-1">
+                            <ModelAvatarIcon model={model} />
+                          </div>
+                          <div className="overflow-hidden">
+                            <div className={`text-sm font-medium truncate ${
+                               selectedModelId === model.id 
+                                 ? (isNotion ? 'text-black dark:text-white font-bold' : isApple ? 'text-blue-600 dark:text-blue-400 font-bold' : isForsion1 ? 'text-amber-800 dark:text-amber-300 font-bold' : 'text-forsion-600 dark:text-forsion-400')
+                                 : 'text-gray-900 dark:text-dark-text'
+                            }`}>{model.name}</div>
+                            <div className="text-xs text-gray-500 truncate">{model.description}</div>
+                          </div>
+                        </button>
+                       ))
+                     )}
+                 </AnimatedDropdown>
+               )}
+             </AnimatePresence>
           </div>
           <div className={`text-xs md:text-sm hidden md:block font-medium tracking-wide ${
-             isNotion ? 'text-gray-400 font-serif' : isMonet ? 'text-[#4A4B6A]/80 font-bold' : 'text-slate-400 dark:text-dark-muted'
+             isNotion ? 'text-gray-400 font-serif' : isMonet ? 'text-[#4A4B6A]/80 font-bold' : isApple ? 'text-gray-500 dark:text-gray-400' : isForsion1 ? 'text-stone-500 dark:text-stone-400' : 'text-slate-400 dark:text-dark-muted'
           }`}>
             Forsion AI Studio
           </div>
@@ -1866,78 +1886,69 @@ const App: React.FC = () => {
             ? 'bg-notion-bg dark:bg-notion-darkbg border-notion-border dark:border-notion-darkborder'
             : isMonet
               ? 'glass border-t border-white/10'
-              : 'bg-white/5 dark:bg-[#030712]/60 backdrop-blur-xl border-white/40 dark:border-white/10'
+              : isApple
+                ? 'apple-glass border-gray-200 dark:border-gray-700/50'
+                : isForsion1
+                  ? 'forsion1-glass border-[#d5d0c8] dark:border-gray-700/50'
+                  : 'bg-white/5 dark:bg-[#030712]/60 backdrop-blur-xl border-white/40 dark:border-white/10'
         }`}>
           <form 
             onSubmit={handleSendMessage} 
-            className="max-w-4xl mx-auto relative group"
+            className="max-w-3xl mx-auto relative group"
             onDragEnter={handleInputDragEnter}
             onDragOver={handleInputDragOver}
             onDragLeave={handleInputDragLeave}
             onDrop={handleInputDrop}
           >
              {/* Drag Overlay - Fixed over input area */}
-             {isDraggingOverInput && (
-               <div className="fixed inset-0 bg-white/80 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center pointer-events-none">
-                 <div className="text-center">
-                   <UploadCloud size={64} className="text-forsion-500 mx-auto mb-4" />
-                   <h3 className="text-2xl font-bold text-gray-800 dark:text-white">Drop to upload</h3>
-                   <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">Images, PDF, Word, Text files</p>
-                 </div>
-               </div>
-             )}
-
-             {/* Attachment Preview - Moved above toggles */}
-             {attachments.length > 0 && (
-               <div className="mb-3 ml-2">
-                 <div className="flex gap-2 flex-wrap max-w-full overflow-x-auto pb-2">
-                   {attachments.map((attachment, index) => (
-                     <div key={index} className="relative group/preview flex-shrink-0">
-                       {attachment.type === 'image' ? (
-                         <>
-                           <img 
-                             src={attachment.url} 
-                             alt={`Preview ${index + 1}`}
-                             className={`h-20 w-auto rounded-lg shadow-lg object-cover ${isNotion ? 'border border-gray-300' : 'border border-gray-200 dark:border-dark-border bg-gray-100'}`} 
-                           />
-                           {/* Image editing hint - only show on first image */}
-                           {index === 0 && (
-                             <div className={`absolute top-full left-0 mt-2 px-3 py-1.5 rounded-md text-xs whitespace-nowrap z-10 ${
-                               isNotion 
-                                 ? 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700' 
-                                 : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                             }`}>
-                               💡 Try: /edit or /img2img commands
-                             </div>
-                           )}
-                         </>
-                       ) : (
-                         <div className={`h-20 px-4 rounded-lg shadow-lg flex items-center gap-3 ${isNotion ? 'border border-gray-300 bg-gray-100' : 'border border-gray-200 dark:border-dark-border bg-gray-100 dark:bg-gray-800'}`}>
-                           <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                           </svg>
-                           <div className="overflow-hidden max-w-[120px]">
-                             <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{attachment.name}</div>
-                             <div className="text-xs text-gray-500 dark:text-gray-400">
-                               {attachment.mimeType.includes('pdf') ? 'PDF' : 
-                                attachment.mimeType.includes('word') ? 'Word' : 
-                                attachment.mimeType.includes('text') ? 'Text' : 'Document'}
-                             </div>
-                           </div>
-                         </div>
-                       )}
-                       <button 
-                         type="button" 
-                         onClick={() => clearAttachment(index)} 
-                         className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors"
-                       >
-                         <XIcon size={12} />
-                       </button>
+             <AnimatePresence>
+               {isDraggingOverInput && (
+                 <motion.div
+                   initial={{ opacity: 0 }}
+                   animate={{ opacity: 1 }}
+                   exit={{ opacity: 0 }}
+                   transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+                   className={`fixed inset-0 z-50 flex items-center justify-center pointer-events-none ${
+                     isNotion ? 'bg-gray-50/85 dark:bg-gray-900/85 backdrop-blur-md'
+                     : isMonet ? 'bg-white/40 backdrop-blur-xl'
+                     : isApple ? 'bg-white/60 dark:bg-gray-900/70 backdrop-blur-xl'
+                     : isForsion1 ? 'bg-[#edeae5]/70 dark:bg-[#1a1918]/80 backdrop-blur-xl'
+                     : 'bg-white/50 dark:bg-[#030712]/70 backdrop-blur-xl'
+                   }`}
+                 >
+                   <motion.div
+                     initial={{ scale: 0.94, y: 6 }}
+                     animate={{ scale: 1, y: 0 }}
+                     exit={{ scale: 0.96, y: 4 }}
+                     transition={{ type: 'spring', stiffness: 360, damping: 28 }}
+                     className={`flex flex-col items-center gap-4 px-12 py-10 border-2 border-dashed ${
+                       isNotion
+                         ? 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200'
+                         : isMonet
+                           ? 'border-[#4A4B6A]/40 bg-white/60 backdrop-blur-md text-[#4A4B6A]'
+                           : isApple
+                             ? 'border-blue-400/60 dark:border-blue-500/40 bg-white/70 dark:bg-gray-900/70 backdrop-blur-md text-blue-600 dark:text-blue-400'
+                             : isForsion1
+                               ? 'border-amber-500/60 dark:border-amber-600/40 bg-[#edeae5]/80 dark:bg-[#1a1918]/80 backdrop-blur-md text-amber-800 dark:text-amber-300'
+                               : 'border-forsion-400/60 dark:border-cyan-500/40 bg-white/70 dark:bg-[#030712]/80 backdrop-blur-md text-forsion-600 dark:text-cyan-400'
+                     }`}
+                     style={{ borderRadius: 'var(--radius-xl)' }}
+                   >
+                     <UploadCloud size={48} className="opacity-90" />
+                     <div className="text-center">
+                       <p className="text-xl font-semibold">Drop to upload</p>
+                       <p className={`text-sm mt-1 ${
+                         isNotion ? 'text-gray-500 dark:text-gray-400'
+                         : isMonet ? 'text-[#4A4B6A]/70'
+                         : isApple ? 'text-blue-500/70 dark:text-blue-400/70'
+                         : isForsion1 ? 'text-amber-700/70 dark:text-amber-400/70'
+                         : 'text-gray-500 dark:text-gray-400'
+                       }`}>Images, PDF, Word, Text files</p>
                      </div>
-                   ))}
-                 </div>
-               </div>
-             )}
+                   </motion.div>
+                 </motion.div>
+               )}
+             </AnimatePresence>
 
              {/* Deep Thinking and Force Image Generation Toggles */}
              <div className="flex items-center gap-4 mb-3 ml-2">
@@ -1956,9 +1967,9 @@ const App: React.FC = () => {
                          ? 'bg-gray-300 dark:bg-gray-600'
                          : 'bg-gray-300 dark:bg-gray-700'
                    }`}></div>
-                   <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                   <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm ${
                      isDeepThinking ? 'translate-x-5' : 'translate-x-0'
-                   }`}></div>
+                   }`} style={{ transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}></div>
                  </div>
                  <div className="flex items-center gap-1.5">
                    <BrainCircuit size={16} className={`${
@@ -2005,9 +2016,9 @@ const App: React.FC = () => {
                          ? 'bg-gray-300 dark:bg-gray-600'
                          : 'bg-gray-300 dark:bg-gray-700'
                    }`}></div>
-                   <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                   <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm ${
                      forceImageGeneration ? 'translate-x-5' : 'translate-x-0'
-                   }`}></div>
+                   }`} style={{ transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}></div>
                  </div>
                  <div className="flex items-center gap-1.5">
                    <ImageIcon size={16} className={`${
@@ -2082,13 +2093,93 @@ const App: React.FC = () => {
                themePreset={themePreset}
              />
 
-             <div className={`relative flex items-end gap-2 p-2 transition-all ${
-               isNotion
-                 ? 'bg-transparent border-t-0 border-b-2 border-gray-200 dark:border-gray-700 rounded-none focus-within:border-black dark:focus-within:border-white'
-                 : isMonet
-                   ? 'bg-white/40 border border-white/30 rounded-[2rem] shadow-sm focus-within:ring-2 focus-within:ring-white/30 backdrop-blur-md'
-                   : 'bg-white/80 dark:bg-white/10 backdrop-blur-2xl rounded-[2rem] shadow-[0_20px_60px_rgba(15,23,42,0.12)] dark:shadow-[0_25px_80px_rgba(2,6,23,0.75)] border border-white/60 dark:border-white/15 focus-within:ring-2 focus-within:ring-forsion-400/40 dark:focus-within:ring-cyan-400/20'
-             }`}>
+             <div
+               className={`relative flex flex-col overflow-hidden ${
+                 isNotion
+                   ? 'bg-transparent border-t-0 border-b-2 border-gray-200 dark:border-gray-700 rounded-none focus-within:border-black dark:focus-within:border-white'
+                   : isMonet
+                     ? 'bg-white/40 border border-white/30 shadow-sm focus-within:ring-2 focus-within:ring-white/30 backdrop-blur-md'
+                     : isApple
+                       ? 'apple-glass border-gray-200 dark:border-gray-700/50 shadow-sm focus-within:ring-2 focus-within:ring-blue-500/25'
+                       : isForsion1
+                         ? 'forsion1-glass border-[#d5d0c8] dark:border-gray-700/50 shadow-sm focus-within:ring-2 focus-within:ring-amber-500/25'
+                         : 'bg-white/80 dark:bg-white/10 backdrop-blur-2xl shadow-[0_20px_60px_rgba(15,23,42,0.12)] dark:shadow-[0_25px_80px_rgba(2,6,23,0.75)] border border-white/60 dark:border-white/15 focus-within:ring-2 focus-within:ring-forsion-400/40 dark:focus-within:ring-cyan-400/20'
+               }`}
+               style={{
+                 borderRadius: isInputExpanded ? 'var(--radius-lg)' : 'var(--radius-xl)',
+                 maxHeight: isInputExpanded ? '60vh' : undefined,
+                 transition: 'border-radius 0.3s cubic-bezier(0.25,0.1,0.25,1)',
+               }}
+             >
+               {/* Attachment chips — inside the composer bubble */}
+               <AnimatePresence>
+                 {attachments.length > 0 && (
+                   <motion.div
+                     initial={{ opacity: 0, height: 0 }}
+                     animate={{ opacity: 1, height: 'auto' }}
+                     exit={{ opacity: 0, height: 0 }}
+                     transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                     className="flex flex-wrap gap-2 px-3 pt-3 overflow-hidden"
+                   >
+                     {attachments.map((attachment, index) => (
+                       <motion.div
+                         key={index}
+                         initial={{ opacity: 0, scale: 0.85, y: 4 }}
+                         animate={{ opacity: 1, scale: 1, y: 0 }}
+                         exit={{ opacity: 0, scale: 0.85 }}
+                         transition={{ type: 'spring', stiffness: 400, damping: 28, delay: Math.min(index * 0.04, 0.15) }}
+                         className={`group/chip flex items-center gap-2 p-1.5 pr-3 rounded-[var(--radius-sm)] flex-shrink-0 ${
+                           isNotion
+                             ? 'bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700'
+                             : isApple
+                               ? 'bg-white/60 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700/50 backdrop-blur-sm'
+                               : isForsion1
+                                 ? 'bg-stone-100/60 dark:bg-stone-800/60 border border-[#d5d0c8] dark:border-gray-700/50 backdrop-blur-sm'
+                                 : 'bg-white/10 dark:bg-white/5 border border-white/15 dark:border-white/10'
+                         }`}
+                       >
+                         {attachment.type === 'image' ? (
+                           <div className="w-9 h-9 rounded-[var(--radius-xs)] overflow-hidden flex-shrink-0">
+                             <img src={attachment.url} alt="" className="w-full h-full object-cover" />
+                           </div>
+                         ) : (
+                           <div className={`w-9 h-9 rounded-[var(--radius-xs)] flex-shrink-0 flex items-center justify-center ${isNotion ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-blue-500/10'}`}>
+                             <svg className="w-5 h-5 text-blue-500 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                             </svg>
+                           </div>
+                         )}
+                         <div className="min-w-0">
+                           <p className="text-xs font-medium text-gray-900 dark:text-white truncate max-w-[90px]">{attachment.name}</p>
+                           <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                             {attachment.type === 'image' ? 'Image' :
+                              attachment.mimeType.includes('pdf') ? 'PDF' :
+                              attachment.mimeType.includes('word') ? 'Word' :
+                              attachment.mimeType.includes('text') ? 'Text' : 'Document'}
+                           </p>
+                         </div>
+                         <button
+                           type="button"
+                           onClick={() => clearAttachment(index)}
+                           className="opacity-0 group-hover/chip:opacity-100 transition-opacity duration-150 w-5 h-5 rounded-full bg-gray-200 dark:bg-white/10 hover:bg-red-500 hover:text-white flex items-center justify-center text-gray-500 dark:text-gray-400 flex-shrink-0 ml-1"
+                         >
+                           <XIcon size={11} />
+                         </button>
+                       </motion.div>
+                     ))}
+                     {attachments.some(a => a.type === 'image') && (
+                       <span className={`self-center text-[11px] px-2 py-1 rounded-[var(--radius-xs)] ${
+                         isNotion ? 'text-gray-500 dark:text-gray-400' : 'text-blue-500 dark:text-blue-400'
+                       }`}>
+                         Try /edit or /img2img
+                       </span>
+                     )}
+                   </motion.div>
+                 )}
+               </AnimatePresence>
+
+               {/* Input row */}
+               <div className="flex items-end gap-2 p-2">
                <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*,.pdf,.doc,.docx,.txt,.md" multiple className="hidden" />
                <button 
                  type="button"
@@ -2098,7 +2189,11 @@ const App: React.FC = () => {
                       ? 'text-gray-400 hover:text-gray-800 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
                       : isMonet
                         ? 'text-[#4A4B6A]/70 hover:text-[#4A4B6A] hover:bg-white/50'
-                        : 'text-slate-500 hover:text-forsion-400 dark:text-slate-300 dark:hover:text-cyan-200 hover:bg-white/60 dark:hover:bg-white/10 border border-transparent dark:border-white/10 shadow-sm'
+                        : isApple
+                          ? 'text-blue-500/70 hover:text-blue-600 dark:text-blue-400/70 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                          : isForsion1
+                            ? 'text-amber-700/70 hover:text-amber-800 dark:text-amber-400/70 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                            : 'text-slate-500 hover:text-forsion-400 dark:text-slate-300 dark:hover:text-cyan-200 hover:bg-white/60 dark:hover:bg-white/10 border border-transparent dark:border-white/10 shadow-sm'
                  } hover:-translate-y-0.5 active:scale-95 shadow-sm`}
                  title="Attach File"
                >
@@ -2131,12 +2226,17 @@ const App: React.FC = () => {
                      }
                    }}
                    onKeyDown={(e) => {
-                     if (e.key === 'Enter' && !e.shiftKey) {
+                     if (e.key === 'Enter' && !e.shiftKey && !isInputExpanded) {
                        e.preventDefault();
                        setShowCommandAutocomplete(false);
                        handleSendMessage();
+                     } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && isInputExpanded) {
+                       e.preventDefault();
+                       setIsInputExpanded(false);
+                       handleSendMessage();
                      } else if (e.key === 'Escape') {
                        setShowCommandAutocomplete(false);
+                       if (isInputExpanded) setIsInputExpanded(false);
                      } else if (showCommandAutocomplete && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Tab')) {
                        // Let CommandAutocomplete handle these keys
                        return;
@@ -2150,17 +2250,21 @@ const App: React.FC = () => {
                      const target = e.target as HTMLTextAreaElement;
                      setCursorPosition(target.selectionStart || 0);
                    }}
-                   placeholder={`Message ${currentModel.name}...`}
+                   placeholder={isInputExpanded ? `Message ${currentModel.name}... (Ctrl+Enter to send)` : `Message ${currentModel.name}...`}
                    disabled={isProcessing}
                    rows={1}
-                   className={`w-full bg-transparent py-3 px-2 focus:outline-none placeholder-slate-400 dark:placeholder-gray-600 resize-none overflow-y-auto ${
+                   className={`w-full bg-transparent py-3 px-2 focus:outline-none placeholder-slate-400 dark:placeholder-gray-600 resize-none overflow-y-auto transition-[max-height] duration-300 ${
                       isNotion 
                         ? 'text-gray-900 dark:text-white font-serif' 
                         : isMonet
                           ? 'text-[#4A4B6A] dark:text-white placeholder-slate-500'
-                          : 'text-slate-800 dark:text-gray-100'
+                          : isApple
+                            ? 'text-gray-900 dark:text-gray-100'
+                            : isForsion1
+                              ? 'text-stone-800 dark:text-stone-100'
+                              : 'text-slate-800 dark:text-gray-100'
                    }`}
-                   style={{ maxHeight: '200px' }}
+                   style={{ maxHeight: isInputExpanded ? '50vh' : '200px' }}
                  />
                  
                  {/* Command Autocomplete */}
@@ -2195,30 +2299,44 @@ const App: React.FC = () => {
                {/* Expand Button */}
                <button 
                  type="button"
-                 onClick={() => { setExpandedInput(input); setIsInputExpanded(true); }}
+                 onClick={() => setIsInputExpanded(prev => !prev)}
                  className={`p-2 rounded-full transition-all duration-300 flex-shrink-0 self-end ${
                     isNotion 
                       ? 'text-gray-400 hover:text-gray-800 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
                       : isMonet
                         ? 'text-[#4A4B6A]/70 hover:text-[#4A4B6A] hover:bg-white/50'
-                        : 'text-slate-500 hover:text-forsion-400 dark:text-slate-300 dark:hover:text-cyan-200 hover:bg-white/60 dark:hover:bg-white/10'
+                        : isApple
+                          ? 'text-blue-500/60 hover:text-blue-600 dark:text-blue-400/60 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                          : isForsion1
+                            ? 'text-amber-700/60 hover:text-amber-800 dark:text-amber-400/60 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                            : 'text-slate-500 hover:text-forsion-400 dark:text-slate-300 dark:hover:text-cyan-200 hover:bg-white/60 dark:hover:bg-white/10'
                  }`}
-                 title="Expand Input"
+                 title={isInputExpanded ? 'Collapse' : 'Expand Input'}
                >
-                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                 <svg
+                   xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                   fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                   style={{ transform: isInputExpanded ? 'rotate(45deg)' : 'rotate(0deg)', transition: 'transform 0.3s cubic-bezier(0.25,0.1,0.25,1)' }}
+                 >
+                   <polyline points="15 3 21 3 21 9"></polyline>
+                   <polyline points="9 21 3 21 3 15"></polyline>
+                   <line x1="21" y1="3" x2="14" y2="10"></line>
+                   <line x1="3" y1="21" x2="10" y2="14"></line>
+                 </svg>
                </button>
                
                {isProcessing ? (
                  <button 
                    type="button"
                    onClick={handleStopGeneration}
+                   style={{ borderRadius: 'var(--radius-md)' }}
                    className={`p-3 transition-all ${
                       isNotion 
                         ? 'text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300'
                         : isMonet
-                          ? 'bg-red-500/80 hover:bg-red-600/80 text-white rounded-2xl shadow-sm'
-                          : 'bg-gradient-to-r from-red-500 to-red-600 dark:from-red-500/80 dark:to-red-600/80 rounded-2xl text-white hover:from-red-400 hover:to-red-500 dark:hover:from-red-400/80 dark:hover:to-red-500/80 shadow-lg shadow-red-500/30 dark:shadow-[0_15px_40px_rgba(239,68,68,0.4)] border border-white/30 dark:border-white/10'
-                   } hover:-translate-y-0.5 active:scale-95`}
+                          ? 'bg-red-500/80 hover:bg-red-600/80 text-white shadow-sm'
+                          : 'bg-gradient-to-r from-red-500 to-red-600 dark:from-red-500/80 dark:to-red-600/80 text-white hover:from-red-400 hover:to-red-500 dark:hover:from-red-400/80 dark:hover:to-red-500/80 shadow-lg shadow-red-500/30 dark:shadow-[0_15px_40px_rgba(239,68,68,0.4)] border border-white/30 dark:border-white/10'
+                   } hover:-translate-y-0.5 active:scale-[0.97]`}
                    title="Stop generation"
                  >
                    <Square size={20} fill="currentColor" />
@@ -2227,18 +2345,46 @@ const App: React.FC = () => {
                   <button 
                     type="submit"
                     disabled={(!input.trim() && attachments.length === 0)}
+                    style={{ borderRadius: 'var(--radius-md)' }}
                     className={`p-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                       isNotion 
                         ? 'text-gray-500 hover:text-black dark:text-gray-400 dark:hover:text-white'
                         : isMonet
-                          ? 'bg-[#3E406F] hover:bg-[#5A5C8A] text-white rounded-2xl shadow-md'
-                          : 'bg-gradient-to-r from-forsion-500 to-indigo-500 dark:from-sky-500/80 dark:to-indigo-500/80 rounded-2xl text-white hover:from-forsion-400 hover:to-indigo-400 dark:hover:from-sky-400/80 dark:hover:to-indigo-400/80 shadow-lg shadow-forsion-500/30 dark:shadow-[0_15px_40px_rgba(15,23,42,0.65)] border border-white/30 dark:border-white/10'
-                   } hover:-translate-y-0.5 active:scale-95`}
+                          ? 'bg-[#3E406F] hover:bg-[#5A5C8A] text-white shadow-md'
+                          : isApple
+                            ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-md shadow-blue-500/20 border border-blue-400/30'
+                            : isForsion1
+                              ? 'bg-amber-700 hover:bg-amber-800 text-white shadow-md shadow-amber-700/20 border border-amber-600/30'
+                              : 'bg-gradient-to-r from-forsion-500 to-indigo-500 dark:from-sky-500/80 dark:to-indigo-500/80 text-white hover:from-forsion-400 hover:to-indigo-400 dark:hover:from-sky-400/80 dark:hover:to-indigo-400/80 shadow-lg shadow-forsion-500/30 dark:shadow-[0_15px_40px_rgba(15,23,42,0.65)] border border-white/30 dark:border-white/10'
+                   } hover:-translate-y-0.5 active:scale-[0.97]`}
                  >
                    <Send size={20} />
                  </button>
                )}
-             </div>
+               </div>{/* end input row */}
+
+               {/* Expanded footer — shown only when expanded */}
+               {isInputExpanded && (
+                 <div className={`flex items-center justify-between px-4 py-2.5 border-t text-xs ${
+                   isNotion
+                     ? 'border-notion-border dark:border-notion-darkborder text-gray-400 dark:text-gray-500'
+                     : 'border-white/10 dark:border-white/[0.06] text-slate-400 dark:text-gray-500'
+                 }`}>
+                   <span>Ctrl+Enter to send &middot; Esc to collapse</span>
+                   <button
+                     type="button"
+                     onClick={() => setIsInputExpanded(false)}
+                     className={`px-3 py-1 rounded-[var(--radius-xs)] transition-colors font-medium ${
+                       isNotion
+                         ? 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white'
+                         : 'hover:bg-white/10 dark:hover:bg-white/[0.06] hover:text-slate-700 dark:hover:text-white'
+                     }`}
+                   >
+                     Collapse
+                   </button>
+                 </div>
+               )}
+             </div>{/* end composer bubble */}
           </form>
           <div className={`text-center text-xs mt-3 font-medium ${isMonet ? 'text-[#4A4B6A]/60' : 'text-slate-400 dark:text-dark-muted'}`}>
             AI can make mistakes. Please verify important information.
@@ -2246,194 +2392,109 @@ const App: React.FC = () => {
         </div>
       </div>
 
-       {showSettings && (
-         <SettingsModal
-           onClose={() => setShowSettings(false)}
-           userRole={user!.role}
-           user={user!}
-           currentTheme={theme}
-           onThemeChange={(t) => updateAppSettings({ theme: t })}
-           currentPreset={themePreset}
-           onPresetChange={(p) => updateAppSettings({ themePreset: p })}
-           onModelsChange={syncSettingsFromBackend}
-           onUpdateSettings={updateAppSettings}
-           isOffline={isOfflineMode}
-           onReconnect={attemptReconnect}
-         />
-       )}
+       <AnimatePresence>
+         {showSettings && (
+           <SettingsModal
+             key="settings-modal"
+             onClose={() => setShowSettings(false)}
+             userRole={user!.role}
+             user={user!}
+             currentTheme={theme}
+             onThemeChange={(t) => updateAppSettings({ theme: t })}
+             currentPreset={themePreset}
+             onPresetChange={(p) => updateAppSettings({ themePreset: p })}
+             onModelsChange={syncSettingsFromBackend}
+             onUpdateSettings={updateAppSettings}
+             isOffline={isOfflineMode}
+             onReconnect={attemptReconnect}
+           />
+         )}
+       </AnimatePresence>
 
-       {showAgentConfig && currentSessionId && (
-         <AgentConfigPanel
-           sessionId={currentSessionId}
-           agentConfig={sessions.find(s => s.id === currentSessionId)?.agentConfig}
-           globalDefaults={appSettings?.agentDefaults}
-           onSave={(config) => {
-             setSessions(prev => prev.map(s =>
-               s.id === currentSessionId ? { ...s, agentConfig: config } : s
-             ));
-           }}
-           onSkillsChanged={() => {
-             setShowAgentConfig(false);
-             setTimeout(() => setShowAgentConfig(true), 0);
-           }}
-           onClose={() => setShowAgentConfig(false)}
-           themePreset={themePreset}
-         />
-       )}
+       <AnimatePresence>
+         {showAgentConfig && currentSessionId && (
+           <AgentConfigPanel
+             key="agent-config-panel"
+             sessionId={currentSessionId}
+             agentConfig={sessions.find(s => s.id === currentSessionId)?.agentConfig}
+             globalDefaults={appSettings?.agentDefaults}
+             onSave={(config) => {
+               setSessions(prev => prev.map(s =>
+                 s.id === currentSessionId ? { ...s, agentConfig: config } : s
+               ));
+             }}
+             onSkillsChanged={() => {
+               setShowAgentConfig(false);
+               setTimeout(() => setShowAgentConfig(true), 0);
+             }}
+             onClose={() => setShowAgentConfig(false)}
+             themePreset={themePreset}
+           />
+         )}
+       </AnimatePresence>
 
-       {showWorkspacePanel && currentSessionId && (
-         <WorkspacePanel
-           sessionId={currentSessionId}
-           isOpen={showWorkspacePanel}
-           onClose={() => setShowWorkspacePanel(false)}
-           themePreset={themePreset}
-         />
-       )}
+       <AnimatePresence>
+         {showWorkspacePanel && currentSessionId && (
+           <WorkspacePanel
+             key="workspace-panel"
+             sessionId={currentSessionId}
+             isOpen={showWorkspacePanel}
+             onClose={() => setShowWorkspacePanel(false)}
+             themePreset={themePreset}
+           />
+         )}
+       </AnimatePresence>
 
       
       {/* File Size Error Dialog */}
-      {fileSizeError && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4"
-          onClick={() => setFileSizeError(null)}
-        >
-          <div
-            className={`w-full max-w-sm rounded-2xl shadow-2xl p-6 text-center ${
-              isNotion
-                ? 'bg-notion-bg dark:bg-notion-darkbg border border-notion-border dark:border-notion-darkborder'
-                : 'bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border'
-            }`}
-            onClick={(e) => e.stopPropagation()}
+      <AnimatePresence>
+        {fileSizeError && (
+          <AnimatedModalBackdrop
+            key="file-size-error"
+            onClose={() => setFileSizeError(null)}
+            className="bg-black/50 backdrop-blur-sm"
+            zIndex={70}
           >
-            <div className="w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4">
-              <svg className="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
-            </div>
-            <h3 className={`text-lg font-bold mb-2 ${
-              isNotion ? 'text-gray-900 dark:text-white font-serif' : 'text-gray-900 dark:text-white'
-            }`}>
-              文件过大
-            </h3>
-            <p className={`text-sm mb-1 ${isNotion ? 'text-gray-600 dark:text-gray-400 font-serif' : 'text-gray-600 dark:text-gray-400'}`}>
-              <span className="font-medium text-gray-800 dark:text-gray-200">{fileSizeError.name}</span>
-            </p>
-            <p className={`text-sm mb-5 ${isNotion ? 'text-gray-500 dark:text-gray-400 font-serif' : 'text-gray-500 dark:text-gray-400'}`}>
-              文件大小 {fileSizeError.size}MB，超过 10MB 限制。请压缩后重试。
-            </p>
-            <button
-              onClick={() => setFileSizeError(null)}
-              className={`w-full py-2.5 rounded-xl font-semibold transition-all active:scale-95 ${
+            <AnimatedModalContent
+              className={`w-full max-w-sm rounded-2xl shadow-2xl p-6 text-center ${
                 isNotion
-                  ? 'bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-100'
-                  : isMonet
-                    ? 'bg-[#3E406F] hover:bg-[#5A5C8A] text-white'
-                    : 'bg-gradient-to-r from-forsion-500 to-indigo-500 text-white hover:from-forsion-400 hover:to-indigo-400 shadow-lg'
+                  ? 'bg-notion-bg dark:bg-notion-darkbg border border-notion-border dark:border-notion-darkborder'
+                  : 'bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border'
               }`}
             >
-              我知道了
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Expanded Input Modal with bounce animation */}
-      {isInputExpanded && (
-        <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={(e) => e.target === e.currentTarget && setIsInputExpanded(false)}
-        >
-          <div 
-            className={`w-full max-w-4xl h-[70vh] flex flex-col rounded-2xl shadow-2xl transform transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] animate-[modalBounce_0.5s_ease-out] ${
-              isNotion 
-                ? 'bg-notion-bg dark:bg-notion-darkbg border border-notion-border dark:border-notion-darkborder'
-                : 'bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border'
-            }`}
-            style={{
-              animation: 'modalBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)'
-            }}
-          >
-            <style>{`
-              @keyframes modalBounce {
-                0% {
-                  opacity: 0;
-                  transform: scale(0.3) translateY(100px);
-                }
-                50% {
-                  opacity: 1;
-                  transform: scale(1.05) translateY(-10px);
-                }
-                70% {
-                  transform: scale(0.95) translateY(5px);
-                }
-                100% {
-                  transform: scale(1) translateY(0);
-                }
-              }
-            `}</style>
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-dark-border">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Compose Message</h3>
-              <button 
-                onClick={() => setIsInputExpanded(false)}
-                className="p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              >
-                <XIcon size={20} />
-              </button>
-            </div>
-            <div className="flex-1 p-4 overflow-hidden">
-              <textarea
-                value={expandedInput}
-                onChange={(e) => setExpandedInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                    e.preventDefault();
-                    setInput(expandedInput);
-                    setIsInputExpanded(false);
-                    setTimeout(() => handleSendMessage(), 100);
-                  }
-                }}
-                placeholder={`Message ${currentModel.name}... (Ctrl+Enter to send)`}
-                className={`w-full h-full bg-transparent focus:outline-none resize-none text-lg leading-relaxed ${
-                  isNotion 
-                    ? 'text-gray-900 dark:text-white font-serif placeholder-gray-400'
-                    : 'text-slate-800 dark:text-gray-100 placeholder-slate-400 dark:placeholder-gray-600'
-                }`}
-                autoFocus
-              />
-            </div>
-            <div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-dark-border">
-              <span className="text-xs text-gray-400 dark:text-gray-500">
-                Press Ctrl+Enter to send directly
-              </span>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setIsInputExpanded(false)}
-                  className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    setInput(expandedInput);
-                    setIsInputExpanded(false);
-                    if (textareaRef.current) {
-                      textareaRef.current.style.height = 'auto';
-                      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + 'px';
-                    }
-                  }}
-                  className={`px-6 py-2 font-semibold rounded-lg transition-all transform hover:scale-105 active:scale-95 ${
-                    isNotion
-                      ? 'bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-100'
-                      : 'bg-gradient-to-r from-forsion-500 to-indigo-500 text-white hover:from-forsion-400 hover:to-indigo-400 shadow-lg'
-                  }`}
-                >
-                  Apply
-                </button>
+              <div className="w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4">
+                <svg className="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
+              <h3 className={`text-lg font-bold mb-2 ${
+                isNotion ? 'text-gray-900 dark:text-white font-serif' : 'text-gray-900 dark:text-white'
+              }`}>
+                文件过大
+              </h3>
+              <p className={`text-sm mb-1 ${isNotion ? 'text-gray-600 dark:text-gray-400 font-serif' : 'text-gray-600 dark:text-gray-400'}`}>
+                <span className="font-medium text-gray-800 dark:text-gray-200">{fileSizeError.name}</span>
+              </p>
+              <p className={`text-sm mb-5 ${isNotion ? 'text-gray-500 dark:text-gray-400 font-serif' : 'text-gray-500 dark:text-gray-400'}`}>
+                文件大小 {fileSizeError.size}MB，超过 10MB 限制。请压缩后重试。
+              </p>
+              <button
+                onClick={() => setFileSizeError(null)}
+                className={`w-full py-2.5 rounded-xl font-semibold transition-all active:scale-[0.97] ${
+                  isNotion
+                    ? 'bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-100'
+                    : isMonet
+                      ? 'bg-[#3E406F] hover:bg-[#5A5C8A] text-white'
+                      : 'bg-gradient-to-r from-forsion-500 to-indigo-500 text-white hover:from-forsion-400 hover:to-indigo-400 shadow-lg'
+                }`}
+              >
+                我知道了
+              </button>
+            </AnimatedModalContent>
+          </AnimatedModalBackdrop>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 };

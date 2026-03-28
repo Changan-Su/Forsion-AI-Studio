@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Shuffle, X } from 'lucide-react';
+import { motion } from './AnimatedUI';
 
 // Common emojis organized by category
 const EMOJI_LIST = [
@@ -121,12 +122,17 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, onClose, position, 
     : EMOJI_LIST;
 
   const pickerContent = calculatedPosition ? (
-    <div
+    <motion.div
       ref={pickerRef}
+      initial={{ opacity: 0, scale: 0.95, y: -4 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95, y: -4 }}
+      transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
       className="fixed z-[9999] bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-3 w-72"
       style={{ 
         top: `${calculatedPosition.top}px`, 
-        left: `${calculatedPosition.left}px` 
+        left: `${calculatedPosition.left}px`,
+        transformOrigin: '0% 0%',
       }}
     >
       {/* Header */}
@@ -174,7 +180,7 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, onClose, position, 
           Remove Emoji
         </button>
       </div>
-    </div>
+    </motion.div>
   ) : null;
 
   // Use portal to render outside the sidebar DOM hierarchy

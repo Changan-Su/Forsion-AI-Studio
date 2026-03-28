@@ -1,7 +1,7 @@
 
 import { User, AppSettings, UserRole } from '../types';
 import { DEFAULT_MODEL_ID } from '../constants';
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL, APP_ID } from '../config';
 
 // Single source of truth for backend base URL
 const API_URL = API_BASE_URL;
@@ -475,7 +475,7 @@ export const backendService = {
   // 12. Get Global Models from backend (project-specific)
   async getGlobalModels(): Promise<any[]> {
     try {
-      const res = await fetch(`${API_URL}/projects/ai-studio/models`, {
+      const res = await fetch(`${API_URL}/projects/${APP_ID}/models`, {
         headers: getHeaders()
       });
       markOnline();
@@ -616,10 +616,6 @@ export const backendService = {
 
       if (!res.ok) {
         markOnline();
-        if (res.status === 401) {
-          clearAuth();
-          throw new AuthRequiredError();
-        }
         const detail = await extractDetail(res);
         throw new Error(detail || `API error: ${res.status}`);
       }
@@ -796,7 +792,6 @@ export const backendService = {
         };
       }
     } catch (error) {
-      if (error instanceof AuthRequiredError) throw error;
       if (isNetworkError(error)) markOffline();
       else markOnline();
       throw error;
@@ -859,10 +854,6 @@ export const backendService = {
 
       if (!res.ok) {
         markOnline();
-        if (res.status === 401) {
-          clearAuth();
-          throw new AuthRequiredError();
-        }
         const detail = await extractDetail(res);
         throw new Error(detail || `API error: ${res.status}`);
       }
@@ -896,7 +887,6 @@ export const backendService = {
         },
       };
     } catch (error: any) {
-      if (error instanceof AuthRequiredError) throw error;
       if (isNetworkError(error)) markOffline();
       else markOnline();
       throw error;
@@ -955,10 +945,6 @@ export const backendService = {
 
       if (!res.ok) {
         markOnline();
-        if (res.status === 401) {
-          clearAuth();
-          throw new AuthRequiredError();
-        }
         const detail = await extractDetail(res);
         throw new Error(detail || `API error: ${res.status}`);
       }
@@ -982,7 +968,6 @@ export const backendService = {
         },
       };
     } catch (error: any) {
-      if (error instanceof AuthRequiredError) throw error;
       if (isNetworkError(error)) markOffline();
       else markOnline();
       throw error;

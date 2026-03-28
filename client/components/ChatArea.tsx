@@ -11,13 +11,14 @@ import ToolCallBlock from './ToolCallBlock';
 import ExecutionOutput from './ExecutionOutput';
 import { pyodideService } from '../services/pyodideService';
 import { workspaceService } from '../services/workspaceService';
+import { motion, AnimatePresence, AnimatedCollapse } from './AnimatedUI';
 
 // Code Block Component with Copy functionality and Python Run button
 const CodeBlock: React.FC<{
   language?: string;
   children: string;
   sessionId?: string;
-  themePreset?: 'default' | 'notion' | 'monet';
+  themePreset?: 'default' | 'notion' | 'monet' | 'apple' | 'forsion1';
 }> = ({ language, children, sessionId, themePreset }) => {
   const [copied, setCopied] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -114,11 +115,9 @@ const CodeBlock: React.FC<{
 const ThinkingBlock: React.FC<{ reasoning: string; isNotion: boolean }> = ({ reasoning, isNotion }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   
-  // Get last 1-2 lines for preview
   const previewLines = useMemo(() => {
     if (!reasoning || !reasoning.trim()) return '';
     const trimmed = reasoning.trim();
-    // If content is short, show it all
     if (trimmed.length <= 150) return trimmed;
     const lines = trimmed.split('\n').filter(l => l.trim());
     if (lines.length === 0) return trimmed.substring(0, 150) + '...';
@@ -128,7 +127,7 @@ const ThinkingBlock: React.FC<{ reasoning: string; isNotion: boolean }> = ({ rea
   }, [reasoning]);
   
   return (
-    <div className={`mb-4 rounded-xl overflow-hidden transition-all duration-300 ${
+    <div className={`mb-4 rounded-xl overflow-hidden ${
       isNotion 
         ? 'bg-gray-50 dark:bg-notion-darksidebar border border-gray-200 dark:border-gray-700' 
         : 'bg-slate-50/80 dark:bg-gray-900/50 border border-slate-200/50 dark:border-gray-700/50'
@@ -136,7 +135,7 @@ const ThinkingBlock: React.FC<{ reasoning: string; isNotion: boolean }> = ({ rea
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
-        className={`w-full flex items-center gap-2 px-4 py-3 text-left transition-colors cursor-pointer ${
+        className={`w-full flex items-center gap-2 px-4 py-3 text-left transition-colors duration-200 cursor-pointer ${
           isNotion 
             ? 'hover:bg-gray-100 dark:hover:bg-gray-800' 
             : 'hover:bg-slate-100/50 dark:hover:bg-gray-800/50'
@@ -150,15 +149,17 @@ const ThinkingBlock: React.FC<{ reasoning: string; isNotion: boolean }> = ({ rea
         }`}>
           Deep Thinking
         </span>
-        {isExpanded ? (
-          <ChevronDown size={14} className="text-gray-400 ml-auto" />
-        ) : (
-          <ChevronRight size={14} className="text-gray-400 ml-auto" />
-        )}
+        <motion.div
+          animate={{ rotate: isExpanded ? 90 : 0 }}
+          transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+          className="ml-auto"
+        >
+          <ChevronRight size={14} className="text-gray-400" />
+        </motion.div>
       </button>
       
       {/* Preview when collapsed */}
-      {!isExpanded && (
+      <AnimatedCollapse isOpen={!isExpanded}>
         <div className={`px-4 pb-3 -mt-1 text-sm italic ${
           isNotion 
             ? 'text-gray-500 dark:text-gray-400 font-serif' 
@@ -177,10 +178,10 @@ const ThinkingBlock: React.FC<{ reasoning: string; isNotion: boolean }> = ({ rea
             <div className="text-xs opacity-70">Click to view thinking process...</div>
           )}
         </div>
-      )}
+      </AnimatedCollapse>
       
       {/* Full content when expanded */}
-      {isExpanded && (
+      <AnimatedCollapse isOpen={isExpanded}>
         <div className={`px-4 pb-4 border-t ${
           isNotion 
             ? 'border-gray-200 dark:border-gray-700' 
@@ -194,7 +195,7 @@ const ThinkingBlock: React.FC<{ reasoning: string; isNotion: boolean }> = ({ rea
             {reasoning}
           </div>
         </div>
-      )}
+      </AnimatedCollapse>
     </div>
   );
 };
@@ -220,7 +221,7 @@ interface ChatAreaProps {
   isProcessing: boolean;
   currentModel: AIModel;
   allModels: AIModel[]; // All available models for looking up message-specific model
-  themePreset: 'default' | 'notion' | 'monet';
+  themePreset: 'default' | 'notion' | 'monet' | 'apple' | 'forsion1';
   onFileUpload: (file: File) => void;
   onRegenerateMessage?: (messageId: string) => void;
   user?: { username: string; nickname?: string; avatar?: string }; // User info for avatar display
@@ -232,6 +233,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
   const [isDragging, setIsDragging] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const dragCounter = useRef(0);
+  const animatedIdsRef = useRef<Set<string>>(new Set());
 
   // Copy message content to clipboard
   const handleCopyMessage = async (messageId: string, content: string) => {
@@ -307,6 +309,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
   // Styling helpers based on themePreset
   const isNotion = themePreset === 'notion';
   const isMonet = themePreset === 'monet';
+  const isApple = themePreset === 'apple';
+  const isForsion1 = themePreset === 'forsion1';
 
   if (messages.length === 0) {
     return (
@@ -316,7 +320,11 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
             ? 'bg-notion-bg dark:bg-notion-darkbg'
             : isMonet
               ? 'bg-transparent'
-              : 'bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.97),_rgba(228,238,255,0.92))] dark:bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.25),_#030712)]'
+              : isApple
+                ? 'bg-apple-surface'
+                : isForsion1
+                  ? 'bg-forsion1-surface'
+                  : 'bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.97),_rgba(228,238,255,0.92))] dark:bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.25),_#030712)]'
         }`}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
@@ -324,39 +332,87 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
         onDrop={handleDrop}
       >
         
-        {isDragging && (
-           <div className="absolute inset-0 bg-forsion-500/10 dark:bg-forsion-500/20 backdrop-blur-sm z-50 flex items-center justify-center border-4 border-dashed border-forsion-400 rounded-xl m-4">
-             <div className="text-center animate-bounce">
-                <UploadCloud size={64} className="text-forsion-600 dark:text-forsion-400 mx-auto mb-4" />
-                <h3 className="text-2xl font-bold text-forsion-700 dark:text-forsion-200">Drop file here</h3>
-                <p className="text-sm text-forsion-600 dark:text-forsion-300 mt-2">Images, PDF, Word, Text files</p>
-             </div>
-           </div>
-        )}
+        <AnimatePresence>
+          {isDragging && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
+              className={`absolute inset-0 z-50 flex items-center justify-center m-3 border-2 border-dashed ${
+                isNotion
+                  ? 'border-gray-300 dark:border-gray-600 bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur-sm'
+                  : isMonet
+                    ? 'border-[#4A4B6A]/40 bg-white/30 backdrop-blur-md'
+                    : isApple
+                      ? 'border-blue-400/60 dark:border-blue-500/40 bg-white/50 dark:bg-gray-900/50 backdrop-blur-md'
+                      : isForsion1
+                        ? 'border-amber-500/60 dark:border-amber-600/40 bg-[#edeae5]/60 dark:bg-[#1a1918]/60 backdrop-blur-md'
+                        : 'border-forsion-400/50 dark:border-forsion-400/30 bg-forsion-500/5 dark:bg-forsion-500/10 backdrop-blur-sm'
+              }`}
+              style={{ borderRadius: 'var(--radius-xl)' }}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 380, damping: 28, delay: 0.05 }}
+                className={`flex flex-col items-center gap-3 ${
+                  isNotion ? 'text-gray-700 dark:text-gray-200'
+                  : isMonet ? 'text-[#4A4B6A]'
+                  : isApple ? 'text-blue-600 dark:text-blue-400'
+                  : isForsion1 ? 'text-amber-800 dark:text-amber-300'
+                  : 'text-forsion-600 dark:text-forsion-400'
+                }`}
+              >
+                <UploadCloud size={52} className="opacity-90" />
+                <div className="text-center">
+                  <p className="text-xl font-semibold">Drop file here</p>
+                  <p className={`text-sm mt-1 opacity-70`}>Images, PDF, Word, Text files</p>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        <div className={`relative w-20 h-20 rounded-3xl flex items-center justify-center mb-8 animate-fade-in-up ${
-           isNotion 
-             ? 'bg-gray-100 dark:bg-notion-darksidebar border border-notion-border dark:border-notion-darkborder shadow-sm' 
-             : isMonet
-               ? 'glass-dark shadow-xl text-[#4A4B6A]'
-               : 'bg-gradient-to-tr from-forsion-500 to-indigo-600 shadow-2xl shadow-forsion-500/20'
-        }`}>
-          <Bot size={40} className={isNotion ? "text-gray-800 dark:text-gray-200" : isMonet ? "text-[#4A4B6A]" : "text-white"} />
-        </div>
-        <h2 className={`text-3xl font-bold mb-3 tracking-tight ${
-           isNotion 
-             ? 'text-gray-900 dark:text-white font-serif' 
-             : isMonet
-               ? 'text-[#4A4B6A] font-cursive text-4xl drop-shadow-sm'
-               : 'text-transparent bg-clip-text bg-gradient-to-r from-forsion-600 to-indigo-600 dark:from-forsion-400 dark:to-indigo-400'
-        }`}>
-          Forsion AI Studio
-        </h2>
-        <p className={`text-center max-w-md text-lg ${
-           isNotion ? 'text-gray-500 dark:text-gray-400 font-serif italic' : isMonet ? 'text-[#4A4B6A]/80 font-medium' : 'text-slate-500 dark:text-gray-400'
-        }`}>
-          Start a conversation with <span className={`font-semibold ${isNotion ? 'text-gray-800 dark:text-gray-200 underline decoration-dotted' : isMonet ? 'text-[#4A4B6A] underline decoration-[#4A4B6A]/30' : 'text-forsion-600 dark:text-forsion-400'}`}>{currentModel.name}</span>.
-        </p>
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 260, damping: 24, delay: 0.1 }}
+          className="flex flex-col items-center"
+        >
+          <div className={`relative w-20 h-20 rounded-3xl flex items-center justify-center mb-8 ${
+             isNotion 
+               ? 'bg-gray-100 dark:bg-notion-darksidebar border border-notion-border dark:border-notion-darkborder shadow-sm' 
+               : isMonet
+                 ? 'glass-dark shadow-xl text-[#4A4B6A]'
+                 : isApple
+                   ? 'bg-blue-500 shadow-2xl shadow-blue-500/20'
+                   : isForsion1
+                     ? 'bg-amber-700 shadow-2xl shadow-amber-700/20'
+                     : 'bg-gradient-to-tr from-forsion-500 to-indigo-600 shadow-2xl shadow-forsion-500/20'
+          }`}>
+            <Bot size={40} className={isNotion ? "text-gray-800 dark:text-gray-200" : isMonet ? "text-[#4A4B6A]" : "text-white"} />
+          </div>
+          <h2 className={`text-3xl font-bold mb-3 tracking-tight ${
+             isNotion 
+               ? 'text-gray-900 dark:text-white font-serif' 
+               : isMonet
+                 ? 'text-[#4A4B6A] font-cursive text-4xl drop-shadow-sm'
+                 : isApple
+                   ? 'text-blue-600 dark:text-blue-400'
+                   : isForsion1
+                     ? 'text-amber-800 dark:text-amber-300'
+                     : 'text-transparent bg-clip-text bg-gradient-to-r from-forsion-600 to-indigo-600 dark:from-forsion-400 dark:to-indigo-400'
+          }`}>
+            Forsion AI Studio
+          </h2>
+          <p className={`text-center max-w-md text-lg ${
+             isNotion ? 'text-gray-500 dark:text-gray-400 font-serif italic' : isMonet ? 'text-[#4A4B6A]/80 font-medium' : isApple ? 'text-gray-500 dark:text-gray-400' : isForsion1 ? 'text-stone-500 dark:text-stone-400' : 'text-slate-500 dark:text-gray-400'
+          }`}>
+            Start a conversation with <span className={`font-semibold ${isNotion ? 'text-gray-800 dark:text-gray-200 underline decoration-dotted' : isMonet ? 'text-[#4A4B6A] underline decoration-[#4A4B6A]/30' : isApple ? 'text-blue-600 dark:text-blue-400' : isForsion1 ? 'text-amber-800 dark:text-amber-300' : 'text-forsion-600 dark:text-forsion-400'}`}>{currentModel.name}</span>.
+          </p>
+        </motion.div>
       </div>
     );
   }
@@ -368,7 +424,11 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
           ? 'bg-notion-bg dark:bg-notion-darkbg'
           : isMonet
             ? 'bg-transparent'
-            : 'bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.98),_rgba(227,238,255,0.9))] dark:bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.25),_#030712)]'
+            : isApple
+              ? 'bg-apple-surface'
+              : isForsion1
+                ? 'bg-forsion1-surface'
+                : 'bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.98),_rgba(227,238,255,0.9))] dark:bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.25),_#030712)]'
       }`}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
@@ -386,10 +446,16 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
           ? messages.find((m, i) => i > msgIdx && m.role === 'tool' && m.iterationIndex === msg.iterationIndex)
           : undefined;
 
+        const isNewMsg = !animatedIdsRef.current.has(msg.id);
+        if (isNewMsg) animatedIdsRef.current.add(msg.id);
+
         return (
-        <div
+        <motion.div
           key={msg.id}
-          className={`flex gap-4 max-w-4xl mx-auto group ${
+          initial={isNewMsg ? { opacity: 0, y: 12 } : false}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 28, mass: 0.8 }}
+          className={`flex gap-4 max-w-3xl mx-auto group ${
             msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'
           }`}
         >
@@ -401,7 +467,11 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
                   ? 'bg-gray-800 dark:bg-white text-white dark:text-black'
                   : isMonet
                     ? 'bg-[#4A4B6A] text-white'
-                    : 'bg-forsion-600 text-white'
+                    : isApple
+                      ? 'bg-blue-500 text-white'
+                      : isForsion1
+                        ? 'bg-amber-700 text-white'
+                        : 'bg-forsion-600 text-white'
               }`}
             >
               {user?.avatar ? (
@@ -439,7 +509,11 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
                       ? 'bg-transparent border border-gray-300 dark:border-gray-600'
                       : isMonet
                         ? 'glass-dark text-[#4A4B6A] border border-white/20'
-                        : 'bg-indigo-600 text-white border-2 border-white dark:border-gray-800'
+                        : isApple
+                          ? 'bg-blue-500 text-white border-2 border-white dark:border-gray-800'
+                          : isForsion1
+                            ? 'bg-amber-700 text-white border-2 border-white dark:border-gray-800'
+                            : 'bg-indigo-600 text-white border-2 border-white dark:border-gray-800'
                   }`}
                   fallbackIcon={<Cpu size={18} className={isNotion ? "text-gray-800 dark:text-gray-200" : ""} />}
                 />
@@ -456,43 +530,59 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
               className={`px-5 py-4 transition-all duration-200 ${
                 isNotion
                   ? 'rounded-md border border-transparent hover:border-gray-200 dark:hover:border-gray-700 ' + (msg.role === 'user' ? 'bg-gray-100 dark:bg-notion-darksidebar text-gray-900 dark:text-white' : 'bg-transparent text-gray-900 dark:text-white pl-0')
-                      : `rounded-2xl shadow-sm ${msg.role === 'user' 
+                      : `shadow-sm ${msg.role === 'user' 
                         ? isMonet
-                          ? 'bg-gradient-to-br from-[#3E406F] to-[#5a5c8a] text-white rounded-[26px] rounded-tr-2xl shadow-md border border-white/10'
-                          : 'bg-gradient-to-br from-forsion-500 via-indigo-500 to-indigo-600 text-white rounded-[26px] rounded-tr-2xl border border-white/30 shadow-[0_20px_45px_rgba(79,70,229,0.35)]'
+                          ? 'bg-gradient-to-br from-[#3E406F] to-[#5a5c8a] text-white rounded-[var(--radius-lg)] rounded-tr-[var(--radius-xs)] shadow-md border border-white/10'
+                          : isApple
+                            ? 'bg-blue-500 text-white rounded-[var(--radius-lg)] rounded-tr-[var(--radius-xs)] shadow-md border border-blue-400/30'
+                            : isForsion1
+                              ? 'bg-amber-700 text-white rounded-[var(--radius-lg)] rounded-tr-[var(--radius-xs)] shadow-md border border-amber-600/30'
+                              : 'bg-gradient-to-br from-forsion-500 via-indigo-500 to-indigo-600 text-white rounded-[var(--radius-lg)] rounded-tr-[var(--radius-xs)] border border-white/30 shadow-[0_20px_45px_rgba(79,70,229,0.35)]'
                       : msg.isError
-                        ? 'bg-red-50 border border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200'
+                        ? 'rounded-[var(--radius-md)] bg-red-50 border border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200'
                         : isMonet
-                          ? 'glass text-gray-900 dark:text-white rounded-[26px] rounded-tl-sm shadow-sm'
-                          : 'bg-white/80 text-slate-800 border border-white/70 backdrop-blur-md dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-tl-sm shadow-[0_15px_45px_rgba(15,23,42,0.08)] dark:shadow-none'}`
+                          ? 'glass text-gray-900 dark:text-white rounded-[var(--radius-lg)] rounded-tl-[var(--radius-xs)] shadow-sm'
+                          : isApple
+                            ? 'apple-glass text-gray-900 dark:text-gray-100 rounded-[var(--radius-lg)] rounded-tl-[var(--radius-xs)] shadow-sm'
+                            : isForsion1
+                              ? 'forsion1-glass text-stone-900 dark:text-stone-100 rounded-[var(--radius-lg)] rounded-tl-[var(--radius-xs)] shadow-sm'
+                              : 'bg-white/80 text-slate-800 border border-white/70 backdrop-blur-md dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-[var(--radius-lg)] rounded-tl-[var(--radius-xs)] shadow-[0_15px_45px_rgba(15,23,42,0.08)] dark:shadow-none'}`
               }`}
             >
-              {/* User Attachments */}
+              {/* User Attachments — chip style */}
               {msg.attachments && msg.attachments.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-3">
                   {msg.attachments.map((att, idx) => (
-                    <div key={idx} className="relative overflow-hidden rounded-lg border border-white/20 dark:border-gray-600 max-w-[200px]">
-                      {att.type === 'image' && (
-                        att.url ? (
-                          <img src={att.url} alt="Uploaded attachment" className="w-full h-auto object-cover" />
-                        ) : att.workspacePath && sessionId ? (
-                          <WorkspaceImage sessionId={sessionId} path={att.workspacePath} className="w-full h-auto object-cover" />
-                        ) : (
-                          <div className="w-32 h-20 bg-gray-200/30 dark:bg-gray-700/50 flex items-center justify-center">
-                            <svg className="w-8 h-8 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    <div key={idx} className="flex-shrink-0">
+                      {att.type === 'image' ? (
+                        <div className="relative overflow-hidden rounded-[var(--radius-md)] border border-white/15 dark:border-gray-600 max-w-[200px] shadow-sm">
+                          {att.url ? (
+                            <img src={att.url} alt="Uploaded attachment" className="w-full h-auto object-cover" />
+                          ) : att.workspacePath && sessionId ? (
+                            <WorkspaceImage sessionId={sessionId} path={att.workspacePath} className="w-full h-auto object-cover" />
+                          ) : (
+                            <div className="w-32 h-20 bg-gray-200/30 dark:bg-gray-700/50 flex items-center justify-center">
+                              <svg className="w-8 h-8 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                            </div>
+                          )}
+                          {att.name && (
+                            <div className="absolute bottom-0 left-0 right-0 px-2 py-1 bg-black/40 backdrop-blur-sm">
+                              <p className="text-[10px] text-white/80 truncate">{att.name}</p>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 p-1.5 pr-3 rounded-[var(--radius-sm)] bg-white/10 dark:bg-gray-800 border border-white/15 dark:border-gray-600 shadow-sm">
+                          <div className="w-9 h-9 rounded-[var(--radius-xs)] bg-blue-500/10 flex-shrink-0 flex items-center justify-center">
+                            <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
                           </div>
-                        )
-                      )}
-                      {att.type === 'document' && (
-                        <div className="p-3 bg-white/10 dark:bg-gray-800 flex items-center gap-2">
-                          <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
                           <div className="overflow-hidden">
-                            <div className="text-sm font-medium truncate">{att.name || 'Document'}</div>
-                            <div className="text-xs opacity-70">{att.mimeType.split('/')[1]?.toUpperCase()}</div>
+                            <div className="text-xs font-medium truncate max-w-[120px]">{att.name || 'Document'}</div>
+                            <div className="text-[10px] opacity-60">{att.mimeType.split('/')[1]?.toUpperCase()}</div>
                           </div>
                         </div>
                       )}
@@ -588,7 +678,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
                 {/* Copy Button */}
                 <button
                   onClick={() => handleCopyMessage(msg.id, msg.content)}
-                  className={`p-1.5 rounded-lg transition-all hover:scale-105 active:scale-95 ${
+                  className={`p-1.5 rounded-lg transition-all duration-200 hover:scale-105 active:scale-[0.97] ${
                     copiedMessageId === msg.id
                       ? 'text-green-500 dark:text-green-400 bg-green-100 dark:bg-green-900/30'
                       : isNotion
@@ -608,7 +698,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
                 {onRegenerateMessage && (
                   <button
                     onClick={() => onRegenerateMessage(msg.id)}
-                    className={`p-1.5 rounded-lg transition-all hover:scale-105 active:scale-95 ${
+                    className={`p-1.5 rounded-lg transition-all duration-200 hover:scale-105 active:scale-[0.97] ${
                       isNotion
                         ? 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                         : 'text-slate-400 hover:text-slate-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-slate-100 dark:hover:bg-gray-800'
@@ -627,38 +717,54 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
               {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
           </div>
-        </div>
+        </motion.div>
         );
       })}
 
-      {isProcessing && (
-        <div className="flex gap-4 max-w-4xl mx-auto">
-          <ModelAvatar
-            modelId={currentModel.id}
-            avatarData={currentModel.avatar}
-            size={36}
-            className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center shadow-md ${
-              isNotion 
-                ? 'bg-transparent border border-gray-300 dark:border-gray-600'
-                : 'bg-indigo-600 text-white border-2 border-white dark:border-gray-800'
-            }`}
-            fallbackIcon={
-              <div className={`w-5 h-5 border-2 border-t-transparent rounded-full animate-spin ${
-                isNotion ? 'border-gray-800 dark:border-white' : 'border-white'
-              }`} />
-            }
-          />
-          <div className="flex items-center">
-            <span className={`text-sm animate-pulse font-medium px-4 py-2 rounded-full ${
-               isNotion 
-                 ? 'text-gray-500 bg-gray-100 dark:bg-gray-800 dark:text-gray-400 font-serif' 
-                 : 'text-slate-500 dark:text-gray-400 bg-white dark:bg-gray-800 shadow-sm border border-slate-100 dark:border-gray-700'
-            }`}>
-              Processing request...
-            </span>
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {isProcessing && (
+          <motion.div
+            key="processing"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+            className="flex gap-4 max-w-4xl mx-auto"
+          >
+            <ModelAvatar
+              modelId={currentModel.id}
+              avatarData={currentModel.avatar}
+              size={36}
+              className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center shadow-md ${
+                isNotion 
+                  ? 'bg-transparent border border-gray-300 dark:border-gray-600'
+                  : 'bg-indigo-600 text-white border-2 border-white dark:border-gray-800'
+              }`}
+              fallbackIcon={
+                <div className={`w-5 h-5 border-2 border-t-transparent rounded-full animate-spin ${
+                  isNotion ? 'border-gray-800 dark:border-white' : 'border-white'
+                }`} />
+              }
+            />
+            <div className="flex items-center">
+              <span className={`text-sm font-medium px-4 py-2 rounded-full ${
+                 isNotion 
+                   ? 'text-gray-500 bg-gray-100 dark:bg-gray-800 dark:text-gray-400 font-serif' 
+                   : 'text-slate-500 dark:text-gray-400 bg-white dark:bg-gray-800 shadow-sm border border-slate-100 dark:border-gray-700'
+              }`}>
+                <span className="inline-flex items-center gap-1">
+                  Processing request
+                  <span className="inline-flex gap-0.5">
+                    <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </span>
+                </span>
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <div ref={bottomRef} />
     </div>
   );

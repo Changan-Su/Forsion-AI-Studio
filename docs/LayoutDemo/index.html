@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Forsion AI Studio — Layout Redesign Demo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; }
+
+    /* ───── Apple-style design tokens ───── */
+    :root {
+      --radius-xs: 8px;
+      --radius-sm: 12px;
+      --radius-md: 16px;
+      --radius-lg: 22px;
+      --radius-xl: 28px;
+      --radius-pill: 9999px;
+
+      --ease-apple: cubic-bezier(0.25, 0.1, 0.25, 1);
+      --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+      --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+
+      --dur-micro: 150ms;
+      --dur-fast: 200ms;
+      --dur-normal: 300ms;
+      --dur-modal: 400ms;
+    }
+
+    /* ───── Scrollbar ───── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
+
+    /* ───── Glass surfaces ───── */
+    .glass-sidebar {
+      background: rgba(12, 14, 28, 0.85);
+      backdrop-filter: blur(40px) saturate(180%);
+      border-right: 1px solid rgba(255,255,255,0.06);
+    }
+    .glass-header {
+      background: rgba(8, 10, 22, 0.65);
+      backdrop-filter: blur(20px) saturate(150%);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .glass-input {
+      background: rgba(255,255,255,0.06);
+      backdrop-filter: blur(24px);
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+    .glass-input:focus-within {
+      border-color: rgba(56, 189, 248, 0.3);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3), 0 0 0 3px rgba(56, 189, 248, 0.08), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+    .glass-msg {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+    .glass-attachment {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+
+    /* ───── Inline expand animation ───── */
+    .composer-area {
+      transition: max-height var(--dur-normal) var(--ease-apple),
+                  border-radius var(--dur-normal) var(--ease-apple);
+      overflow: hidden;
+    }
+    .composer-area.collapsed { max-height: 160px; }
+    .composer-area.expanded {
+      max-height: 60vh;
+      border-radius: var(--radius-lg) !important;
+    }
+
+    .composer-textarea {
+      transition: height var(--dur-normal) var(--ease-apple);
+    }
+
+    /* ───── Attachment chip animations ───── */
+    .attachment-chip {
+      animation: chipIn var(--dur-normal) var(--ease-spring) both;
+    }
+    @keyframes chipIn {
+      from { opacity: 0; transform: scale(0.85) translateY(4px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .attachment-chip:hover .chip-remove {
+      opacity: 1;
+      transform: scale(1);
+    }
+    .chip-remove {
+      opacity: 0;
+      transform: scale(0.7);
+      transition: opacity var(--dur-fast) var(--ease-apple),
+                  transform var(--dur-fast) var(--ease-spring);
+    }
+
+    /* ───── Message entrance ───── */
+    .msg-enter {
+      animation: msgSlideIn 0.4s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+    }
+    @keyframes msgSlideIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ───── Smooth button press ───── */
+    .btn-press {
+      transition: transform var(--dur-micro) var(--ease-apple),
+                  background var(--dur-fast) var(--ease-apple),
+                  box-shadow var(--dur-fast) var(--ease-apple);
+    }
+    .btn-press:active { transform: scale(0.97); }
+
+    /* ───── Session item transitions ───── */
+    .session-item {
+      transition: background var(--dur-fast) var(--ease-apple),
+                  border-color var(--dur-fast) var(--ease-apple),
+                  box-shadow var(--dur-normal) var(--ease-apple),
+                  transform var(--dur-fast) var(--ease-apple);
+    }
+    .session-item:hover { transform: translateX(2px); }
+    .session-item.active {
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(255,255,255,0.12);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    }
+
+    /* ───── Drag overlay ───── */
+    .drag-overlay {
+      animation: dragFadeIn 0.2s ease-out both;
+    }
+    @keyframes dragFadeIn {
+      from { opacity: 0; backdrop-filter: blur(0); }
+      to   { opacity: 1; backdrop-filter: blur(12px); }
+    }
+
+    /* ───── Label / notes ───── */
+    .demo-label {
+      position: absolute;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 0 0 8px 8px;
+      top: 0;
+      z-index: 100;
+      letter-spacing: 0.02em;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    }
+
+    .note-callout {
+      background: rgba(59, 130, 246, 0.08);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #93c5fd;
+      line-height: 1.6;
+    }
+    .note-callout strong { color: #60a5fa; }
+  </style>
+</head>
+<body class="bg-[#08090f] text-gray-200 min-h-screen">
+
+  <!-- ═══════════════ INTRO SECTION ═══════════════ -->
+  <div class="max-w-5xl mx-auto px-6 py-16">
+    <h1 class="text-4xl font-bold text-white mb-3 tracking-tight">Forsion AI Studio — Layout Redesign</h1>
+    <p class="text-lg text-gray-400 mb-8 max-w-2xl">
+      以下是三个核心改进的交互 Demo：布局优化、附件区域重新设计、以及文字框原地展开。
+      点击 Demo 中的按钮可以体验交互效果。
+    </p>
+
+    <div class="space-y-6 mb-12">
+      <div class="note-callout">
+        <strong>改进 1：布局</strong> — 侧栏比例收窄（240→224px），header 高度降低（64→52px），
+        消息区域留白更均匀，input 区域视觉权重降低但功能不变。
+      </div>
+      <div class="note-callout">
+        <strong>改进 2：附件预览</strong> — 附件以「chip」形式内嵌在输入框内部（不是外部独立行），
+        图片有圆角缩略图+文件名，文档有图标+文件名。入场有弹簧动画，hover 显示删除按钮。
+      </div>
+      <div class="note-callout">
+        <strong>改进 3：文字展开</strong> — 点击展开按钮后，输入框**原地**平滑拉高到 60vh，
+        而不是弹出一个新的模态窗口。收回时平滑缩小回原始高度。圆角随高度平滑过渡。
+      </div>
+      <div class="note-callout">
+        <strong>改进 4：圆角一致性</strong> — 定义 6 级圆角 token（8/12/16/22/28/pill），
+        所有 UI 元素对齐到这些 token，避免 rounded-lg 和 rounded-2xl 混用的视觉错位。
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ FULL LAYOUT DEMO ═══════════════ -->
+  <div class="max-w-[1400px] mx-auto px-6 pb-24">
+    <h2 class="text-2xl font-bold text-white mb-6">Full Layout Demo</h2>
+
+    <div class="relative rounded-[20px] overflow-hidden border border-white/10 shadow-2xl" style="height: 700px;">
+      <span class="demo-label left-4">Layout Structure</span>
+
+      <!-- ROOT: flex row -->
+      <div class="flex h-full">
+
+        <!-- ═══ SIDEBAR (224px) ═══ -->
+        <aside class="glass-sidebar w-56 flex-shrink-0 flex flex-col">
+          <!-- Brand -->
+          <div class="p-5 pb-4">
+            <div class="flex items-center gap-2.5 mb-5">
+              <div class="w-8 h-8 rounded-[10px] bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg">
+                <span class="text-white font-bold text-sm">F</span>
+              </div>
+              <span class="font-semibold text-white/90 tracking-wide text-[15px]">Forsion AI</span>
+            </div>
+            <button class="w-full flex items-center gap-2 text-white bg-gradient-to-r from-sky-500 to-indigo-500 px-4 py-2.5 rounded-[var(--radius-sm)] btn-press shadow-lg shadow-sky-500/20 text-sm font-medium">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              New Chat
+            </button>
+          </div>
+
+          <!-- Sessions -->
+          <div class="flex-1 overflow-y-auto px-3 space-y-1">
+            <p class="text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-2 mb-2">History</p>
+
+            <div class="session-item active flex items-center gap-2.5 px-3 py-2.5 rounded-[var(--radius-sm)] cursor-pointer border border-transparent">
+              <span class="text-base">🎨</span>
+              <span class="text-sm font-medium text-white/90 truncate">UI Redesign Discussion</span>
+            </div>
+            <div class="session-item flex items-center gap-2.5 px-3 py-2.5 rounded-[var(--radius-sm)] cursor-pointer border border-transparent hover:bg-white/[0.04]">
+              <span class="text-base">💻</span>
+              <span class="text-sm text-gray-400 truncate">Python Script Helper</span>
+            </div>
+            <div class="session-item flex items-center gap-2.5 px-3 py-2.5 rounded-[var(--radius-sm)] cursor-pointer border border-transparent hover:bg-white/[0.04]">
+              <span class="text-base">📊</span>
+              <span class="text-sm text-gray-400 truncate">Data Analysis Q&A</span>
+            </div>
+            <div class="session-item flex items-center gap-2.5 px-3 py-2.5 rounded-[var(--radius-sm)] cursor-pointer border border-transparent hover:bg-white/[0.04]">
+              <span class="text-base">✍️</span>
+              <span class="text-sm text-gray-400 truncate">Blog Post Draft</span>
+            </div>
+          </div>
+
+          <!-- User -->
+          <div class="p-4 border-t border-white/[0.06]">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-xs font-bold text-white">SK</div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-white/90 truncate">Skyler</p>
+                <p class="text-[11px] text-gray-500">admin</p>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <!-- ═══ MAIN AREA ═══ -->
+        <main class="flex-1 flex flex-col min-w-0 bg-gradient-to-b from-[#0a0c18] to-[#060812]">
+
+          <!-- Header (52px, slimmer) -->
+          <header class="glass-header h-[52px] flex items-center justify-between px-5 flex-shrink-0">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-semibold text-white/90">Gemini 2.5 Flash</span>
+              <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+            <span class="text-xs text-gray-500 font-medium tracking-wide">Forsion AI Studio</span>
+          </header>
+
+          <!-- Messages -->
+          <div class="flex-1 overflow-y-auto px-5 py-6 space-y-6" id="chatScroll">
+
+            <!-- User message -->
+            <div class="flex gap-3 max-w-3xl mx-auto flex-row-reverse msg-enter">
+              <div class="w-8 h-8 rounded-full bg-sky-600 flex-shrink-0 flex items-center justify-center text-xs font-bold text-white shadow-md">SK</div>
+              <div class="flex flex-col items-end max-w-[80%]">
+                <div class="px-4 py-3 rounded-[var(--radius-lg)] rounded-tr-[var(--radius-xs)] bg-gradient-to-br from-sky-500 to-indigo-600 text-white text-sm leading-relaxed shadow-lg shadow-sky-500/20 border border-white/20">
+                  帮我分析一下这张设计稿的布局问题
+                </div>
+                <span class="text-[10px] text-gray-500 mt-1.5 px-1">14:32</span>
+              </div>
+            </div>
+
+            <!-- AI message with attachment -->
+            <div class="flex gap-3 max-w-3xl mx-auto msg-enter" style="animation-delay: 0.1s">
+              <div class="w-8 h-8 rounded-full bg-indigo-600 flex-shrink-0 flex items-center justify-center shadow-md border border-white/10">
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+              </div>
+              <div class="flex flex-col items-start max-w-[80%]">
+                <div class="px-4 py-3.5 glass-msg rounded-[var(--radius-lg)] rounded-tl-[var(--radius-xs)] text-sm leading-relaxed">
+                  <p class="mb-3">好的，我来分析这张设计稿。主要有以下几个问题：</p>
+                  <p class="mb-2"><strong class="text-white/90">1. 视觉层级不清晰</strong> — header 和侧栏的权重过重，挤压了核心对话区的空间。</p>
+                  <p class="mb-2"><strong class="text-white/90">2. 圆角不统一</strong> — 混合使用了 8px、12px、16px、24px、32px 等多种圆角，缺乏系统性。</p>
+                  <p><strong class="text-white/90">3. 过渡生硬</strong> — 大部分 UI 变化没有动画过渡，造成视觉跳跃。</p>
+                </div>
+                <!-- Action bar (copy, regen) -->
+                <div class="flex items-center gap-1 mt-1.5 opacity-0 hover:opacity-100 transition-opacity" style="opacity: 0.5;">
+                  <button class="p-1 rounded-md text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-colors">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke-width="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke-width="2"/></svg>
+                  </button>
+                  <button class="p-1 rounded-md text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-colors">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- User message with inline attachment preview (IMPROVED) -->
+            <div class="flex gap-3 max-w-3xl mx-auto flex-row-reverse msg-enter" style="animation-delay: 0.15s">
+              <div class="w-8 h-8 rounded-full bg-sky-600 flex-shrink-0 flex items-center justify-center text-xs font-bold text-white shadow-md">SK</div>
+              <div class="flex flex-col items-end max-w-[80%]">
+                <!-- Inline attachment in message (IMPROVED DESIGN) -->
+                <div class="mb-2 flex flex-wrap gap-2 justify-end">
+                  <div class="relative group rounded-[var(--radius-md)] overflow-hidden border border-white/10 shadow-md" style="width: 180px;">
+                    <div class="aspect-[4/3] bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center">
+                      <svg class="w-10 h-10 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    </div>
+                    <div class="px-2.5 py-1.5 bg-black/40 backdrop-blur-sm">
+                      <p class="text-[11px] text-white/70 truncate">design-v3.png</p>
+                    </div>
+                  </div>
+                </div>
+                <div class="px-4 py-3 rounded-[var(--radius-lg)] rounded-tr-[var(--radius-xs)] bg-gradient-to-br from-sky-500 to-indigo-600 text-white text-sm leading-relaxed shadow-lg shadow-sky-500/20 border border-white/20">
+                  这是最新的布局，你看看还有什么需要修改的？
+                </div>
+                <span class="text-[10px] text-gray-500 mt-1.5 px-1">14:35</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- ═══ INPUT AREA (REDESIGNED) ═══ -->
+          <div class="px-5 pb-4 pt-2 relative">
+            <span class="demo-label right-8" style="top: -24px; border-radius: 8px 8px 0 0;">Redesigned Input Area</span>
+            <div class="max-w-3xl mx-auto">
+
+              <!-- Attachment chips INSIDE the input container -->
+              <div class="glass-input rounded-[var(--radius-xl)] composer-area collapsed" id="composerBox">
+
+                <!-- Inline attachment chips row -->
+                <div class="px-3 pt-3 flex flex-wrap gap-2" id="attachmentArea" style="display: none;">
+                  <!-- Chips get added dynamically -->
+                </div>
+
+                <!-- Textarea row -->
+                <div class="flex items-end gap-1.5 p-2">
+                  <!-- Attach button -->
+                  <button onclick="addDemoAttachment()" class="p-2.5 rounded-full text-gray-400 hover:text-sky-400 hover:bg-white/[0.06] btn-press flex-shrink-0 self-end transition-colors" title="Attach file">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                  </button>
+
+                  <!-- Textarea -->
+                  <div class="relative flex-1">
+                    <textarea
+                      id="mainTextarea"
+                      rows="1"
+                      placeholder="Message Gemini 2.5 Flash..."
+                      class="composer-textarea w-full bg-transparent py-3 px-2 text-sm text-white/90 placeholder-gray-500 focus:outline-none resize-none overflow-y-auto leading-relaxed"
+                      style="max-height: 200px;"
+                      oninput="autoResize(this)"
+                    ></textarea>
+                  </div>
+
+                  <!-- Expand/Collapse button -->
+                  <button onclick="toggleExpand()" class="p-2 rounded-full text-gray-400 hover:text-sky-400 hover:bg-white/[0.06] btn-press flex-shrink-0 self-end transition-colors" title="Expand input" id="expandBtn">
+                    <svg id="expandIcon" class="w-[18px] h-[18px] transition-transform" style="transition: transform 0.3s cubic-bezier(0.25,0.1,0.25,1)" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="15 3 21 3 21 9"></polyline>
+                      <polyline points="9 21 3 21 3 15"></polyline>
+                      <line x1="21" y1="3" x2="14" y2="10"></line>
+                      <line x1="3" y1="21" x2="10" y2="14"></line>
+                    </svg>
+                  </button>
+
+                  <!-- Send button -->
+                  <button class="p-2.5 bg-gradient-to-r from-sky-500 to-indigo-500 rounded-[var(--radius-md)] text-white btn-press flex-shrink-0 self-end shadow-lg shadow-sky-500/20 border border-white/20 hover:shadow-sky-500/30 transition-shadow">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19V5m0 0l-7 7m7-7l7 7" transform="rotate(45 12 12)"/></svg>
+                  </button>
+                </div>
+
+                <!-- Expanded mode footer (hidden by default) -->
+                <div id="expandedFooter" class="hidden px-4 py-2.5 border-t border-white/[0.06] flex items-center justify-between">
+                  <span class="text-[11px] text-gray-500">Ctrl+Enter to send &middot; Esc to collapse</span>
+                  <div class="flex gap-2">
+                    <button onclick="toggleExpand()" class="text-xs text-gray-400 hover:text-white px-3 py-1.5 rounded-[var(--radius-xs)] hover:bg-white/[0.06] btn-press transition-colors">
+                      Collapse
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Controls row (below input box) -->
+              <div class="flex items-center gap-3 mt-2.5 ml-1">
+                <label class="flex items-center gap-1.5 cursor-pointer select-none group">
+                  <div class="relative">
+                    <div class="w-8 h-[18px] rounded-full bg-gray-700 transition-colors group-hover:bg-gray-600"></div>
+                    <div class="absolute top-[3px] left-[3px] w-3 h-3 rounded-full bg-white shadow-sm" style="transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)"></div>
+                  </div>
+                  <span class="text-xs text-gray-500 group-hover:text-gray-400 transition-colors">Deep Thinking</span>
+                </label>
+                <label class="flex items-center gap-1.5 cursor-pointer select-none group">
+                  <div class="relative">
+                    <div class="w-8 h-[18px] rounded-full bg-gray-700 transition-colors group-hover:bg-gray-600"></div>
+                    <div class="absolute top-[3px] left-[3px] w-3 h-3 rounded-full bg-white shadow-sm" style="transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)"></div>
+                  </div>
+                  <span class="text-xs text-gray-500 group-hover:text-gray-400 transition-colors">Force Image</span>
+                </label>
+              </div>
+
+              <p class="text-center text-[11px] text-gray-600 mt-3">AI can make mistakes. Please verify important information.</p>
+            </div>
+          </div>
+
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ ATTACHMENT REDESIGN COMPARISON ═══════════════ -->
+  <div class="max-w-[1400px] mx-auto px-6 pb-24">
+    <h2 class="text-2xl font-bold text-white mb-6">Attachment Preview — Before vs After</h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <!-- BEFORE -->
+      <div class="relative rounded-[var(--radius-lg)] border border-white/10 bg-[#0c0e1a] p-6 overflow-hidden">
+        <span class="demo-label left-4">Before (Current)</span>
+        <div class="mt-6 space-y-3">
+          <p class="text-xs text-gray-500 uppercase font-semibold tracking-wider mb-3">Attachment Preview</p>
+          <!-- Old style: h-20 boxes sitting outside the input -->
+          <div class="flex gap-2 flex-wrap mb-4">
+            <div class="relative flex-shrink-0">
+              <div class="h-20 w-auto rounded-lg shadow-lg border border-gray-700 bg-gray-800 overflow-hidden" style="width: 100px;">
+                <div class="w-full h-full bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center">
+                  <svg class="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                </div>
+              </div>
+              <button class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md" style="width: 20px; height: 20px; font-size: 10px; display: flex; align-items: center; justify-content: center;">&times;</button>
+            </div>
+            <div class="relative flex-shrink-0">
+              <div class="h-20 px-4 rounded-lg shadow-lg flex items-center gap-3 border border-gray-700 bg-gray-800">
+                <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                <div class="overflow-hidden max-w-[120px]">
+                  <div class="text-sm font-medium text-white truncate">report.pdf</div>
+                  <div class="text-xs text-gray-400">PDF</div>
+                </div>
+              </div>
+              <button class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md" style="width: 20px; height: 20px; font-size: 10px; display: flex; align-items: center; justify-content: center;">&times;</button>
+            </div>
+          </div>
+          <!-- Old input bar below -->
+          <div class="bg-white/10 rounded-[2rem] p-2 flex items-center gap-2 border border-white/15">
+            <div class="p-3 rounded-full text-gray-400"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg></div>
+            <span class="flex-1 text-gray-500 text-sm">Message...</span>
+            <div class="p-3 bg-sky-500 rounded-[1rem] text-white"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+          </div>
+          <div class="mt-4 space-y-1 text-xs text-red-400/70">
+            <p>&#x2717; Attachments sit outside and above input — disconnected</p>
+            <p>&#x2717; Fixed h-20 makes all previews the same ugly height</p>
+            <p>&#x2717; Red close button overflows with -top-2 -right-2</p>
+            <p>&#x2717; No entrance animation, no hover interaction</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- AFTER -->
+      <div class="relative rounded-[var(--radius-lg)] border border-white/10 bg-[#0c0e1a] p-6 overflow-hidden">
+        <span class="demo-label left-4">After (Proposed)</span>
+        <div class="mt-6 space-y-3">
+          <p class="text-xs text-gray-500 uppercase font-semibold tracking-wider mb-3">Attachment Preview</p>
+          <!-- New style: chips INSIDE the input box -->
+          <div class="glass-input rounded-[var(--radius-xl)]">
+            <!-- Chips row inside -->
+            <div class="px-3 pt-3 flex flex-wrap gap-2">
+              <!-- Image chip -->
+              <div class="attachment-chip glass-attachment rounded-[var(--radius-sm)] flex items-center gap-2.5 p-1.5 pr-3 group cursor-default" style="animation-delay: 0s">
+                <div class="w-10 h-10 rounded-[var(--radius-xs)] overflow-hidden bg-gradient-to-br from-slate-600 to-slate-700 flex-shrink-0 flex items-center justify-center">
+                  <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                </div>
+                <div class="min-w-0">
+                  <p class="text-xs text-white/80 font-medium truncate">screenshot.png</p>
+                  <p class="text-[10px] text-gray-500">245 KB</p>
+                </div>
+                <button class="chip-remove ml-1 w-5 h-5 rounded-full bg-white/10 hover:bg-red-500/80 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+              <!-- Document chip -->
+              <div class="attachment-chip glass-attachment rounded-[var(--radius-sm)] flex items-center gap-2.5 p-1.5 pr-3 group cursor-default" style="animation-delay: 0.06s">
+                <div class="w-10 h-10 rounded-[var(--radius-xs)] bg-blue-500/10 flex-shrink-0 flex items-center justify-center">
+                  <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </div>
+                <div class="min-w-0">
+                  <p class="text-xs text-white/80 font-medium truncate">report.pdf</p>
+                  <p class="text-[10px] text-gray-500">1.2 MB</p>
+                </div>
+                <button class="chip-remove ml-1 w-5 h-5 rounded-full bg-white/10 hover:bg-red-500/80 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+            </div>
+            <!-- Input row -->
+            <div class="flex items-end gap-1.5 p-2">
+              <div class="p-2.5 text-gray-400"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg></div>
+              <span class="flex-1 text-sm text-gray-500 py-3">帮我分析这个设计...</span>
+              <div class="p-2.5 bg-gradient-to-r from-sky-500 to-indigo-500 rounded-[var(--radius-md)] text-white shadow-lg"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+            </div>
+          </div>
+          <div class="mt-4 space-y-1 text-xs text-emerald-400/70">
+            <p>&#x2713; Chips live inside the input — unified visual container</p>
+            <p>&#x2713; Thumbnail + filename + size — informative at a glance</p>
+            <p>&#x2713; Remove button hidden until hover — cleaner default state</p>
+            <p>&#x2713; Spring entrance animation per chip</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ INLINE EXPAND DEMO ═══════════════ -->
+  <div class="max-w-[1400px] mx-auto px-6 pb-24">
+    <h2 class="text-2xl font-bold text-white mb-6">Text Expand — Inline vs Modal</h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <!-- BEFORE: Modal -->
+      <div class="relative rounded-[var(--radius-lg)] border border-white/10 bg-[#0c0e1a] p-6 overflow-hidden">
+        <span class="demo-label left-4">Before: Opens a modal</span>
+        <div class="mt-6">
+          <div class="bg-white/10 rounded-[2rem] p-2 flex items-center gap-2 border border-white/15 mb-4">
+            <div class="p-3 rounded-full text-gray-400"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg></div>
+            <span class="flex-1 text-sm text-gray-500">Message...</span>
+            <div class="p-2 text-gray-400">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+            </div>
+            <div class="p-3 bg-sky-500 rounded-[1rem] text-white"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+          </div>
+          <!-- Fake modal overlay -->
+          <div class="bg-black/50 backdrop-blur-sm rounded-[var(--radius-lg)] p-4 flex items-center justify-center" style="height: 250px;">
+            <div class="bg-[#1a1c2e] border border-white/10 rounded-[var(--radius-lg)] w-full max-w-sm p-4 shadow-2xl">
+              <div class="flex items-center justify-between mb-3 pb-3 border-b border-white/[0.06]">
+                <span class="text-sm font-semibold text-white">Compose Message</span>
+                <span class="text-gray-500 text-xs">&times;</span>
+              </div>
+              <div class="h-24 bg-white/[0.03] rounded-[var(--radius-sm)] border border-white/[0.06] p-3">
+                <span class="text-sm text-gray-500">Type here...</span>
+              </div>
+              <div class="flex justify-end gap-2 mt-3">
+                <button class="text-xs text-gray-400 px-3 py-1.5">Cancel</button>
+                <button class="text-xs bg-sky-500 text-white px-3 py-1.5 rounded-lg">Apply</button>
+              </div>
+            </div>
+          </div>
+          <div class="mt-4 space-y-1 text-xs text-red-400/70">
+            <p>&#x2717; Context switch — new floating window covers the chat</p>
+            <p>&#x2717; Text must be synced back to main input on "Apply"</p>
+            <p>&#x2717; Losing spatial continuity with the original input box</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- AFTER: Inline expand -->
+      <div class="relative rounded-[var(--radius-lg)] border border-white/10 bg-[#0c0e1a] p-6 overflow-hidden">
+        <span class="demo-label left-4">After: Expands in place</span>
+        <div class="mt-6">
+          <p class="text-xs text-gray-500 mb-3">Click the expand icon to toggle:</p>
+
+          <div class="glass-input rounded-[var(--radius-xl)] composer-area collapsed" id="demoComposer2" style="transition: max-height 0.35s cubic-bezier(0.25,0.1,0.25,1), border-radius 0.35s cubic-bezier(0.25,0.1,0.25,1);">
+            <div class="flex items-end gap-1.5 p-2">
+              <div class="p-2.5 text-gray-400"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg></div>
+              <textarea
+                id="demoTextarea2"
+                rows="1"
+                placeholder="Message..."
+                class="composer-textarea w-full bg-transparent py-3 px-2 text-sm text-white/90 placeholder-gray-500 focus:outline-none resize-none overflow-y-auto"
+                style="max-height: 200px; height: 44px;"
+              ></textarea>
+              <button onclick="toggleExpand2()" class="p-2 text-gray-400 hover:text-sky-400 btn-press flex-shrink-0 self-end rounded-full hover:bg-white/[0.06] transition-colors" id="expandBtn2">
+                <svg id="expandIcon2" class="w-[18px] h-[18px]" style="transition: transform 0.3s cubic-bezier(0.25,0.1,0.25,1)" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="15 3 21 3 21 9"></polyline>
+                  <polyline points="9 21 3 21 3 15"></polyline>
+                  <line x1="21" y1="3" x2="14" y2="10"></line>
+                  <line x1="3" y1="21" x2="10" y2="14"></line>
+                </svg>
+              </button>
+              <div class="p-2.5 bg-gradient-to-r from-sky-500 to-indigo-500 rounded-[var(--radius-md)] text-white shadow-lg self-end"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+            </div>
+            <div id="expandedFooter2" class="hidden px-4 py-2.5 border-t border-white/[0.06] flex items-center justify-between">
+              <span class="text-[11px] text-gray-500">Ctrl+Enter to send &middot; Esc to collapse</span>
+              <button onclick="toggleExpand2()" class="text-xs text-gray-400 hover:text-white px-3 py-1.5 rounded-[var(--radius-xs)] hover:bg-white/[0.06] btn-press transition-colors">Collapse</button>
+            </div>
+          </div>
+
+          <div class="mt-4 space-y-1 text-xs text-emerald-400/70">
+            <p>&#x2713; No context switch — stays right where the input is</p>
+            <p>&#x2713; Smooth height + border-radius transition</p>
+            <p>&#x2713; Same textarea, no text sync needed</p>
+            <p>&#x2713; Esc or click collapse to return to compact mode</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ RADIUS TOKEN GUIDE ═══════════════ -->
+  <div class="max-w-[1400px] mx-auto px-6 pb-24">
+    <h2 class="text-2xl font-bold text-white mb-6">Border Radius Token System</h2>
+    <p class="text-gray-400 text-sm mb-8 max-w-2xl">
+      定义 6 个圆角级别，所有 UI 元素严格对齐到这些 token，避免混用导致的视觉不协调。
+    </p>
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div class="text-center">
+        <div class="w-full aspect-square bg-white/[0.06] border border-white/10 mb-3 flex items-center justify-center text-xs text-gray-400" style="border-radius: var(--radius-xs)">Content</div>
+        <p class="text-sm font-semibold text-white">XS — 8px</p>
+        <p class="text-[11px] text-gray-500 mt-1">Inline code, small tags, inner corners of messages</p>
+      </div>
+      <div class="text-center">
+        <div class="w-full aspect-square bg-white/[0.06] border border-white/10 mb-3 flex items-center justify-center text-xs text-gray-400" style="border-radius: var(--radius-sm)">Content</div>
+        <p class="text-sm font-semibold text-white">SM — 12px</p>
+        <p class="text-[11px] text-gray-500 mt-1">Buttons, session items, tooltips, dropdowns</p>
+      </div>
+      <div class="text-center">
+        <div class="w-full aspect-square bg-white/[0.06] border border-white/10 mb-3 flex items-center justify-center text-xs text-gray-400" style="border-radius: var(--radius-md)">Content</div>
+        <p class="text-sm font-semibold text-white">MD — 16px</p>
+        <p class="text-[11px] text-gray-500 mt-1">Cards, attachment chips, code blocks, send button</p>
+      </div>
+      <div class="text-center">
+        <div class="w-full aspect-square bg-white/[0.06] border border-white/10 mb-3 flex items-center justify-center text-xs text-gray-400" style="border-radius: var(--radius-lg)">Content</div>
+        <p class="text-sm font-semibold text-white">LG — 22px</p>
+        <p class="text-[11px] text-gray-500 mt-1">Message bubbles, popovers, panels</p>
+      </div>
+      <div class="text-center">
+        <div class="w-full aspect-square bg-white/[0.06] border border-white/10 mb-3 flex items-center justify-center text-xs text-gray-400" style="border-radius: var(--radius-xl)">Content</div>
+        <p class="text-sm font-semibold text-white">XL — 28px</p>
+        <p class="text-[11px] text-gray-500 mt-1">Input composer, modals, settings panel</p>
+      </div>
+      <div class="text-center">
+        <div class="w-full aspect-square bg-white/[0.06] border border-white/10 mb-3 flex items-center justify-center text-xs text-gray-400" style="border-radius: var(--radius-pill)">Content</div>
+        <p class="text-sm font-semibold text-white">Pill — 9999px</p>
+        <p class="text-[11px] text-gray-500 mt-1">Avatar, toggle switch, badge, icon-only buttons</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SCRIPTS ═══════════════ -->
+  <script>
+    // --- Main demo textarea auto-resize ---
+    function autoResize(el) {
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+    }
+
+    // --- Inline expand / collapse (main demo) ---
+    let isExpanded = false;
+    function toggleExpand() {
+      const box = document.getElementById('composerBox');
+      const textarea = document.getElementById('mainTextarea');
+      const footer = document.getElementById('expandedFooter');
+      const icon = document.getElementById('expandIcon');
+      isExpanded = !isExpanded;
+
+      if (isExpanded) {
+        box.classList.remove('collapsed');
+        box.classList.add('expanded');
+        textarea.style.height = '40vh';
+        textarea.style.maxHeight = '50vh';
+        footer.classList.remove('hidden');
+        footer.classList.add('flex');
+        icon.style.transform = 'rotate(45deg)';
+        textarea.focus();
+      } else {
+        box.classList.remove('expanded');
+        box.classList.add('collapsed');
+        textarea.style.height = 'auto';
+        textarea.style.maxHeight = '200px';
+        autoResize(textarea);
+        footer.classList.add('hidden');
+        footer.classList.remove('flex');
+        icon.style.transform = 'rotate(0)';
+      }
+    }
+
+    // --- Inline expand (comparison demo) ---
+    let isExpanded2 = false;
+    function toggleExpand2() {
+      const box = document.getElementById('demoComposer2');
+      const textarea = document.getElementById('demoTextarea2');
+      const footer = document.getElementById('expandedFooter2');
+      const icon = document.getElementById('expandIcon2');
+      isExpanded2 = !isExpanded2;
+
+      if (isExpanded2) {
+        box.classList.remove('collapsed');
+        box.classList.add('expanded');
+        textarea.style.height = '200px';
+        textarea.style.maxHeight = '300px';
+        footer.classList.remove('hidden');
+        footer.classList.add('flex');
+        icon.style.transform = 'rotate(45deg)';
+        textarea.focus();
+      } else {
+        box.classList.remove('expanded');
+        box.classList.add('collapsed');
+        textarea.style.height = '44px';
+        textarea.style.maxHeight = '200px';
+        footer.classList.add('hidden');
+        footer.classList.remove('flex');
+        icon.style.transform = 'rotate(0)';
+      }
+    }
+
+    // --- Add demo attachment chips ---
+    let chipCount = 0;
+    const chipData = [
+      { name: 'photo.jpg', size: '1.8 MB', type: 'image' },
+      { name: 'notes.md', size: '12 KB', type: 'doc' },
+      { name: 'diagram.png', size: '340 KB', type: 'image' },
+      { name: 'slides.pdf', size: '4.5 MB', type: 'doc' },
+    ];
+
+    function addDemoAttachment() {
+      const area = document.getElementById('attachmentArea');
+      area.style.display = 'flex';
+
+      const data = chipData[chipCount % chipData.length];
+      chipCount++;
+
+      const chip = document.createElement('div');
+      chip.className = 'attachment-chip glass-attachment rounded-[12px] flex items-center gap-2.5 p-1.5 pr-3 group cursor-default';
+      chip.style.animationDelay = '0s';
+
+      const isImage = data.type === 'image';
+      chip.innerHTML = `
+        <div class="w-10 h-10 rounded-[8px] overflow-hidden ${isImage ? 'bg-gradient-to-br from-slate-600 to-slate-700' : 'bg-blue-500/10'} flex-shrink-0 flex items-center justify-center">
+          ${isImage
+            ? '<svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>'
+            : '<svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>'
+          }
+        </div>
+        <div class="min-w-0">
+          <p class="text-xs text-white/80 font-medium truncate">${data.name}</p>
+          <p class="text-[10px] text-gray-500">${data.size}</p>
+        </div>
+        <button onclick="this.parentElement.remove(); checkAttachments();" class="chip-remove ml-1 w-5 h-5 rounded-full bg-white/10 hover:bg-red-500/80 flex items-center justify-center text-gray-400 hover:text-white transition-colors">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      `;
+
+      area.appendChild(chip);
+    }
+
+    function checkAttachments() {
+      const area = document.getElementById('attachmentArea');
+      if (area.children.length === 0) {
+        area.style.display = 'none';
+      }
+    }
+
+    // Keyboard support
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (isExpanded) toggleExpand();
+        if (isExpanded2) toggleExpand2();
+      }
+    });
+  </script>
+
+</body>
+</html>

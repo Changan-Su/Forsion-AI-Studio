@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, Wrench, CheckCircle, XCircle, Loader2, RotateCw, Clock } from 'lucide-react';
 import type { ToolCall, ToolResult } from '../types';
+import { AnimatedCollapse } from './AnimatedUI';
 
 interface ToolCallBlockProps {
   toolCall: ToolCall;
@@ -99,7 +100,7 @@ const ToolCallBlock: React.FC<ToolCallBlockProps> = ({
       )}
 
       {/* Expanded details */}
-      {expanded && (
+      <AnimatedCollapse isOpen={expanded}>
         <div className={`px-3 pb-3 text-xs font-mono border-t ${
           isNotion ? 'border-gray-100 dark:border-gray-800 text-gray-700 dark:text-gray-300'
             : isMonet ? 'border-white/10 text-gray-700 dark:text-gray-300'
@@ -124,7 +125,7 @@ const ToolCallBlock: React.FC<ToolCallBlockProps> = ({
             </div>
           )}
         </div>
-      )}
+      </AnimatedCollapse>
     </div>
   );
 };

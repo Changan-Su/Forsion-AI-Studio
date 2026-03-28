@@ -3,6 +3,7 @@ import { MessageSquare, Plus, Trash2, LogOut, Settings, X, MoreHorizontal, Edit2
 import { ChatSession, User, UserRole } from '../types';
 import CreditBalance from './CreditBalance';
 import EmojiPicker from './EmojiPicker';
+import { AnimatePresence, AnimatedOverlay, AnimatedDropdown, AnimatedCollapse, motion } from './AnimatedUI';
 
 interface SidebarProps {
   sessions: ChatSession[];
@@ -19,7 +20,7 @@ interface SidebarProps {
   onOpenSettings: () => void;
   isOpen: boolean;
   onClose: () => void;
-  themePreset: 'default' | 'notion' | 'monet';
+  themePreset: 'default' | 'notion' | 'monet' | 'apple' | 'forsion1';
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -46,6 +47,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [showArchivedSection, setShowArchivedSection] = useState(false);
   const isNotion = themePreset === 'notion';
   const isMonet = themePreset === 'monet';
+  const isApple = themePreset === 'apple';
+  const isForsion1 = themePreset === 'forsion1';
   
   // Refs
   const menuRef = useRef<HTMLDivElement>(null);
@@ -118,14 +121,27 @@ const Sidebar: React.FC<SidebarProps> = ({
   const renderSessionItem = (session: ChatSession, isArchived: boolean = false) => (
     <div
       key={session.id}
-      className={`group relative flex items-center gap-2 px-3 py-3 rounded-2xl cursor-pointer transition-all border ${
+      style={{ borderRadius: 'var(--radius-sm)' }}
+      className={`group relative flex items-center gap-2 px-3 py-3 cursor-pointer transition-all border ${
         currentSessionId === session.id
-          ? isMonet 
-            ? 'bg-white/50 border-white/30 text-[#4A4B6A] font-bold shadow-sm backdrop-blur-md' 
-            : 'bg-white/90 border-white/80 text-gray-900 dark:bg-white/10 dark:border-white/20 dark:text-white font-semibold shadow-[0_12px_30px_rgba(15,23,42,0.08)]'
-          : isMonet
-            ? 'border-transparent hover:bg-white/30 text-[#4A4B6A]/80 hover:text-[#4A4B6A] font-medium'
-            : 'bg-white/30 border-transparent text-gray-600 dark:bg-white/5 dark:text-gray-300 hover:bg-white/60 hover:border-white/70 dark:hover:bg-white/10 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white'
+          ? isNotion
+            ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white font-semibold'
+            : isMonet 
+              ? 'bg-white/50 border-white/30 text-[#4A4B6A] font-bold shadow-sm backdrop-blur-md'
+              : isApple
+                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700/40 text-blue-900 dark:text-blue-100 font-semibold'
+                : isForsion1
+                  ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/40 text-amber-900 dark:text-amber-100 font-semibold'
+                  : 'bg-white/90 border-white/80 text-gray-900 dark:bg-white/10 dark:border-white/20 dark:text-white font-semibold shadow-[0_12px_30px_rgba(15,23,42,0.08)]'
+          : isNotion
+            ? 'border-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+            : isMonet
+              ? 'border-transparent hover:bg-white/30 text-[#4A4B6A]/80 hover:text-[#4A4B6A] font-medium'
+              : isApple
+                ? 'border-transparent text-gray-600 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-900/10 hover:text-blue-900 dark:hover:text-blue-100'
+                : isForsion1
+                  ? 'border-transparent text-stone-600 dark:text-stone-400 hover:bg-amber-50 dark:hover:bg-amber-900/10 hover:text-amber-900 dark:hover:text-amber-100'
+                  : 'bg-white/30 border-transparent text-gray-600 dark:bg-white/5 dark:text-gray-300 hover:bg-white/60 hover:border-white/70 dark:hover:bg-white/10 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white'
       }`}
       onClick={() => {
         // Don't select session if we're currently editing
@@ -205,52 +221,57 @@ const Sidebar: React.FC<SidebarProps> = ({
         </button>
 
         {/* Dropdown Menu */}
-        {showMenuFor === session.id && (
-          <div
-            ref={menuRef}
-            className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-1 min-w-[140px]"
-          >
-            <button
-              onClick={(e) => handleStartRename(session, e)}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+        <AnimatePresence>
+          {showMenuFor === session.id && (
+            <AnimatedDropdown
+              key="session-menu"
+              origin="top-right"
+              className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-800 rounded-[var(--radius-sm)] shadow-xl border border-gray-200 dark:border-gray-700 py-1 min-w-[140px]"
             >
-              <Edit2 size={14} />
-              Rename
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onArchiveSession(session.id);
-                setShowMenuFor(null);
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            >
-              {isArchived ? (
-                <>
-                  <ArchiveRestore size={14} />
-                  Unarchive
-                </>
-              ) : (
-                <>
-                  <Archive size={14} />
-                  Archive
-                </>
-              )}
-            </button>
-            <div className="my-1 border-t border-gray-200 dark:border-gray-700" />
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDeleteSession(session.id);
-                setShowMenuFor(null);
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-            >
-              <Trash2 size={14} />
-              Delete
-            </button>
-          </div>
-        )}
+              <div ref={menuRef}>
+                <button
+                  onClick={(e) => handleStartRename(session, e)}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                >
+                  <Edit2 size={14} />
+                  Rename
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onArchiveSession(session.id);
+                    setShowMenuFor(null);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                >
+                  {isArchived ? (
+                    <>
+                      <ArchiveRestore size={14} />
+                      Unarchive
+                    </>
+                  ) : (
+                    <>
+                      <Archive size={14} />
+                      Archive
+                    </>
+                  )}
+                </button>
+                <div className="my-1 border-t border-gray-200 dark:border-gray-700" />
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteSession(session.id);
+                    setShowMenuFor(null);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors duration-200"
+                >
+                  <Trash2 size={14} />
+                  Delete
+                </button>
+              </div>
+            </AnimatedDropdown>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
@@ -258,31 +279,42 @@ const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       {/* Mobile Overlay */}
-      {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/60 z-30 md:hidden backdrop-blur-sm"
-          onClick={onClose}
-        />
-      )}
+      <AnimatePresence>
+        {isOpen && (
+          <AnimatedOverlay
+            key="sidebar-overlay"
+            onClick={onClose}
+            className="bg-black/50 backdrop-blur-sm z-30 md:hidden"
+          />
+        )}
+      </AnimatePresence>
 
       {/* Sidebar Container */}
       <div className={`
-        fixed inset-y-0 left-0 z-40 w-72 
-        ${isMonet 
-          ? 'bg-white/30 backdrop-blur-xl border-r border-white/20 shadow-[4px_0_24px_rgba(0,0,0,0.02)]' 
-          : 'bg-gradient-to-b from-white/90 via-slate-50/80 to-slate-100/70 dark:from-[#0e1325]/90 dark:via-[#070b18]/85 dark:to-[#020409]/90 border-r border-white/30 dark:border-slate-800/80 backdrop-blur-2xl shadow-[0_25px_60px_rgba(15,23,42,0.12)] dark:shadow-[0_15px_40px_rgba(2,6,23,0.7)]'
+        fixed inset-y-0 left-0 z-40 w-64 
+        ${isNotion
+          ? 'bg-notion-sidebar dark:bg-notion-darksidebar border-r border-notion-border dark:border-notion-darkborder'
+          : isMonet 
+            ? 'bg-white/30 backdrop-blur-xl border-r border-white/20 shadow-[4px_0_24px_rgba(0,0,0,0.02)]'
+            : isApple
+              ? 'apple-glass border-r border-gray-200 dark:border-gray-700/50'
+            : isForsion1
+              ? 'forsion1-glass border-r border-[#d5d0c8] dark:border-gray-700/50'
+            : 'bg-gradient-to-b from-white/90 via-slate-50/80 to-slate-100/70 dark:from-[#0e1325]/90 dark:via-[#070b18]/85 dark:to-[#020409]/90 border-r border-white/30 dark:border-slate-800/80 backdrop-blur-2xl shadow-[0_25px_60px_rgba(15,23,42,0.12)] dark:shadow-[0_15px_40px_rgba(2,6,23,0.7)]'
         }
         transform transition-transform duration-300 ease-in-out flex flex-col text-gray-700 dark:text-gray-200
-        md:relative md:translate-x-0 md:w-64
+        md:relative md:translate-x-0 md:w-56
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="p-4">
           <div className="flex items-center justify-between mb-6">
-            <div className={`flex items-center gap-2 font-bold text-xl tracking-wider ${isMonet ? 'text-[#4A4B6A] font-cursive text-2xl drop-shadow-sm' : 'text-forsion-600 dark:text-forsion-400'}`}>
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shadow-lg ${
-                isMonet ? 'bg-[#4A4B6A] backdrop-blur-md border border-white/20' : 'bg-gradient-to-tr from-forsion-500 to-purple-600'
-              }`}>
-                <span className="text-white">F</span>
+            <div className={`flex items-center gap-2 font-bold text-xl tracking-wider ${
+              isNotion ? 'text-gray-900 dark:text-white' : isMonet ? 'text-[#4A4B6A] font-cursive text-2xl drop-shadow-sm' : isApple ? 'text-blue-600 dark:text-blue-400' : isForsion1 ? 'text-amber-800 dark:text-amber-300' : 'text-forsion-600 dark:text-forsion-400'
+            }`}>
+              <div className={`w-8 h-8 flex items-center justify-center shadow-lg ${
+                isNotion ? 'bg-gray-900 dark:bg-white' : isMonet ? 'bg-[#4A4B6A] backdrop-blur-md border border-white/20' : isApple ? 'bg-blue-500' : isForsion1 ? 'bg-amber-700' : 'bg-gradient-to-tr from-forsion-500 to-purple-600'
+              }`} style={{ borderRadius: 'var(--radius-sm)' }}>
+                <span className={isNotion ? 'text-white dark:text-black' : 'text-white'}>F</span>
               </div>
               Forsion AI
             </div>
@@ -294,10 +326,17 @@ const Sidebar: React.FC<SidebarProps> = ({
           
           <button
             onClick={() => { onNewChat(); onClose(); }}
-            className={`w-full flex items-center gap-2 text-white border border-white/40 px-4 py-3 rounded-2xl transition-transform duration-300 ease-out shadow-xl hover:-translate-y-0.5 active:scale-95 backdrop-blur ${
-              isMonet 
-                ? 'bg-[#4A4B6A] hover:bg-[#3E406F] border-white/20 text-white font-medium' 
-                : 'bg-gradient-to-r from-forsion-500 to-indigo-500 hover:from-forsion-400 hover:to-indigo-400 shadow-forsion-500/30'
+            style={{ borderRadius: 'var(--radius-md)' }}
+            className={`w-full flex items-center gap-2 px-4 py-3 transition-all duration-200 ease-out active:scale-[0.97] ${
+              isNotion
+                ? 'bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-100 font-medium shadow-sm'
+                : isMonet 
+                  ? 'bg-[#4A4B6A] hover:bg-[#3E406F] border border-white/20 text-white font-medium shadow-xl backdrop-blur'
+                  : isApple
+                    ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-md shadow-blue-500/20 border border-blue-400/30 hover:-translate-y-0.5'
+                    : isForsion1
+                      ? 'bg-amber-700 hover:bg-amber-800 text-white shadow-md shadow-amber-700/20 border border-amber-600/30 hover:-translate-y-0.5'
+                      : 'bg-gradient-to-r from-forsion-500 to-indigo-500 hover:from-forsion-400 hover:to-indigo-400 text-white border border-white/40 shadow-xl shadow-forsion-500/30 hover:-translate-y-0.5 backdrop-blur'
             }`}
           >
             <Plus size={18} />
@@ -320,28 +359,39 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="mt-4">
               <button
                 onClick={() => setShowArchivedSection(!showArchivedSection)}
-                className="w-full flex items-center gap-2 px-2 py-2 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
+                className="w-full flex items-center gap-2 px-2 py-2 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider hover:text-gray-600 dark:hover:text-gray-400 transition-colors duration-200"
               >
-                {showArchivedSection ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                <motion.div
+                  animate={{ rotate: showArchivedSection ? 90 : 0 }}
+                  transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                >
+                  <ChevronRight size={14} />
+                </motion.div>
                 Archived ({archivedSessions.length})
               </button>
-              {showArchivedSection && (
+              <AnimatedCollapse isOpen={showArchivedSection}>
                 <div className="space-y-1 mt-1">
                   {archivedSessions.map((session) => renderSessionItem(session, true))}
                 </div>
-              )}
+              </AnimatedCollapse>
             </div>
           )}
         </div>
 
         <div className={`p-4 border-t ${
-          isMonet 
-            ? 'border-white/10 bg-white/5' 
-            : 'border-white/40 dark:border-white/10 bg-white/70 dark:bg-white/5 backdrop-blur-xl'
+          isNotion
+            ? 'border-notion-border dark:border-notion-darkborder bg-notion-sidebar dark:bg-notion-darksidebar'
+            : isMonet 
+              ? 'border-white/10 bg-white/5'
+              : isApple
+                ? 'border-gray-200 dark:border-gray-700/50'
+                : isForsion1
+                  ? 'border-[#d5d0c8] dark:border-gray-700/50'
+                  : 'border-white/40 dark:border-white/10 bg-white/70 dark:bg-white/5 backdrop-blur-xl'
         }`}>
           <div className="flex items-center gap-3 mb-4">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm overflow-hidden ${
-              isMonet ? 'bg-[#4A4B6A] border border-white/20' : 'bg-gradient-to-br from-indigo-500 to-purple-500'
+              isMonet ? 'bg-[#4A4B6A] border border-white/20' : isApple ? 'bg-blue-500' : isForsion1 ? 'bg-amber-700' : 'bg-gradient-to-br from-indigo-500 to-purple-500'
             }`}>
               {user.avatar ? (
                 <img src={user.avatar} alt={user.nickname || user.username} className="w-full h-full object-cover" />
@@ -364,7 +414,8 @@ const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-1">
             <button
               onClick={() => { onOpenSettings(); onClose(); }}
-              className={`w-full flex items-center gap-2 text-sm px-3 py-2 rounded-xl transition-colors ${
+              style={{ borderRadius: 'var(--radius-xs)' }}
+              className={`w-full flex items-center gap-2 text-sm px-3 py-2 transition-colors ${
                 isMonet
                   ? 'text-[#4A4B6A] hover:bg-white/40 font-medium'
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-forsion-300 hover:bg-white/70 dark:hover:bg-white/10'
@@ -375,7 +426,8 @@ const Sidebar: React.FC<SidebarProps> = ({
             </button>
             <button
               onClick={onLogout}
-              className={`w-full flex items-center gap-2 text-sm px-3 py-2 rounded-xl transition-colors ${
+              style={{ borderRadius: 'var(--radius-xs)' }}
+              className={`w-full flex items-center gap-2 text-sm px-3 py-2 transition-colors ${
                 isMonet
                   ? 'text-[#4A4B6A]/90 hover:bg-red-500/10 hover:text-red-600 font-medium'
                   : 'text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-white/70 dark:hover:bg-white/10'

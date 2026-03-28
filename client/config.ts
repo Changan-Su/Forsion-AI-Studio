@@ -25,3 +25,5 @@ const getApiBaseUrl = (): string => {
 export const API_BASE_URL = typeof window !== 'undefined'
   ? getApiBaseUrl()
   : '/api';
+
+export const APP_ID = import.meta.env.VITE_APP_ID || 'ai-studio';
