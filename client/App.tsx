@@ -54,7 +54,7 @@ const App: React.FC = () => {
 
   // Theme & Settings
   const [theme, setTheme] = useState<'light' | 'dark'>('dark'); // Default to Dark
-  const [themePreset, setThemePreset] = useState<'default' | 'notion' | 'monet' | 'apple' | 'forsion1'>('apple');
+  const [themePreset, setThemePreset] = useState<'default' | 'notion' | 'monet' | 'apple' | 'forsion1'>('monet');
   const [customModels, setCustomModels] = useState<AIModel[]>([]);
   const [globalModels, setGlobalModels] = useState<AIModel[]>([]); // Models from backend admin
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
