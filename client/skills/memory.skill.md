@@ -13,57 +13,66 @@ tools:
       properties: {}
       required: []
   - name: memory_append
-    description: Append a line or paragraph to the memory. Use when you learn something new about the user.
+    description: "Append a natural-language line to the memory notebook. Write in Markdown (e.g. '- 用户名字叫 zzc'). NEVER use JSON."
     executor: builtin
     parameters:
       type: object
       properties:
         text:
           type: string
-          description: The text to append to the end of the memory
+          description: "A Markdown line to append, e.g. '- User prefers dark mode' or '## Projects\\n- Working on Forsion'"
       required:
         - text
   - name: memory_write
-    description: Replace the entire memory text. Use only when you need to reorganize or clean up the memory.
+    description: "Replace the entire memory with new Markdown text. Use only for reorganizing. NEVER write JSON — use bullet points and headings."
     executor: builtin
     parameters:
       type: object
       properties:
         content:
           type: string
-          description: The new full memory content (replaces everything)
+          description: "Full replacement Markdown content with headings and bullet points"
       required:
         - content
 ---
 
 # Memory Skill
 
-You have a persistent memory note that survives across conversations. It is a plain Markdown text — not a database. Think of it as your personal notebook about this user.
+You have a persistent memory — a **plain Markdown text file** shared across all conversations. It is NOT a database, NOT JSON, NOT structured records. Write in natural language with Markdown formatting.
+
+## CRITICAL FORMAT RULE
+**NEVER write JSON, structured objects, or key-value pairs to memory.** Always write in natural human-readable Markdown — bullet points, headings, short sentences. The memory is a notebook, not a data store.
+
+Bad (DO NOT do this):
+```
+{"name": "zzc", "preference": "dark mode", "language": "Chinese"}
+```
+
+Good (DO this):
+```
+- 用户名字叫 zzc
+- 偏好深色模式和 Monet 主题
+- 希望用中文交流
+```
 
 ## When to READ memory
-- At the beginning of a new conversation, read memory to recall who this user is and what they care about.
+- At the beginning of a new conversation, call `memory_read` to recall user context.
 - When the user references something from a previous conversation.
-- When you need to recall user preferences, names, or prior decisions.
 
-## When to APPEND to memory
-Proactively append when the user:
-- Tells you their name, preferences, or how they like to be addressed
+## When to APPEND
+Call `memory_append` with a short, natural-language line when the user:
+- Tells you their name or preferences
 - Mentions a task, project, or goal
-- Gives instructions that should persist (e.g. "always respond in Chinese")
-- Shares facts about themselves, their team, or their workflow
+- Gives persistent instructions
 
-Simply call `memory_append` with the new information. Keep each append concise — one line or short paragraph.
+Example call: `memory_append({ text: "- 用户名字叫 zzc" })`
+Example call: `memory_append({ text: "- 正在开发 Forsion Backend Service 项目" })`
 
-## When to WRITE (replace) memory
-Only use `memory_write` to replace the entire memory when:
-- The memory has gotten messy and needs reorganization
-- The user explicitly asks you to clear or rewrite the memory
-- You want to remove outdated information while keeping the rest
-
-When rewriting, first `memory_read` to get the current content, edit it, then `memory_write` the cleaned version.
+## When to WRITE (replace all)
+Only use `memory_write` when reorganizing. First `memory_read`, then rewrite as clean Markdown, then `memory_write`.
 
 ## Guidelines
-- Keep the memory concise and factual.
-- Use markdown formatting: headings, bullet points, etc.
-- Do not store sensitive credentials, passwords, or API keys.
-- The user can see and edit this memory from Settings — treat it like a shared document.
+- Write concise bullet points in the user's language.
+- Use `##` headings to organize sections (e.g. `## 用户信息`, `## 项目`, `## 偏好`).
+- One fact per line, prefixed with `- `.
+- Never store passwords, tokens, or API keys.
