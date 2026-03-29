@@ -42,6 +42,8 @@ export interface AgentRunInput {
   onStatusUpdate: (event: AgentStatusEvent) => void;
   /** Called each time a text chunk arrives during LLM streaming */
   onStreamChunk: (content: string, reasoning?: string) => void;
+  /** Called after each iteration to progressively insert tool messages into the UI */
+  onToolMessages?: (msgs: Message[]) => void;
 }
 
 export interface AgentRunOutput {
@@ -63,7 +65,8 @@ function buildToolCallMessage(
   toolCalls: ToolCall[],
   partialContent: string,
   modelId: string,
-  iteration: number
+  iteration: number,
+  reasoning?: string
 ): Message {
   return {
     id: makeId(),
@@ -73,6 +76,7 @@ function buildToolCallMessage(
     modelId,
     toolCalls,
     iterationIndex: iteration,
+    reasoning,
   };
 }
 
@@ -217,8 +221,8 @@ function toGeminiHistory(messages: Message[]) {
 }
 
 /** Convert session Message[] to OpenAI-compatible messages array */
-function toOpenAIHistory(messages: Message[]) {
-  const result: Array<{ role: string; content: string | unknown; tool_calls?: unknown; tool_call_id?: string }> = [];
+function toOpenAIHistory(messages: Message[], enableThinking: boolean = false) {
+  const result: Array<Record<string, unknown>> = [];
 
   for (const m of messages) {
     if (m.role === 'tool' && m.toolResults) {
@@ -233,7 +237,7 @@ function toOpenAIHistory(messages: Message[]) {
     }
 
     if (m.role === 'model' && m.toolCalls) {
-      result.push({
+      const msg: Record<string, unknown> = {
         role: 'assistant',
         content: m.content || null,
         tool_calls: m.toolCalls.map((tc) => ({
@@ -241,12 +245,21 @@ function toOpenAIHistory(messages: Message[]) {
           type: 'function',
           function: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
         })),
-      });
+      };
+      // Kimi/Moonshot requires reasoning_content on all assistant messages when thinking is enabled
+      if (enableThinking) {
+        msg.reasoning_content = m.reasoning || '';
+      }
+      result.push(msg);
       continue;
     }
 
     const role = m.role === 'user' ? 'user' : m.role === 'model' ? 'assistant' : m.role;
-    result.push({ role, content: m.content });
+    const msg: Record<string, unknown> = { role, content: m.content };
+    if (enableThinking && role === 'assistant' && m.reasoning) {
+      msg.reasoning_content = m.reasoning;
+    }
+    result.push(msg);
   }
 
   return result;
@@ -255,7 +268,7 @@ function toOpenAIHistory(messages: Message[]) {
 // ── Main agentic loop ─────────────────────────────────────────────────────────
 
 export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunOutput> {
-  const { model, agentConfig, appSettings, signal, onStatusUpdate, onStreamChunk } = input;
+  const { model, agentConfig, appSettings, signal, onStatusUpdate, onStreamChunk, onToolMessages } = input;
 
   // Load workspace-scoped custom skills for this session
   let workspaceSkills: SkillDefinition[] = [];
@@ -319,8 +332,7 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunOutput
     let iterUsage: { prompt_tokens: number; completion_tokens: number } | undefined;
 
     if (isGlobal) {
-      // Global model — route through backend proxy
-      const openAIHistory = toOpenAIHistory(workingHistory) as { role: string; content: string }[];
+      const openAIHistory = toOpenAIHistory(workingHistory, input.enableThinking) as { role: string; content: string }[];
       if (iteration === 0) {
         openAIHistory.push({ role: 'user', content: input.userMessage });
       }
@@ -372,7 +384,7 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunOutput
         throw new Error(`No API key configured for model "${model.name}"`);
       }
 
-      const openAIHistory = toOpenAIHistory(workingHistory) as { role: string; content: string }[];
+      const openAIHistory = toOpenAIHistory(workingHistory, input.enableThinking) as { role: string; content: string }[];
       if (iteration === 0) {
         openAIHistory.push({ role: 'user', content: input.userMessage });
       }
@@ -411,11 +423,10 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunOutput
 
     // ── Model wants to call tools ─────────────────────────────────────────
 
-    const toolCallMsg = buildToolCallMessage(modelToolCalls, modelContent, model.id, iteration);
+    const toolCallMsg = buildToolCallMessage(modelToolCalls, modelContent, model.id, iteration, modelReasoning);
     toolMessages.push(toolCallMsg);
     workingHistory.push(toolCallMsg);
 
-    // Execute all tool calls in parallel
     for (const tc of modelToolCalls) {
       onStatusUpdate({ type: 'tool_call_start', iteration, toolName: tc.name, toolCallId: tc.id });
     }
@@ -430,6 +441,9 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunOutput
     const resultMsg = buildToolResultMessage(results, iteration);
     toolMessages.push(resultMsg);
     workingHistory.push(resultMsg);
+
+    // Emit tool messages progressively so the UI shows each iteration live
+    onToolMessages?.([toolCallMsg, resultMsg]);
 
     // Degenerate loop detection
     if (isDegenerate(toolErrorHistory)) {

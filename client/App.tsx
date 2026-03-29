@@ -12,12 +12,15 @@ import { Send, Zap, Menu, Sparkles, MessageSquare, Code, Brain, BrainCircuit, Im
 import { getPresetAvatar, svgToDataUrl } from './src/utils/presetAvatars';
 import { detectImageGenerationIntent, generateImage, detectImageEditIntent, editImage, imageToImage } from './services/imageGenerationService';
 import CommandAutocomplete from './components/CommandAutocomplete';
+import type { Command } from './components/CommandAutocomplete';
+import { getAllBuiltinSkills } from './services/skillsRegistry';
 import AgentConfigPanel from './components/AgentConfigPanel';
 import AgentStatusBar from './components/AgentStatusBar';
 import WorkspacePanel from './components/WorkspacePanel';
 import { runAgentLoop } from './services/agentRuntime';
 import { workspaceService } from './services/workspaceService';
 import { chatSyncService } from './services/chatSyncService';
+import { compressImage } from './services/imageUtils';
 import { AnimatePresence, AnimatedModalBackdrop, AnimatedModalContent, AnimatedDropdown, motion } from './components/AnimatedUI';
 
 const App: React.FC = () => {
@@ -51,7 +54,7 @@ const App: React.FC = () => {
 
   // Theme & Settings
   const [theme, setTheme] = useState<'light' | 'dark'>('dark'); // Default to Dark
-  const [themePreset, setThemePreset] = useState<'default' | 'notion' | 'monet' | 'apple' | 'forsion1'>('default');
+  const [themePreset, setThemePreset] = useState<'default' | 'notion' | 'monet' | 'apple' | 'forsion1'>('apple');
   const [customModels, setCustomModels] = useState<AIModel[]>([]);
   const [globalModels, setGlobalModels] = useState<AIModel[]>([]); // Models from backend admin
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
@@ -88,6 +91,22 @@ const App: React.FC = () => {
 
   // Mobile UI State
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const currentSessionForSkills = sessions.find(s => s.id === currentSessionId);
+  const skillCommands = useMemo<Command[]>(() => {
+    const ids = currentSessionForSkills?.agentConfig?.enabledSkillIds ?? [];
+    if (ids.length === 0) return [];
+    const allSkills = getAllBuiltinSkills();
+    return ids.map(id => {
+      const skill = allSkills.find(s => s.id === id);
+      if (!skill) return null;
+      return {
+        command: `/${skill.id}`,
+        description: `Use ${skill.name} skill`,
+        category: 'skill' as const,
+      };
+    }).filter(Boolean) as Command[];
+  }, [currentSessionForSkills?.agentConfig?.enabledSkillIds]);
 
   const clearAuthState = useCallback((reason?: string) => {
     localStorage.removeItem('auth_token');
@@ -538,7 +557,8 @@ const App: React.FC = () => {
     });
     
     if (isImage) {
-      const dataUrl = await readAsDataUrl();
+      const rawDataUrl = await readAsDataUrl();
+      const dataUrl = await compressImage(rawDataUrl);
       setAttachments(prev => [...prev, {
         type: 'image', url: dataUrl, workspacePath: wsPath, mimeType: file.type, name: file.name,
       }]);
@@ -748,6 +768,18 @@ const App: React.FC = () => {
     } else if (input.trim() === '/dt') {
       finalInput = '';
       shouldUseDeepThinking = true;
+    }
+
+    // Handle skill commands: /skillId message → prepend instruction to prioritize that skill
+    const skillMatch = finalInput.match(/^\/(\w+)\s+([\s\S]*)$/);
+    if (skillMatch) {
+      const allSkills = getAllBuiltinSkills();
+      const matchedSkill = allSkills.find(s => s.id === skillMatch[1]);
+      if (matchedSkill) {
+        const skillName = matchedSkill.name;
+        const toolNames = matchedSkill.tools.map(t => t.name).join(', ');
+        finalInput = `[Use ${skillName} skill — prioritize calling: ${toolNames}]\n\n${skillMatch[2]}`;
+      }
     }
     
     // Build the user-visible message (clean, without extracted document text)
@@ -1191,20 +1223,29 @@ const App: React.FC = () => {
           signal: abortControllerRef.current?.signal,
           onStatusUpdate: (event) => setAgentStatus(event),
           onStreamChunk: updateStreamingMessage,
+          onToolMessages: (msgs) => {
+            setSessions(prev => prev.map(s => {
+              if (s.id !== sessionId) return s;
+              const botIdx = s.messages.findIndex(m => m.id === botMessageId);
+              if (botIdx < 0) return s;
+              const before = s.messages.slice(0, botIdx);
+              const bot = s.messages[botIdx];
+              return { ...s, messages: [...before, ...msgs, bot], updatedAt: Date.now() };
+            }));
+          },
         });
 
-        // Insert intermediate tool messages before the final bot message
-        if (agentOutput.toolMessages.length > 0) {
-          setSessions(prev => prev.map(s => {
-            if (s.id !== sessionId) return s;
-            const withoutBot = s.messages.filter(m => m.id !== botMessageId);
-            return {
-              ...s,
-              messages: [...withoutBot, ...agentOutput.toolMessages, { ...botMessage, content: agentOutput.finalContent, reasoning: agentOutput.reasoning }],
-              updatedAt: Date.now(),
-            };
-          }));
-        }
+        // Final update: set the bot message content to the final output
+        setSessions(prev => prev.map(s => {
+          if (s.id !== sessionId) return s;
+          return {
+            ...s,
+            messages: s.messages.map(m =>
+              m.id === botMessageId ? { ...m, content: agentOutput.finalContent, reasoning: agentOutput.reasoning } : m
+            ),
+            updatedAt: Date.now(),
+          };
+        }));
 
         usage = agentOutput.usage;
         setAgentStatus(null);
@@ -2272,6 +2313,7 @@ const App: React.FC = () => {
                    <CommandAutocomplete
                      input={input}
                      cursorPosition={cursorPosition}
+                     extraCommands={skillCommands}
                      onSelect={(command) => {
                        const textBeforeCursor = input.substring(0, cursorPosition);
                        const lastSlashIndex = textBeforeCursor.lastIndexOf('/');

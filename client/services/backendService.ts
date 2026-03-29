@@ -583,7 +583,7 @@ export const backendService = {
           imageAttachments.forEach(att => {
             contentArray.push({
               type: 'image_url',
-              image_url: { url: att.url }
+              image_url: { url: att.url, detail: 'high' }
             });
           });
           

@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { X, Save, User, Monitor, Code, ToggleLeft, ToggleRight, Plus, Trash2, Box, Puzzle, Bot, RefreshCw, Globe, Code2, Zap, Wrench, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Save, User, Monitor, Code, ToggleLeft, ToggleRight, Plus, Trash2, Box, Puzzle, Bot, Brain, RefreshCw, Globe, Code2, Zap, Wrench, CheckCircle2, XCircle, Loader2, Download, Upload } from 'lucide-react';
 import { AppSettings, UserRole, AIModel, AgentDefaults, McpServerConfig, SkillDefinition, CustomSkillDefinition } from '../types';
 import { BUILTIN_MODELS, DEFAULT_MODEL_ID } from '../constants';
 import { changePassword } from '../services/authService';
 import { backendService } from '../services/backendService';
 import { getAllBuiltinSkills } from '../services/skillsRegistry';
+import { readMemory, writeMemory, downloadMemoryFile, importMemoryFile } from '../services/memoryService';
 import SkillsMarket from './SkillsMarket';
 import { AnimatedModalBackdrop, AnimatedModalContent } from './AnimatedUI';
 
@@ -25,7 +26,7 @@ interface SettingsModalProps {
 
 type TabType = 'general' | 'agent' | 'skills' | 'account' | 'developer';
 
-const SKILL_ICONS: Record<string, React.ElementType> = { Globe, Code2, Zap, Wrench };
+const SKILL_ICONS: Record<string, React.ElementType> = { Globe, Code2, Zap, Wrench, Brain };
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ 
   onClose, 
@@ -73,6 +74,34 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [newMcpUrl, setNewMcpUrl] = useState('');
   const [agentChanged, setAgentChanged] = useState(false);
   const builtinSkills = getAllBuiltinSkills();
+
+  // Memory State
+  const [memoryText, setMemoryText] = useState('');
+  const [memoryLoaded, setMemoryLoaded] = useState(false);
+  const [loadingMemory, setLoadingMemory] = useState(false);
+  const [showMemory, setShowMemory] = useState(false);
+  const [memoryDirty, setMemoryDirty] = useState(false);
+  const memoryFileRef = useRef<HTMLInputElement>(null);
+
+  const loadMemory = async () => {
+    setLoadingMemory(true);
+    try {
+      const text = await readMemory();
+      setMemoryText(text);
+      setMemoryLoaded(true);
+      setMemoryDirty(false);
+    } catch (e) {
+      console.warn('[SettingsModal] Failed to load memory:', e);
+    } finally {
+      setLoadingMemory(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showMemory && !memoryLoaded && !loadingMemory) {
+      loadMemory();
+    }
+  }, [showMemory]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -783,6 +812,123 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       <Plus size={16} />
                     </button>
                   </div>
+                </div>
+
+                {/* Memory */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className={`text-sm font-medium ${isMonet ? 'text-[#4A4B6A]' : 'text-gray-700 dark:text-gray-300'}`}>
+                      Memory
+                    </label>
+                    <button
+                      onClick={() => setShowMemory(prev => !prev)}
+                      className={`text-xs px-2 py-1 rounded-md transition-colors ${
+                        isMonet ? 'text-[#4A4B6A]/70 hover:bg-white/20' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-zinc-800'
+                      }`}
+                    >
+                      {showMemory ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
+                  <p className={`text-xs mb-3 ${isMonet ? 'text-[#4A4B6A]/60' : 'text-gray-400 dark:text-gray-500'}`}>
+                    A shared Markdown note the agent reads and writes. Enable Memory skill to let the agent auto-save context.
+                  </p>
+
+                  {showMemory && (
+                    <div className="space-y-3">
+                      {/* Toolbar */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => downloadMemoryFile(memoryText)}
+                          disabled={!memoryText}
+                          className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-30 ${
+                            isMonet ? 'border-white/30 hover:bg-white/20 text-[#4A4B6A]' : 'border-gray-200 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-zinc-800'
+                          }`}
+                        >
+                          <Download size={13} /> Export
+                        </button>
+                        <button
+                          onClick={() => memoryFileRef.current?.click()}
+                          className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                            isMonet ? 'border-white/30 hover:bg-white/20 text-[#4A4B6A]' : 'border-gray-200 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-zinc-800'
+                          }`}
+                        >
+                          <Upload size={13} /> Import
+                        </button>
+                        <input
+                          ref={memoryFileRef}
+                          type="file"
+                          accept=".md,.txt,text/markdown,text/plain"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              try {
+                                const text = await importMemoryFile(file);
+                                setMemoryText(text);
+                                setMemoryDirty(false);
+                              } catch (err) {
+                                console.error('[Memory] Import failed:', err);
+                              }
+                            }
+                            if (memoryFileRef.current) memoryFileRef.current.value = '';
+                          }}
+                        />
+                        <button
+                          onClick={loadMemory}
+                          disabled={loadingMemory}
+                          className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border transition-colors ml-auto ${
+                            isMonet ? 'border-white/30 hover:bg-white/20' : 'border-gray-200 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-zinc-800'
+                          }`}
+                          title="Reload from server"
+                        >
+                          <RefreshCw size={13} className={loadingMemory ? 'animate-spin' : ''} />
+                        </button>
+                      </div>
+
+                      {/* Editor */}
+                      {loadingMemory ? (
+                        <p className="text-xs text-gray-400 flex items-center gap-1.5 py-3">
+                          <Loader2 size={13} className="animate-spin" /> Loading memory…
+                        </p>
+                      ) : (
+                        <>
+                          <textarea
+                            value={memoryText}
+                            onChange={(e) => { setMemoryText(e.target.value); setMemoryDirty(true); }}
+                            placeholder="Memory is empty. The agent will write here when Memory skill is enabled, or you can type directly."
+                            rows={8}
+                            className={`w-full px-3 py-2.5 rounded-lg text-xs font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-forsion-500 resize-y ${
+                              isMonet
+                                ? 'bg-white/30 border border-white/30 text-[#4A4B6A] placeholder-[#4A4B6A]/40'
+                                : 'bg-gray-50 dark:bg-zinc-900 border border-gray-300 dark:border-dark-border text-gray-900 dark:text-white placeholder-gray-400'
+                            }`}
+                          />
+                          {memoryDirty && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await writeMemory(memoryText);
+                                  setMemoryDirty(false);
+                                } catch (err) {
+                                  console.error('[Memory] Save failed:', err);
+                                }
+                              }}
+                              className={`flex items-center gap-1.5 text-xs px-4 py-2 rounded-lg font-medium transition-colors ${
+                                isMonet
+                                  ? 'bg-[#4A4B6A] hover:bg-[#3E406F] text-white'
+                                  : 'bg-forsion-600 hover:bg-forsion-500 text-white'
+                              }`}
+                            >
+                              <Save size={13} /> Save Memory
+                            </button>
+                          )}
+                          <p className={`text-[10px] ${isMonet ? 'text-[#4A4B6A]/40' : 'text-gray-400 dark:text-gray-600'}`}>
+                            {memoryText.length} chars — synced across devices
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Save Agent Defaults */}

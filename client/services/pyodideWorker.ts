@@ -24,7 +24,7 @@ self.onmessage = async (e: MessageEvent) => {
       pyodide = await loadPyodide({ indexURL: PYODIDE_CDN });
       // Pre-load commonly used packages (numpy/matplotlib are in the Pyodide repo but not in the
       // default runtime — must loadPackage once; avoids requiring users to micropip.install.)
-      await pyodide.loadPackage(['micropip', 'numpy', 'matplotlib']);
+      await pyodide.loadPackage(['micropip', 'numpy', 'pandas', 'matplotlib', 'scipy', 'scikit-learn', 'sympy', 'regex']);
       self.postMessage({ type: 'ready' });
     } catch (err: any) {
       self.postMessage({ type: 'error', id: 'init', error: `Pyodide init failed: ${err.message}` });

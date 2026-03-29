@@ -1,6 +1,7 @@
 import { ToolResult, ToolDefinition, CustomToolExecutorConfig } from '../types';
 import { workspaceService } from './workspaceService';
 import { pyodideService } from './pyodideService';
+import { readMemory, writeMemory, appendMemory } from './memoryService';
 
 export type ToolExecutorFn = (
   args: Record<string, unknown>,
@@ -136,6 +137,28 @@ const weatherLookup: ToolExecutorFn = async ({ location }, signal) => {
   };
 };
 
+// ── memory_read ──────────────────────────────────────────────────────────────
+
+const memoryRead: ToolExecutorFn = async () => {
+  const content = await readMemory();
+  if (!content) return '(Memory is empty)';
+  return content.length > 10000 ? content.slice(0, 10000) + '\n...[truncated]' : content;
+};
+
+// ── memory_write ─────────────────────────────────────────────────────────────
+
+const memoryWrite: ToolExecutorFn = async ({ content }) => {
+  await writeMemory(String(content));
+  return `Memory replaced (${String(content).length} chars)`;
+};
+
+// ── memory_append ────────────────────────────────────────────────────────────
+
+const memoryAppend: ToolExecutorFn = async ({ text }) => {
+  await appendMemory(String(text));
+  return `Appended to memory: ${String(text).slice(0, 100)}`;
+};
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 
 export const TOOL_EXECUTORS: Record<string, ToolExecutorFn> = {
@@ -145,6 +168,9 @@ export const TOOL_EXECUTORS: Record<string, ToolExecutorFn> = {
   calculator,
   get_datetime: getDatetime,
   weather_lookup: weatherLookup,
+  memory_read: memoryRead,
+  memory_write: memoryWrite,
+  memory_append: memoryAppend,
 };
 
 // ── Custom tool execution ─────────────────────────────────────────────────────

@@ -50,17 +50,6 @@ tools:
           description: File path to delete
       required:
         - path
-  - name: run_python
-    description: Execute Python code in a sandboxed environment. Can access workspace files at /workspace/ path. Supports pandas, numpy, matplotlib. Use plt.show() to save plots to the workspace.
-    executor: builtin
-    parameters:
-      type: object
-      properties:
-        code:
-          type: string
-          description: Python code to execute
-      required:
-        - code
   - name: show_image
     description: Display an image from the workspace inline in the chat.
     executor: builtin
@@ -83,13 +72,6 @@ You have a **persistent virtual filesystem** for this session. Use it to store, 
 - `read_file` — read any text file (CSV, JSON, Markdown, code, etc.). Output is capped at 10,000 characters.
 - `write_file` — create or overwrite a file. Use structured formats (JSON, CSV, Markdown) where appropriate.
 - `delete_file` — remove files that are no longer needed.
-
-## Python execution (`run_python`)
-- Files in the workspace are accessible at `/workspace/<path>`.
-- Supported libraries: `pandas`, `numpy`, `matplotlib`, `json`, `csv`, `math`, `re`, `datetime`, and Python standard library.
-- Plots: call `plt.show()` — it saves the figure as a PNG to the workspace automatically. Then use `show_image` to display it.
-- Print to stdout to see output; stderr is also captured.
-- Execution is sandboxed (no network access, no OS calls).
 
 ## Images
 - After generating or downloading an image, use `show_image` to display it inline.

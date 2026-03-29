@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Bot, Trash2, Plus, RefreshCw, Globe, Code2, Zap, CheckCircle2, XCircle, Loader2, Wrench, Pencil, RotateCcw } from 'lucide-react';
+import { X, Bot, Trash2, Plus, RefreshCw, Globe, Code2, Zap, Brain, CheckCircle2, XCircle, Loader2, Wrench, Pencil, RotateCcw } from 'lucide-react';
 import { AgentConfig, AgentDefaults, McpServerConfig, SkillDefinition, CustomSkillDefinition } from '../types';
 import { connectMcpServer, disconnectMcpServer } from '../services/mcpClient';
 import { getAllBuiltinSkills } from '../services/skillsRegistry';
@@ -30,6 +30,7 @@ const SKILL_ICONS: Record<string, React.ElementType> = {
   Code2,
   Zap,
   Wrench,
+  Brain,
 };
 
 const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
@@ -419,6 +420,7 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
               <span>20</span>
             </div>
           </div>
+
         </div>
 
         {/* Footer */}

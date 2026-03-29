@@ -14,15 +14,19 @@ import { parseSkillMd, type ParsedSkill } from './skillParser';
 
 import rawWeb from '../skills/web.skill.md?raw';
 import rawCode from '../skills/code.skill.md?raw';
+import rawPython from '../skills/python.skill.md?raw';
 import rawProductivity from '../skills/productivity.skill.md?raw';
 import rawWorkspace from '../skills/workspace.skill.md?raw';
+import rawMemory from '../skills/memory.skill.md?raw';
 
 // ── Parse at module load time ─────────────────────────────────────────────────
 
 const BUILTIN_SKILL_LIST: ParsedSkill[] = [
   parseSkillMd(rawWeb),
   parseSkillMd(rawCode),
+  parseSkillMd(rawPython),
   parseSkillMd(rawProductivity),
+  parseSkillMd(rawMemory),
 ];
 
 const WORKSPACE_SKILL: ParsedSkill = parseSkillMd(rawWorkspace);

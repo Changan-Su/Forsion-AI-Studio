@@ -104,7 +104,7 @@ const CodeBlock: React.FC<{
           images={execResult?.images ?? []}
           isRunning={isRunning}
           durationMs={execResult?.durationMs}
-          themePreset={themePreset ?? 'default'}
+          themePreset={themePreset ?? 'apple'}
         />
       )}
     </div>

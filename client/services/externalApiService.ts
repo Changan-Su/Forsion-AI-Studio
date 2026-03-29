@@ -56,13 +56,11 @@ const prepareRequest = (
          if (att.type === 'image') {
            contentArray.push({
              type: "image_url",
-             image_url: { url: att.url }
+             image_url: { url: att.url, detail: 'high' }
            });
          } else if (att.type === 'document' && att.url && !att.extractedText) {
-           // Native document upload - send as file data URL
-           // Note: Not all APIs support documents, but we send it and let the API handle it
            contentArray.push({
-             type: "image_url", // Some APIs may accept documents via image_url format
+             type: "image_url",
              image_url: { url: att.url }
            });
          }
@@ -331,23 +329,16 @@ export const generateExternalResponse = async (
     if (lastMsg && lastMsg.role === 'user') {
        contentArray.push({ type: "text", text: lastMsg.content });
        
-       // 2. Images and Documents
        attachments.forEach(att => {
          if (att.type === 'image') {
            contentArray.push({
              type: "image_url",
-             image_url: {
-               url: att.url // API expects full data URI
-             }
+             image_url: { url: att.url, detail: 'high' }
            });
          } else if (att.type === 'document' && att.url && !att.extractedText) {
-           // Native document upload - send as file data URL
-           // Note: Not all APIs support documents, but we send it and let the API handle it
            contentArray.push({
-             type: "image_url", // Some APIs may accept documents via image_url format
-             image_url: {
-               url: att.url
-             }
+             type: "image_url",
+             image_url: { url: att.url }
            });
          }
        });

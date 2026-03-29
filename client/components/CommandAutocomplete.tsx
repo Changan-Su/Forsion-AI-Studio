@@ -1,4 +1,5 @@
 import React from 'react';
+import ReactDOM from 'react-dom';
 import { Image as ImageIcon, BrainCircuit, Sparkles, Edit, RefreshCw } from 'lucide-react';
 import { motion } from './AnimatedUI';
 
@@ -6,10 +7,10 @@ export interface Command {
   command: string;
   description: string;
   icon?: React.ReactNode;
-  category: 'image' | 'thinking' | 'other';
+  category: 'image' | 'thinking' | 'skill' | 'other';
 }
 
-export const AVAILABLE_COMMANDS: Command[] = [
+export const BUILTIN_COMMANDS: Command[] = [
   {
     command: '/draw',
     description: 'Generate an image',
@@ -54,12 +55,16 @@ export const AVAILABLE_COMMANDS: Command[] = [
   },
 ];
 
+// For backward compatibility
+export const AVAILABLE_COMMANDS = BUILTIN_COMMANDS;
+
 interface CommandAutocompleteProps {
   input: string;
   cursorPosition: number;
   onSelect: (command: string) => void;
   onClose: () => void;
   isNotion?: boolean;
+  extraCommands?: Command[];
 }
 
 const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
@@ -67,8 +72,11 @@ const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
   cursorPosition,
   onSelect,
   onClose,
-  isNotion = false
+  isNotion = false,
+  extraCommands = []
 }) => {
+  const allCommands = React.useMemo(() => [...BUILTIN_COMMANDS, ...extraCommands], [extraCommands]);
+
   // Extract the command prefix (everything after '/' up to cursor)
   const textBeforeCursor = input.substring(0, cursorPosition);
   const lastSlashIndex = textBeforeCursor.lastIndexOf('/');
@@ -79,8 +87,7 @@ const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
 
   const commandPrefix = textBeforeCursor.substring(lastSlashIndex + 1).toLowerCase();
   
-  // Filter commands that match the prefix
-  const matchingCommands = AVAILABLE_COMMANDS.filter(cmd =>
+  const matchingCommands = allCommands.filter(cmd =>
     cmd.command.toLowerCase().startsWith('/' + commandPrefix)
   );
 
@@ -88,9 +95,8 @@ const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
     return null;
   }
 
-  // Show all commands if no prefix or empty prefix
   const commandsToShow = commandPrefix.length === 0 
-    ? AVAILABLE_COMMANDS 
+    ? allCommands 
     : matchingCommands;
 
   if (commandsToShow.length === 0) {
@@ -98,8 +104,22 @@ const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
   }
 
   const [selectedIndex, setSelectedIndex] = React.useState(0);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [pos, setPos] = React.useState<{ bottom: number; left: number } | null>(null);
 
-  // Handle keyboard navigation
+  // Position the portal element above the textarea using the parent's bounding rect
+  React.useLayoutEffect(() => {
+    const parent = (containerRef.current?.parentElement as HTMLElement | null) ??
+      document.querySelector('textarea');
+    if (!parent) return;
+    const rect = parent.getBoundingClientRect();
+    setPos({ bottom: window.innerHeight - rect.top + 8, left: rect.left });
+  }, [input, cursorPosition]);
+
+  React.useEffect(() => {
+    setSelectedIndex(0);
+  }, [commandPrefix]);
+
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowDown') {
@@ -121,15 +141,17 @@ const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedIndex, commandsToShow, onSelect, onClose]);
 
-  // Calculate position (above the input)
-  return (
+  // Hidden ref anchor to locate the parent
+  const anchor = <div ref={containerRef} className="hidden" />;
+
+  const dropdown = pos ? ReactDOM.createPortal(
     <motion.div
       initial={{ opacity: 0, scale: 0.95, y: 4 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95, y: 4 }}
       transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
-      style={{ transformOrigin: '50% 100%', maxHeight: '256px' }}
-      className={`absolute bottom-full left-0 mb-2 w-64 rounded-xl shadow-xl border z-50 overflow-y-auto ${
+      style={{ position: 'fixed', bottom: pos.bottom, left: pos.left, transformOrigin: '50% 100%', maxHeight: '320px', zIndex: 9999 }}
+      className={`w-72 rounded-xl shadow-2xl border overflow-y-auto ${
         isNotion
           ? 'bg-white dark:bg-notion-darksidebar border-notion-border dark:border-notion-darkborder'
           : 'bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border'
@@ -139,7 +161,9 @@ const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
         isNotion
           ? 'text-gray-500 dark:text-gray-400'
           : 'text-gray-500 dark:text-dark-muted'
-      } uppercase tracking-wider border-b border-gray-200 dark:border-dark-border`}>
+      } uppercase tracking-wider border-b border-gray-200 dark:border-dark-border sticky top-0 ${
+        isNotion ? 'bg-white dark:bg-notion-darksidebar' : 'bg-white dark:bg-dark-card'
+      }`}>
         Commands
       </div>
       {commandsToShow.map((cmd, index) => (
@@ -184,10 +208,11 @@ const CommandAutocomplete: React.FC<CommandAutocompleteProps> = ({
           </div>
         </button>
       ))}
-    </motion.div>
-  );
+    </motion.div>,
+    document.body
+  ) : null;
+
+  return <>{anchor}{dropdown}</>;
 };
 
 export default CommandAutocomplete;
-
-
