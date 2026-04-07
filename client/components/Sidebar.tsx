@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquare, Plus, Trash2, LogOut, Settings, X, MoreHorizontal, Edit2, Archive, ArchiveRestore, ChevronDown, ChevronRight } from 'lucide-react';
 import { ChatSession, User, UserRole } from '../types';
-import CreditBalance from './CreditBalance';
 import EmojiPicker from './EmojiPicker';
 import { AnimatePresence, AnimatedOverlay, AnimatedDropdown, AnimatedCollapse, motion } from './AnimatedUI';
+import { API_ROOT } from '../services/backendService';
+import { useI18n } from '../i18n';
 
 interface SidebarProps {
   sessions: ChatSession[];
@@ -20,7 +21,7 @@ interface SidebarProps {
   onOpenSettings: () => void;
   isOpen: boolean;
   onClose: () => void;
-  themePreset: 'default' | 'notion' | 'monet' | 'apple' | 'forsion1';
+  themePreset: import('../types').ThemePreset;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -49,7 +50,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   const isMonet = themePreset === 'monet';
   const isApple = themePreset === 'apple';
   const isForsion1 = themePreset === 'forsion1';
-  
+  const isQbird = themePreset === 'qbird';
+  const { t } = useI18n();
+
   // Refs
   const menuRef = useRef<HTMLDivElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
@@ -132,7 +135,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700/40 text-blue-900 dark:text-blue-100 font-semibold'
                 : isForsion1
                   ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/40 text-amber-900 dark:text-amber-100 font-semibold'
-                  : 'bg-white/90 border-white/80 text-gray-900 dark:bg-white/10 dark:border-white/20 dark:text-white font-semibold shadow-[0_12px_30px_rgba(15,23,42,0.08)]'
+                  : isQbird
+                    ? 'bg-cyan-50 dark:bg-cyan-900/20 border-cyan-200 dark:border-cyan-700/40 text-cyan-900 dark:text-cyan-100 font-semibold'
+                    : 'bg-white/90 border-white/80 text-gray-900 dark:bg-white/10 dark:border-white/20 dark:text-white font-semibold shadow-[0_12px_30px_rgba(15,23,42,0.08)]'
           : isNotion
             ? 'border-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
             : isMonet
@@ -141,7 +146,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                 ? 'border-transparent text-gray-600 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-900/10 hover:text-blue-900 dark:hover:text-blue-100'
                 : isForsion1
                   ? 'border-transparent text-stone-600 dark:text-stone-400 hover:bg-amber-50 dark:hover:bg-amber-900/10 hover:text-amber-900 dark:hover:text-amber-100'
-                  : 'bg-white/30 border-transparent text-gray-600 dark:bg-white/5 dark:text-gray-300 hover:bg-white/60 hover:border-white/70 dark:hover:bg-white/10 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white'
+                  : isQbird
+                    ? 'border-transparent text-gray-600 dark:text-gray-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/10 hover:text-cyan-900 dark:hover:text-cyan-100'
+                    : 'bg-white/30 border-transparent text-gray-600 dark:bg-white/5 dark:text-gray-300 hover:bg-white/60 hover:border-white/70 dark:hover:bg-white/10 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white'
       }`}
       onClick={() => {
         // Don't select session if we're currently editing
@@ -300,6 +307,8 @@ const Sidebar: React.FC<SidebarProps> = ({
               ? 'apple-glass border-r border-gray-200 dark:border-gray-700/50'
             : isForsion1
               ? 'forsion1-glass border-r border-[#d5d0c8] dark:border-gray-700/50'
+            : isQbird
+              ? 'qbird-glass border-r border-gray-200/50 dark:border-gray-700/30'
             : 'bg-gradient-to-b from-white/90 via-slate-50/80 to-slate-100/70 dark:from-[#0e1325]/90 dark:via-[#070b18]/85 dark:to-[#020409]/90 border-r border-white/30 dark:border-slate-800/80 backdrop-blur-2xl shadow-[0_25px_60px_rgba(15,23,42,0.12)] dark:shadow-[0_15px_40px_rgba(2,6,23,0.7)]'
         }
         transform transition-transform duration-300 ease-in-out flex flex-col text-gray-700 dark:text-gray-200
@@ -309,10 +318,10 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="p-4">
           <div className="flex items-center justify-between mb-6">
             <div className={`flex items-center gap-2 font-bold text-xl tracking-wider ${
-              isNotion ? 'text-gray-900 dark:text-white' : isMonet ? 'text-[#4A4B6A] font-cursive text-2xl drop-shadow-sm' : isApple ? 'text-blue-600 dark:text-blue-400' : isForsion1 ? 'text-amber-800 dark:text-amber-300' : 'text-forsion-600 dark:text-forsion-400'
+              isNotion ? 'text-gray-900 dark:text-white' : isMonet ? 'text-[#4A4B6A] font-cursive text-2xl drop-shadow-sm' : isApple ? 'text-blue-600 dark:text-blue-400' : isForsion1 ? 'text-amber-800 dark:text-amber-300' : isQbird ? 'text-cyan-600 dark:text-cyan-400' : 'text-forsion-600 dark:text-forsion-400'
             }`}>
               <div className={`w-8 h-8 flex items-center justify-center shadow-lg ${
-                isNotion ? 'bg-gray-900 dark:bg-white' : isMonet ? 'bg-[#4A4B6A] backdrop-blur-md border border-white/20' : isApple ? 'bg-blue-500' : isForsion1 ? 'bg-amber-700' : 'bg-gradient-to-tr from-forsion-500 to-purple-600'
+                isNotion ? 'bg-gray-900 dark:bg-white' : isMonet ? 'bg-[#4A4B6A] backdrop-blur-md border border-white/20' : isApple ? 'bg-blue-500' : isForsion1 ? 'bg-amber-700' : isQbird ? 'bg-cyan-600' : 'bg-gradient-to-tr from-forsion-500 to-purple-600'
               }`} style={{ borderRadius: 'var(--radius-sm)' }}>
                 <span className={isNotion ? 'text-white dark:text-black' : 'text-white'}>F</span>
               </div>
@@ -336,21 +345,23 @@ const Sidebar: React.FC<SidebarProps> = ({
                     ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-md shadow-blue-500/20 border border-blue-400/30 hover:-translate-y-0.5'
                     : isForsion1
                       ? 'bg-amber-700 hover:bg-amber-800 text-white shadow-md shadow-amber-700/20 border border-amber-600/30 hover:-translate-y-0.5'
-                      : 'bg-gradient-to-r from-forsion-500 to-indigo-500 hover:from-forsion-400 hover:to-indigo-400 text-white border border-white/40 shadow-xl shadow-forsion-500/30 hover:-translate-y-0.5 backdrop-blur'
+                      : isQbird
+                        ? 'bg-cyan-600 hover:bg-cyan-700 text-white shadow-md shadow-cyan-600/20 border border-cyan-500/30'
+                        : 'bg-gradient-to-r from-forsion-500 to-indigo-500 hover:from-forsion-400 hover:to-indigo-400 text-white border border-white/40 shadow-xl shadow-forsion-500/30 hover:-translate-y-0.5 backdrop-blur'
             }`}
           >
             <Plus size={18} />
-            <span>New Chat</span>
+            <span>{t('sidebar.newChat')}</span>
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-2 space-y-1">
           {/* Active Chats */}
           <div className="px-2 pt-2 pb-1 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-            History
+            {t('sidebar.history')}
           </div>
           {sessions.length === 0 && (
-            <div className="text-center text-gray-400 dark:text-gray-500 text-sm mt-10">No history yet.</div>
+            <div className="text-center text-gray-400 dark:text-gray-500 text-sm mt-10">{t('sidebar.noHistory')}</div>
           )}
           {sessions.map((session) => renderSessionItem(session, false))}
 
@@ -367,7 +378,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 >
                   <ChevronRight size={14} />
                 </motion.div>
-                Archived ({archivedSessions.length})
+                {t('sidebar.archived')} ({archivedSessions.length})
               </button>
               <AnimatedCollapse isOpen={showArchivedSection}>
                 <div className="space-y-1 mt-1">
@@ -387,11 +398,20 @@ const Sidebar: React.FC<SidebarProps> = ({
                 ? 'border-gray-200 dark:border-gray-700/50'
                 : isForsion1
                   ? 'border-[#d5d0c8] dark:border-gray-700/50'
-                  : 'border-white/40 dark:border-white/10 bg-white/70 dark:bg-white/5 backdrop-blur-xl'
+                  : isQbird
+                    ? 'border-gray-200/50 dark:border-gray-700/30'
+                    : 'border-white/40 dark:border-white/10 bg-white/70 dark:bg-white/5 backdrop-blur-xl'
         }`}>
-          <div className="flex items-center gap-3 mb-4">
+          <div
+            className="flex items-center gap-3 mb-4 cursor-pointer rounded-lg p-1 -m-1 transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+            onClick={() => {
+              const token = localStorage.getItem('auth_token') || '';
+              window.open(`${API_ROOT}/account?token=${encodeURIComponent(token)}`, '_blank');
+            }}
+            title="Account Center"
+          >
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm overflow-hidden ${
-              isMonet ? 'bg-[#4A4B6A] border border-white/20' : isApple ? 'bg-blue-500' : isForsion1 ? 'bg-amber-700' : 'bg-gradient-to-br from-indigo-500 to-purple-500'
+              isMonet ? 'bg-[#4A4B6A] border border-white/20' : isApple ? 'bg-blue-500' : isForsion1 ? 'bg-amber-700' : isQbird ? 'bg-cyan-600' : 'bg-gradient-to-br from-indigo-500 to-purple-500'
             }`}>
               {user.avatar ? (
                 <img src={user.avatar} alt={user.nickname || user.username} className="w-full h-full object-cover" />
@@ -400,16 +420,28 @@ const Sidebar: React.FC<SidebarProps> = ({
               )}
             </div>
             <div className="flex-1 overflow-hidden">
-              <p className={`text-sm font-medium truncate ${isMonet ? 'text-[#4A4B6A] font-bold' : 'text-gray-900 dark:text-gray-100'}`}>
-                {user.nickname || user.username}
+              <div className="flex items-center gap-1.5">
+                <p className={`text-sm font-medium truncate ${isMonet ? 'text-[#4A4B6A] font-bold' : 'text-gray-900 dark:text-gray-100'}`}>
+                  {user.nickname || user.username}
+                </p>
+                {user.membershipTier && user.membershipTier !== 'free' && (
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0 ${
+                    user.membershipTier === 'pro'
+                      ? 'bg-gradient-to-r from-violet-500 to-purple-500 text-white'
+                      : 'bg-gradient-to-r from-amber-400 to-orange-400 text-white'
+                  }`}>
+                    {user.membershipTier}
+                  </span>
+                )}
+              </div>
+              <p className={`text-xs truncate ${isMonet ? 'text-[#4A4B6A]/70' : 'text-gray-500 dark:text-gray-400'}`}>
+                {user.membershipTier === 'pro' ? 'Pro Member' : user.membershipTier === 'plus' ? 'Plus Member' : 'Free'}
               </p>
-              <p className={`text-xs truncate ${isMonet ? 'text-[#4A4B6A]/70' : 'text-gray-500'}`}>{user.role}</p>
             </div>
           </div>
-
-          <div className="mb-4">
-            <CreditBalance />
-          </div>
+          <p className={`text-[10px] mb-3 -mt-2 ml-1 ${isMonet ? 'text-[#4A4B6A]/40' : 'text-gray-400 dark:text-gray-600'}`}>
+            {t('sidebar.account')}
+          </p>
 
           <div className="space-y-1">
             <button
@@ -422,7 +454,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               }`}
             >
               <Settings size={16} />
-              Settings
+              {t('sidebar.settings')}
             </button>
             <button
               onClick={onLogout}
@@ -434,7 +466,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               }`}
             >
               <LogOut size={16} />
-              Log Out
+              {t('sidebar.logout')}
             </button>
           </div>
         </div>

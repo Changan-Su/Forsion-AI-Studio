@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { User, ChatSession, Message, AIModel, AppSettings, UserRole, Attachment, AgentConfig, AgentDefaults, AgentStatusEvent } from './types';
+import { User, ChatSession, Message, AIModel, AppSettings, UserRole, Attachment, AgentConfig, AgentDefaults, AgentStatusEvent, ThemePreset, Locale } from './types';
 import { backendService, API_ROOT } from './services/backendService'; // New backend
 import { generateGeminiResponse, generateGeminiResponseStream } from './services/geminiService';
 import { generateExternalResponse, generateExternalResponseStream } from './services/externalApiService';
@@ -8,7 +8,7 @@ import { BUILTIN_MODELS, DEFAULT_MODEL_ID, getAllModels, getConfiguredModels, ST
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 import SettingsModal from './components/SettingsModal';
-import { Send, Zap, Menu, Sparkles, MessageSquare, Code, Brain, BrainCircuit, Image as ImageIcon, ChevronDown, Paperclip, X as XIcon, Box, Square, UploadCloud, Bot, FolderOpen } from 'lucide-react';
+import { Send, Zap, Menu, Sparkles, MessageSquare, Code, Brain, BrainCircuit, Image as ImageIcon, ChevronDown, Paperclip, X as XIcon, Box, Square, UploadCloud, Bot, FolderOpen, Sun, Moon } from 'lucide-react';
 import { getPresetAvatar, svgToDataUrl } from './src/utils/presetAvatars';
 import { detectImageGenerationIntent, generateImage, detectImageEditIntent, editImage, imageToImage } from './services/imageGenerationService';
 import CommandAutocomplete from './components/CommandAutocomplete';
@@ -22,6 +22,8 @@ import { workspaceService } from './services/workspaceService';
 import { chatSyncService } from './services/chatSyncService';
 import { compressImage } from './services/imageUtils';
 import { AnimatePresence, AnimatedModalBackdrop, AnimatedModalContent, AnimatedDropdown, motion } from './components/AnimatedUI';
+import { measureTextareaHeight, clearMeasurementCache } from './services/pretextService';
+import { I18nContext, t as translate } from './i18n';
 
 const App: React.FC = () => {
   // Auth State
@@ -52,9 +54,35 @@ const App: React.FC = () => {
     selectedModelIdRef.current = selectedModelId;
   }, [selectedModelId]);
 
-  // Theme & Settings
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark'); // Default to Dark
-  const [themePreset, setThemePreset] = useState<'default' | 'notion' | 'monet' | 'apple' | 'forsion1'>('monet');
+  // Track textarea width for pretext measurement (avoids DOM reflow on resize)
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        // Content width minus padding (px-2 = 8px each side)
+        textareaWidthRef.current = entry.contentRect.width;
+      }
+    });
+    observer.observe(el);
+    textareaWidthRef.current = el.clientWidth;
+    return () => observer.disconnect();
+  }, []);
+
+  // Theme & Settings — read cached values from localStorage to avoid flash
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const cached = localStorage.getItem('forsion_theme');
+    return (cached === 'light' || cached === 'dark') ? cached : 'dark';
+  });
+  const [themePreset, setThemePreset] = useState<ThemePreset>(() => {
+    const cached = localStorage.getItem('forsion_theme_preset');
+    return (['default', 'notion', 'monet', 'apple', 'forsion1', 'qbird'] as const).includes(cached as any)
+      ? cached as any : 'qbird';
+  });
+  const [locale, setLocale] = useState<Locale>(() => {
+    const cached = localStorage.getItem('forsion_locale');
+    return (cached === 'en' || cached === 'zh') ? cached : 'zh';
+  });
   const [customModels, setCustomModels] = useState<AIModel[]>([]);
   const [globalModels, setGlobalModels] = useState<AIModel[]>([]); // Models from backend admin
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
@@ -83,6 +111,7 @@ const App: React.FC = () => {
   // Expanded Input Modal State
   const [isInputExpanded, setIsInputExpanded] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const textareaWidthRef = useRef(0);
 
   // Agent State
   const [showAgentConfig, setShowAgentConfig] = useState(false);
@@ -112,6 +141,12 @@ const App: React.FC = () => {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('current_username');
     localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    // Clear chat data to prevent leaking sessions to the next logged-in user
+    localStorage.removeItem(STORAGE_KEYS.SESSIONS);
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION_ID);
+    localStorage.removeItem('forsion_sessions_owner');
+    setSessions([]);
+    sessionsInitialized.current = false;
     setUser(null);
     setAuthError(reason || '');
     setCurrentSessionId(null);
@@ -236,12 +271,14 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const initApp = async () => {
+      let currentUser: User | null = null;
       const storedUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
       if (storedUser) {
-        setUser(JSON.parse(storedUser));
+        currentUser = JSON.parse(storedUser);
+        setUser(currentUser);
       } else {
         try {
-          const currentUser = await backendService.getCurrentUser();
+          currentUser = await backendService.getCurrentUser();
           setUser(currentUser);
           localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
         } catch (error: any) {
@@ -254,7 +291,29 @@ const App: React.FC = () => {
           return;
         }
       }
-      
+
+      // Fetch membership tier
+      if (currentUser) {
+        const membership = await backendService.getMyMembership();
+        if (membership?.tier) {
+          currentUser = { ...currentUser, membershipTier: membership.tier as any };
+          setUser(currentUser);
+          localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
+        }
+      }
+
+      // Verify the current user matches the locally cached session owner.
+      // If a different user logged in, discard stale local sessions to prevent data leakage.
+      const cachedOwnerId = localStorage.getItem('forsion_sessions_owner');
+      const isNewUser = currentUser && cachedOwnerId && cachedOwnerId !== currentUser.id;
+      if (isNewUser) {
+        localStorage.removeItem(STORAGE_KEYS.SESSIONS);
+        localStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION_ID);
+      }
+      if (currentUser) {
+        localStorage.setItem('forsion_sessions_owner', currentUser.id);
+      }
+
       const defaultAgentConfig: AgentConfig = {
         systemPrompt: '',
         enabledSkillIds: [],
@@ -270,9 +329,11 @@ const App: React.FC = () => {
       }));
 
       let localSessions: ChatSession[] = [];
-      const storedSessions = localStorage.getItem(STORAGE_KEYS.SESSIONS);
-      if (storedSessions) {
-        localSessions = normalizeSessions(JSON.parse(storedSessions));
+      if (!isNewUser) {
+        const storedSessions = localStorage.getItem(STORAGE_KEYS.SESSIONS);
+        if (storedSessions) {
+          localSessions = normalizeSessions(JSON.parse(storedSessions));
+        }
       }
 
       const remoteSessions = await chatSyncService.fetchSessionList();
@@ -315,7 +376,7 @@ const App: React.FC = () => {
   useEffect(() => {
     // This is the standard way to toggle Tailwind Dark Mode
     const root = document.documentElement;
-    
+
     if (theme === 'dark') {
       root.classList.add('dark');
     } else {
@@ -327,14 +388,24 @@ const App: React.FC = () => {
       monet: 'bg-desktop-surface',
       apple: theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100',
       forsion1: theme === 'dark' ? 'bg-zinc-900' : 'bg-[#edeae5]',
+      qbird: theme === 'dark' ? 'bg-[#1C1C1E]' : 'bg-[#F5F5F7]',
       notion: theme === 'dark' ? 'bg-notion-darkbg' : 'bg-notion-bg',
       default: theme === 'dark' ? 'bg-dark-bg' : 'bg-white',
     };
     const bodyClass = bodyClassMap[themePreset] || bodyClassMap.default;
-      
+
     document.body.className = `${bodyClass} transition-colors duration-300`;
 
+    // Cache to localStorage so the inline script in index.html can apply it before React renders
+    localStorage.setItem('forsion_theme', theme);
+    localStorage.setItem('forsion_theme_preset', themePreset);
+
   }, [theme, themePreset]);
+
+  // Persist locale
+  useEffect(() => {
+    localStorage.setItem('forsion_locale', locale);
+  }, [locale]);
 
   // Persist Sessions locally (could move to backend too in future)
   // Guard against overwriting stored sessions with the initial empty state on first render
@@ -406,7 +477,10 @@ const App: React.FC = () => {
     
     // Update UI state immediately
     if (newSettings.theme !== undefined) setTheme(newSettings.theme);
-    if (newSettings.themePreset !== undefined) setThemePreset(newSettings.themePreset);
+    if (newSettings.themePreset !== undefined) {
+      setThemePreset(newSettings.themePreset);
+      clearMeasurementCache(); // Font may change with theme
+    }
     if (newSettings.customModels !== undefined) setCustomModels(newSettings.customModels);
     
     // Update user profile immediately if nickname or avatar changed
@@ -1732,6 +1806,11 @@ const App: React.FC = () => {
     return <div className="text-gray-500 dark:text-dark-muted">{getModelIcon(model.icon)}</div>;
   };
 
+  const i18nValue = useMemo(() => ({
+    locale,
+    t: (key: string, params?: Record<string, string>) => translate(key, locale, params),
+  }), [locale]);
+
   // Auth Screen
   if (!user) {
     return (
@@ -1784,6 +1863,7 @@ const App: React.FC = () => {
   const isMonet = themePreset === 'monet';
   const isApple = themePreset === 'apple';
   const isForsion1 = themePreset === 'forsion1';
+  const isQbird = themePreset === 'qbird';
   const appBackground = isNotion
     ? 'bg-notion-bg dark:bg-notion-darkbg'
     : isMonet
@@ -1792,13 +1872,16 @@ const App: React.FC = () => {
         ? 'bg-apple-surface'
         : isForsion1
           ? 'bg-forsion1-surface'
-          : theme === 'dark'
-            ? 'bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.25),_rgba(2,6,23,0.95))]'
-            : 'bg-[radial-gradient(140%_140%_at_50%_-10%,_rgba(255,255,255,0.98),_rgba(231,238,255,0.9)_45%,_rgba(214,234,255,0.92)_65%,_rgba(247,250,255,0.95))]';
+          : isQbird
+            ? 'bg-qbird-surface'
+            : theme === 'dark'
+              ? 'bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.25),_rgba(2,6,23,0.95))]'
+              : 'bg-[radial-gradient(140%_140%_at_50%_-10%,_rgba(255,255,255,0.98),_rgba(231,238,255,0.9)_45%,_rgba(214,234,255,0.92)_65%,_rgba(247,250,255,0.95))]';
 
   return (
+    <I18nContext.Provider value={i18nValue}>
     <div className={`relative flex h-screen overflow-hidden font-sans transition-colors duration-500 ${appBackground}`}>
-      {!isNotion && !isMonet && !isApple && !isForsion1 && theme === 'light' && (
+      {!isNotion && !isMonet && !isApple && !isForsion1 && !isQbird && theme === 'light' && (
         <>
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.95),_transparent)] opacity-80 blur-3xl z-0" />
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,_rgba(255,182,193,0.25),_transparent)_0_0/50%_50%,_radial-gradient(circle_at_80%_0%,_rgba(147,197,253,0.3),_transparent)_0_0/60%_60%] opacity-70 blur-2xl z-0" />
@@ -1826,7 +1909,7 @@ const App: React.FC = () => {
       <div className={`relative z-10 flex-1 flex flex-col w-full transition-colors duration-300 ${isNotion ? 'bg-notion-bg dark:bg-notion-darkbg' : 'bg-transparent'}`}>
         {/* Header */}
         <header className={`h-[52px] border-b flex items-center justify-between px-4 md:px-6 z-10 gap-3 backdrop-blur ${
-           isNotion 
+           isNotion
              ? 'bg-notion-bg/80 dark:bg-notion-darkbg/95 border-notion-border dark:border-notion-darkborder'
              : isMonet
                ? 'bg-white/10 border-b border-white/10 shadow-sm'
@@ -1834,7 +1917,9 @@ const App: React.FC = () => {
                  ? 'apple-glass border-gray-200 dark:border-gray-700/50'
                  : isForsion1
                    ? 'forsion1-glass border-[#d5d0c8] dark:border-gray-700/50'
-                   : 'bg-gradient-to-r from-white/80 via-slate-50/70 to-white/80 dark:from-[#0f172a]/70 dark:via-[#0b1120]/70 dark:to-[#020617]/70 border-white/10 dark:border-slate-800'
+                   : isQbird
+                     ? 'qbird-glass border-gray-200/50 dark:border-gray-700/30'
+                     : 'bg-gradient-to-r from-white/80 via-slate-50/70 to-white/80 dark:from-[#0f172a]/70 dark:via-[#0b1120]/70 dark:to-[#020617]/70 border-white/10 dark:border-slate-800'
         }`}>
           <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 text-gray-500 dark:text-dark-muted hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-dark-card rounded-lg">
              <Menu size={20} />
@@ -1848,7 +1933,7 @@ const App: React.FC = () => {
                    ? 'hover:bg-white/40 text-[#4A4B6A]'
                    : 'hover:bg-slate-100 dark:hover:bg-dark-card text-gray-900 dark:text-white'
              }`}>
-                <span className={`truncate font-semibold ${isNotion ? 'font-serif' : isMonet ? 'font-cursive text-xl' : isApple ? 'text-blue-600 dark:text-blue-400' : isForsion1 ? 'text-amber-800 dark:text-amber-300' : 'text-forsion-600 dark:text-forsion-400'}`}>{currentModel.name}</span>
+                <span className={`truncate font-semibold ${isNotion ? 'font-serif' : isMonet ? 'font-cursive text-xl' : isApple ? 'text-blue-600 dark:text-blue-400' : isForsion1 ? 'text-amber-800 dark:text-amber-300' : isQbird ? 'text-cyan-600 dark:text-cyan-400' : 'text-forsion-600 dark:text-forsion-400'}`}>{currentModel.name}</span>
                 <ChevronDown size={14} className={`transition-transform flex-shrink-0 text-[#4A4B6A]/80 ${modelDropdownOpen ? 'rotate-180' : ''}`} />
              </button>
 
@@ -1866,7 +1951,9 @@ const App: React.FC = () => {
                            ? 'apple-glass border-gray-200 dark:border-gray-700/50'
                            : isForsion1
                              ? 'forsion1-glass border-[#d5d0c8] dark:border-gray-700/50'
-                             : 'bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border'
+                             : isQbird
+                               ? 'qbird-glass border-gray-200/50 dark:border-gray-700/30'
+                               : 'bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border'
                    }`}
                  >
                     <div className="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-dark-muted uppercase tracking-wider">Select Model</div>
@@ -1881,7 +1968,7 @@ const App: React.FC = () => {
                        allModels.map(model => (
                          <button key={model.id} onClick={() => { hasManualModelSelection.current = true; setSelectedModelId(model.id); setModelDropdownOpen(false); }} className={`w-full text-left px-4 py-3 flex items-start gap-3 transition-colors duration-200 ${
                            selectedModelId === model.id 
-                             ? (isNotion ? 'bg-gray-100 dark:bg-black/30' : isApple ? 'bg-blue-50 dark:bg-blue-900/20' : isForsion1 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-slate-100 dark:bg-white/5')
+                             ? (isNotion ? 'bg-gray-100 dark:bg-black/30' : isApple ? 'bg-blue-50 dark:bg-blue-900/20' : isForsion1 ? 'bg-amber-50 dark:bg-amber-900/20' : isQbird ? 'bg-cyan-50 dark:bg-cyan-900/20' : 'bg-slate-100 dark:bg-white/5')
                              : 'hover:bg-gray-50 dark:hover:bg-white/5'
                         }`}>
                           <div className="mt-1">
@@ -1890,7 +1977,7 @@ const App: React.FC = () => {
                           <div className="overflow-hidden">
                             <div className={`text-sm font-medium truncate ${
                                selectedModelId === model.id 
-                                 ? (isNotion ? 'text-black dark:text-white font-bold' : isApple ? 'text-blue-600 dark:text-blue-400 font-bold' : isForsion1 ? 'text-amber-800 dark:text-amber-300 font-bold' : 'text-forsion-600 dark:text-forsion-400')
+                                 ? (isNotion ? 'text-black dark:text-white font-bold' : isApple ? 'text-blue-600 dark:text-blue-400 font-bold' : isForsion1 ? 'text-amber-800 dark:text-amber-300 font-bold' : isQbird ? 'text-cyan-600 dark:text-cyan-400 font-bold' : 'text-forsion-600 dark:text-forsion-400')
                                  : 'text-gray-900 dark:text-dark-text'
                             }`}>{model.name}</div>
                             <div className="text-xs text-gray-500 truncate">{model.description}</div>
@@ -1902,10 +1989,47 @@ const App: React.FC = () => {
                )}
              </AnimatePresence>
           </div>
-          <div className={`text-xs md:text-sm hidden md:block font-medium tracking-wide ${
-             isNotion ? 'text-gray-400 font-serif' : isMonet ? 'text-[#4A4B6A]/80 font-bold' : isApple ? 'text-gray-500 dark:text-gray-400' : isForsion1 ? 'text-stone-500 dark:text-stone-400' : 'text-slate-400 dark:text-dark-muted'
+          {/* Center: session title or fallback */}
+          <div className={`flex-1 min-w-0 text-center hidden md:block ${
+             isNotion ? 'font-serif' : ''
           }`}>
-            Forsion AI Studio
+            <span className={`text-xs md:text-sm font-medium tracking-wide truncate block ${
+              isNotion ? 'text-gray-400' : isMonet ? 'text-[#4A4B6A]/60' : isApple ? 'text-gray-400 dark:text-gray-500' : isForsion1 ? 'text-stone-400 dark:text-stone-500' : isQbird ? 'text-gray-400 dark:text-gray-500' : 'text-slate-400 dark:text-dark-muted'
+            }`}>
+              {currentSession?.title || translate('header.title', locale)}
+            </span>
+          </div>
+
+          {/* Right controls: Language + Theme toggle */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setLocale(prev => prev === 'en' ? 'zh' : 'en')}
+              className={`p-2 rounded-lg transition-all text-xs font-bold tracking-wide ${
+                isNotion ? 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
+                : isMonet ? 'text-[#4A4B6A]/70 hover:text-[#4A4B6A] hover:bg-white/30'
+                : isApple ? 'text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                : isForsion1 ? 'text-stone-500 dark:text-stone-400 hover:text-amber-700 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                : isQbird ? 'text-gray-500 dark:text-gray-400 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/20'
+                : 'text-slate-500 dark:text-gray-400 hover:text-forsion-600 dark:hover:text-forsion-400 hover:bg-slate-100 dark:hover:bg-white/10'
+              }`}
+              title={locale === 'en' ? 'Switch to Chinese' : '切换到英文'}
+            >
+              {locale === 'en' ? '中' : 'EN'}
+            </button>
+            <button
+              onClick={() => updateAppSettings({ theme: theme === 'dark' ? 'light' : 'dark' })}
+              className={`p-2 rounded-lg transition-all ${
+                isNotion ? 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
+                : isMonet ? 'text-[#4A4B6A]/70 hover:text-[#4A4B6A] hover:bg-white/30'
+                : isApple ? 'text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                : isForsion1 ? 'text-stone-500 dark:text-stone-400 hover:text-amber-700 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                : isQbird ? 'text-gray-500 dark:text-gray-400 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/20'
+                : 'text-slate-500 dark:text-gray-400 hover:text-forsion-600 dark:hover:text-forsion-400 hover:bg-slate-100 dark:hover:bg-white/10'
+              }`}
+              title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+            >
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
           </div>
         </header>
 
@@ -1919,11 +2043,12 @@ const App: React.FC = () => {
           onRegenerateMessage={handleRegenerateMessage}
           user={user ? { username: user.username, nickname: user.nickname, avatar: user.avatar } : undefined}
           sessionId={currentSessionId ?? undefined}
+          streamingMessageId={streamingMessageId}
         />
 
         {/* Input Area */}
         <div className={`p-4 border-t ${
-          isNotion 
+          isNotion
             ? 'bg-notion-bg dark:bg-notion-darkbg border-notion-border dark:border-notion-darkborder'
             : isMonet
               ? 'glass border-t border-white/10'
@@ -1931,7 +2056,9 @@ const App: React.FC = () => {
                 ? 'apple-glass border-gray-200 dark:border-gray-700/50'
                 : isForsion1
                   ? 'forsion1-glass border-[#d5d0c8] dark:border-gray-700/50'
-                  : 'bg-white/5 dark:bg-[#030712]/60 backdrop-blur-xl border-white/40 dark:border-white/10'
+                  : isQbird
+                    ? 'qbird-glass border-gray-200/50 dark:border-gray-700/30'
+                    : 'bg-white/5 dark:bg-[#030712]/60 backdrop-blur-xl border-white/40 dark:border-white/10'
         }`}>
           <form 
             onSubmit={handleSendMessage} 
@@ -1954,6 +2081,7 @@ const App: React.FC = () => {
                      : isMonet ? 'bg-white/40 backdrop-blur-xl'
                      : isApple ? 'bg-white/60 dark:bg-gray-900/70 backdrop-blur-xl'
                      : isForsion1 ? 'bg-[#edeae5]/70 dark:bg-[#1a1918]/80 backdrop-blur-xl'
+                     : isQbird ? 'bg-[#F5F5F7]/60 dark:bg-[#1C1C1E]/60 backdrop-blur-md'
                      : 'bg-white/50 dark:bg-[#030712]/70 backdrop-blur-xl'
                    }`}
                  >
@@ -1971,7 +2099,9 @@ const App: React.FC = () => {
                              ? 'border-blue-400/60 dark:border-blue-500/40 bg-white/70 dark:bg-gray-900/70 backdrop-blur-md text-blue-600 dark:text-blue-400'
                              : isForsion1
                                ? 'border-amber-500/60 dark:border-amber-600/40 bg-[#edeae5]/80 dark:bg-[#1a1918]/80 backdrop-blur-md text-amber-800 dark:text-amber-300'
-                               : 'border-forsion-400/60 dark:border-cyan-500/40 bg-white/70 dark:bg-[#030712]/80 backdrop-blur-md text-forsion-600 dark:text-cyan-400'
+                               : isQbird
+                                 ? 'border-cyan-400/60 dark:border-cyan-500/40 bg-[#F5F5F7]/60 dark:bg-[#1C1C1E]/60 backdrop-blur-md text-cyan-600 dark:text-cyan-400'
+                                 : 'border-forsion-400/60 dark:border-cyan-500/40 bg-white/70 dark:bg-[#030712]/80 backdrop-blur-md text-forsion-600 dark:text-cyan-400'
                      }`}
                      style={{ borderRadius: 'var(--radius-xl)' }}
                    >
@@ -1983,6 +2113,7 @@ const App: React.FC = () => {
                          : isMonet ? 'text-[#4A4B6A]/70'
                          : isApple ? 'text-blue-500/70 dark:text-blue-400/70'
                          : isForsion1 ? 'text-amber-700/70 dark:text-amber-400/70'
+                         : isQbird ? 'text-cyan-600/70 dark:text-cyan-400/70'
                          : 'text-gray-500 dark:text-gray-400'
                        }`}>Images, PDF, Word, Text files</p>
                      </div>
@@ -1991,137 +2122,58 @@ const App: React.FC = () => {
                )}
              </AnimatePresence>
 
-             {/* Deep Thinking and Force Image Generation Toggles */}
-             <div className="flex items-center gap-4 mb-3 ml-2">
-               <label className="flex items-center gap-2 cursor-pointer select-none">
-                 <div className="relative">
-                   <input
-                     type="checkbox"
-                     checked={isDeepThinking}
-                     onChange={(e) => setIsDeepThinking(e.target.checked)}
-                     className="sr-only peer"
-                   />
-                   <div className={`w-10 h-5 rounded-full transition-all ${
-                     isDeepThinking
-                       ? 'bg-gradient-to-r from-purple-500 to-indigo-500'
-                       : isNotion
-                         ? 'bg-gray-300 dark:bg-gray-600'
-                         : 'bg-gray-300 dark:bg-gray-700'
-                   }`}></div>
-                   <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm ${
-                     isDeepThinking ? 'translate-x-5' : 'translate-x-0'
-                   }`} style={{ transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}></div>
-                 </div>
-                 <div className="flex items-center gap-1.5">
-                   <BrainCircuit size={16} className={`${
-                     isDeepThinking
-                       ? 'text-purple-500 dark:text-purple-400'
-                       : isNotion
-                         ? 'text-gray-400 dark:text-gray-500'
-                         : 'text-gray-400 dark:text-gray-500'
-                   }`} />
-                   <span className={`text-sm font-medium ${
-                     isDeepThinking
-                       ? isNotion
-                         ? 'text-gray-900 dark:text-white'
-                         : 'text-purple-600 dark:text-purple-400'
-                       : 'text-gray-500 dark:text-gray-400'
-                   }`}>
-                     Deep Thinking
-                   </span>
-                 </div>
-               </label>
-               {isDeepThinking && (
-                 <span className={`text-xs px-2 py-0.5 rounded-full ${
-                   isNotion
-                     ? 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
-                     : 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300'
-                 }`}>
-                   Enhanced reasoning enabled
-                 </span>
-               )}
-               
-               {/* Force Image Generation Toggle */}
-               <label className="flex items-center gap-2 cursor-pointer select-none">
-                 <div className="relative">
-                   <input
-                     type="checkbox"
-                     checked={forceImageGeneration}
-                     onChange={(e) => setForceImageGeneration(e.target.checked)}
-                     className="sr-only peer"
-                   />
-                   <div className={`w-10 h-5 rounded-full transition-all ${
-                     forceImageGeneration
-                       ? 'bg-gradient-to-r from-pink-500 to-rose-500'
-                       : isNotion
-                         ? 'bg-gray-300 dark:bg-gray-600'
-                         : 'bg-gray-300 dark:bg-gray-700'
-                   }`}></div>
-                   <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm ${
-                     forceImageGeneration ? 'translate-x-5' : 'translate-x-0'
-                   }`} style={{ transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}></div>
-                 </div>
-                 <div className="flex items-center gap-1.5">
-                   <ImageIcon size={16} className={`${
-                     forceImageGeneration
-                       ? 'text-pink-500 dark:text-pink-400'
-                       : isNotion
-                         ? 'text-gray-400 dark:text-gray-500'
-                         : 'text-gray-400 dark:text-gray-500'
-                   }`} />
-                   <span className={`text-sm font-medium ${
-                     forceImageGeneration
-                       ? isNotion
-                         ? 'text-gray-900 dark:text-white'
-                         : 'text-pink-600 dark:text-pink-400'
-                       : 'text-gray-500 dark:text-gray-400'
-                   }`}>
-                     Force Image
-                   </span>
-                 </div>
-               </label>
-               {forceImageGeneration && (
-                 <span className={`text-xs px-2 py-0.5 rounded-full ${
-                   isNotion
-                     ? 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
-                     : 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-300'
-                 }`}>
-                   Will generate image
-                 </span>
-               )}
+             {/* Compact toolbar — icon-only toggles */}
+             <div className="flex items-center gap-1 mb-2 ml-1">
+               {/* Deep Thinking */}
+               <button
+                 type="button"
+                 onClick={() => setIsDeepThinking(prev => !prev)}
+                 className={`p-1.5 rounded-lg transition-all ${
+                   isDeepThinking
+                     ? 'bg-purple-500/15 text-purple-500 dark:text-purple-400'
+                     : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5'
+                 }`}
+                 title={isDeepThinking ? translate('input.deepThinkingDesc', locale) : translate('input.deepThinking', locale)}
+               >
+                 <BrainCircuit size={16} />
+               </button>
 
-               {/* Agent Settings Button */}
+               {/* Force Image */}
+               <button
+                 type="button"
+                 onClick={() => setForceImageGeneration(prev => !prev)}
+                 className={`p-1.5 rounded-lg transition-all ${
+                   forceImageGeneration
+                     ? 'bg-pink-500/15 text-pink-500 dark:text-pink-400'
+                     : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5'
+                 }`}
+                 title={forceImageGeneration ? translate('input.forceImageDesc', locale) : translate('input.forceImage', locale)}
+               >
+                 <ImageIcon size={16} />
+               </button>
+
+               {/* Agent */}
                <button
                  type="button"
                  onClick={() => setShowAgentConfig(true)}
-                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                   isNotion
-                     ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800'
-                     : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                 }`}
-                 title="Session agent settings"
+                 className="p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-all"
+                 title={translate('input.agent', locale)}
                >
-                 <Bot size={14} />
-                 <span>Agent</span>
+                 <Bot size={16} />
                </button>
 
-               {/* Workspace Panel Toggle */}
+               {/* Workspace Files */}
                <button
                  type="button"
                  onClick={() => setShowWorkspacePanel(!showWorkspacePanel)}
-                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                 className={`p-1.5 rounded-lg transition-all ${
                    showWorkspacePanel
-                     ? isNotion
-                       ? 'bg-gray-800 text-white'
-                       : isMonet
-                         ? 'bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/40'
-                         : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
-                     : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                     ? 'bg-cyan-500/15 text-cyan-500 dark:text-cyan-400'
+                     : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5'
                  }`}
-                 title="Toggle workspace file browser"
+                 title={translate('input.files', locale)}
                >
-                 <FolderOpen size={14} />
-                 <span>Files</span>
+                 <FolderOpen size={16} />
                </button>
              </div>
 
@@ -2144,7 +2196,9 @@ const App: React.FC = () => {
                        ? 'apple-glass border-gray-200 dark:border-gray-700/50 shadow-sm focus-within:ring-2 focus-within:ring-blue-500/25'
                        : isForsion1
                          ? 'forsion1-glass border-[#d5d0c8] dark:border-gray-700/50 shadow-sm focus-within:ring-2 focus-within:ring-amber-500/25'
-                         : 'bg-white/80 dark:bg-white/10 backdrop-blur-2xl shadow-[0_20px_60px_rgba(15,23,42,0.12)] dark:shadow-[0_25px_80px_rgba(2,6,23,0.75)] border border-white/60 dark:border-white/15 focus-within:ring-2 focus-within:ring-forsion-400/40 dark:focus-within:ring-cyan-400/20'
+                         : isQbird
+                           ? 'qbird-glass border-gray-200/50 dark:border-gray-700/30 shadow-sm focus-within:ring-2 focus-within:ring-cyan-500/25'
+                           : 'bg-white/80 dark:bg-white/10 backdrop-blur-2xl shadow-[0_20px_60px_rgba(15,23,42,0.12)] dark:shadow-[0_25px_80px_rgba(2,6,23,0.75)] border border-white/60 dark:border-white/15 focus-within:ring-2 focus-within:ring-forsion-400/40 dark:focus-within:ring-cyan-400/20'
                }`}
                style={{
                  borderRadius: isInputExpanded ? 'var(--radius-lg)' : 'var(--radius-xl)',
@@ -2176,7 +2230,9 @@ const App: React.FC = () => {
                                ? 'bg-white/60 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700/50 backdrop-blur-sm'
                                : isForsion1
                                  ? 'bg-stone-100/60 dark:bg-stone-800/60 border border-[#d5d0c8] dark:border-gray-700/50 backdrop-blur-sm'
-                                 : 'bg-white/10 dark:bg-white/5 border border-white/15 dark:border-white/10'
+                                 : isQbird
+                                   ? 'bg-white/60 dark:bg-gray-800/60 border border-gray-200/50 dark:border-gray-700/30 backdrop-blur-sm'
+                                   : 'bg-white/10 dark:bg-white/5 border border-white/15 dark:border-white/10'
                          }`}
                        >
                          {attachment.type === 'image' ? (
@@ -2226,7 +2282,7 @@ const App: React.FC = () => {
                  type="button"
                  onClick={() => fileInputRef.current?.click()}
                  className={`p-3 rounded-full transition-all duration-300 flex-shrink-0 self-end ${
-                    isNotion 
+                    isNotion
                       ? 'text-gray-400 hover:text-gray-800 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
                       : isMonet
                         ? 'text-[#4A4B6A]/70 hover:text-[#4A4B6A] hover:bg-white/50'
@@ -2234,7 +2290,9 @@ const App: React.FC = () => {
                           ? 'text-blue-500/70 hover:text-blue-600 dark:text-blue-400/70 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20'
                           : isForsion1
                             ? 'text-amber-700/70 hover:text-amber-800 dark:text-amber-400/70 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20'
-                            : 'text-slate-500 hover:text-forsion-400 dark:text-slate-300 dark:hover:text-cyan-200 hover:bg-white/60 dark:hover:bg-white/10 border border-transparent dark:border-white/10 shadow-sm'
+                            : isQbird
+                              ? 'text-cyan-600/70 hover:text-cyan-700 dark:text-cyan-400/70 dark:hover:text-cyan-300 hover:bg-cyan-50 dark:hover:bg-cyan-900/20'
+                              : 'text-slate-500 hover:text-forsion-400 dark:text-slate-300 dark:hover:text-cyan-200 hover:bg-white/60 dark:hover:bg-white/10 border border-transparent dark:border-white/10 shadow-sm'
                  } hover:-translate-y-0.5 active:scale-95 shadow-sm`}
                  title="Attach File"
                >
@@ -2260,10 +2318,16 @@ const App: React.FC = () => {
                         textBeforeCursor.substring(lastSlashIndex + 1).match(/^[a-z]*$/i));
                      setShowCommandAutocomplete(showAutocomplete);
                      
-                     // Auto-resize textarea
-                     if (textareaRef.current) {
-                       textareaRef.current.style.height = 'auto';
-                       textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + 'px';
+                     // Auto-resize textarea using pretext (zero DOM reflow)
+                     if (textareaRef.current && textareaWidthRef.current > 0) {
+                       const maxH = isInputExpanded ? window.innerHeight * 0.5 : 200;
+                       const measured = measureTextareaHeight(
+                         e.target.value,
+                         textareaWidthRef.current,
+                         themePreset,
+                       );
+                       // Add vertical padding (py-3 = 12px * 2 = 24px)
+                       textareaRef.current.style.height = Math.min(measured + 24, maxH) + 'px';
                      }
                    }}
                    onKeyDown={(e) => {
@@ -2295,15 +2359,17 @@ const App: React.FC = () => {
                    disabled={isProcessing}
                    rows={1}
                    className={`w-full bg-transparent py-3 px-2 focus:outline-none placeholder-slate-400 dark:placeholder-gray-600 resize-none overflow-y-auto transition-[max-height] duration-300 ${
-                      isNotion 
-                        ? 'text-gray-900 dark:text-white font-serif' 
+                      isNotion
+                        ? 'text-gray-900 dark:text-white font-serif'
                         : isMonet
                           ? 'text-[#4A4B6A] dark:text-white placeholder-slate-500'
                           : isApple
                             ? 'text-gray-900 dark:text-gray-100'
                             : isForsion1
                               ? 'text-stone-800 dark:text-stone-100'
-                              : 'text-slate-800 dark:text-gray-100'
+                              : isQbird
+                                ? 'text-gray-900 dark:text-gray-100'
+                                : 'text-slate-800 dark:text-gray-100'
                    }`}
                    style={{ maxHeight: isInputExpanded ? '50vh' : '200px' }}
                  />
@@ -2343,7 +2409,7 @@ const App: React.FC = () => {
                  type="button"
                  onClick={() => setIsInputExpanded(prev => !prev)}
                  className={`p-2 rounded-full transition-all duration-300 flex-shrink-0 self-end ${
-                    isNotion 
+                    isNotion
                       ? 'text-gray-400 hover:text-gray-800 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
                       : isMonet
                         ? 'text-[#4A4B6A]/70 hover:text-[#4A4B6A] hover:bg-white/50'
@@ -2351,7 +2417,9 @@ const App: React.FC = () => {
                           ? 'text-blue-500/60 hover:text-blue-600 dark:text-blue-400/60 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20'
                           : isForsion1
                             ? 'text-amber-700/60 hover:text-amber-800 dark:text-amber-400/60 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20'
-                            : 'text-slate-500 hover:text-forsion-400 dark:text-slate-300 dark:hover:text-cyan-200 hover:bg-white/60 dark:hover:bg-white/10'
+                            : isQbird
+                              ? 'text-cyan-600/60 hover:text-cyan-700 dark:text-cyan-400/60 dark:hover:text-cyan-300 hover:bg-cyan-50 dark:hover:bg-cyan-900/20'
+                              : 'text-slate-500 hover:text-forsion-400 dark:text-slate-300 dark:hover:text-cyan-200 hover:bg-white/60 dark:hover:bg-white/10'
                  }`}
                  title={isInputExpanded ? 'Collapse' : 'Expand Input'}
                >
@@ -2389,7 +2457,7 @@ const App: React.FC = () => {
                     disabled={(!input.trim() && attachments.length === 0)}
                     style={{ borderRadius: 'var(--radius-md)' }}
                     className={`p-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                      isNotion 
+                      isNotion
                         ? 'text-gray-500 hover:text-black dark:text-gray-400 dark:hover:text-white'
                         : isMonet
                           ? 'bg-[#3E406F] hover:bg-[#5A5C8A] text-white shadow-md'
@@ -2397,7 +2465,9 @@ const App: React.FC = () => {
                             ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-md shadow-blue-500/20 border border-blue-400/30'
                             : isForsion1
                               ? 'bg-amber-700 hover:bg-amber-800 text-white shadow-md shadow-amber-700/20 border border-amber-600/30'
-                              : 'bg-gradient-to-r from-forsion-500 to-indigo-500 dark:from-sky-500/80 dark:to-indigo-500/80 text-white hover:from-forsion-400 hover:to-indigo-400 dark:hover:from-sky-400/80 dark:hover:to-indigo-400/80 shadow-lg shadow-forsion-500/30 dark:shadow-[0_15px_40px_rgba(15,23,42,0.65)] border border-white/30 dark:border-white/10'
+                              : isQbird
+                                ? 'bg-cyan-600 hover:bg-cyan-700 text-white shadow-md shadow-cyan-600/20 border border-cyan-500/30'
+                                : 'bg-gradient-to-r from-forsion-500 to-indigo-500 dark:from-sky-500/80 dark:to-indigo-500/80 text-white hover:from-forsion-400 hover:to-indigo-400 dark:hover:from-sky-400/80 dark:hover:to-indigo-400/80 shadow-lg shadow-forsion-500/30 dark:shadow-[0_15px_40px_rgba(15,23,42,0.65)] border border-white/30 dark:border-white/10'
                    } hover:-translate-y-0.5 active:scale-[0.97]`}
                  >
                    <Send size={20} />
@@ -2527,7 +2597,13 @@ const App: React.FC = () => {
                     ? 'bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-100'
                     : isMonet
                       ? 'bg-[#3E406F] hover:bg-[#5A5C8A] text-white'
-                      : 'bg-gradient-to-r from-forsion-500 to-indigo-500 text-white hover:from-forsion-400 hover:to-indigo-400 shadow-lg'
+                      : isApple
+                        ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-lg'
+                        : isForsion1
+                          ? 'bg-amber-700 hover:bg-amber-800 text-white shadow-lg'
+                          : isQbird
+                            ? 'bg-cyan-600 hover:bg-cyan-700 text-white shadow-lg'
+                            : 'bg-gradient-to-r from-forsion-500 to-indigo-500 text-white hover:from-forsion-400 hover:to-indigo-400 shadow-lg'
                 }`}
               >
                 我知道了
@@ -2538,6 +2614,7 @@ const App: React.FC = () => {
       </AnimatePresence>
 
     </div>
+    </I18nContext.Provider>
   );
 };
 

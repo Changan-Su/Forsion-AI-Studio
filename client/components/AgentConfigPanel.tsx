@@ -15,7 +15,7 @@ interface AgentConfigPanelProps {
   onSave: (config: AgentConfig) => void;
   onSkillsChanged?: () => void;
   onClose: () => void;
-  themePreset: 'default' | 'notion' | 'monet' | 'apple' | 'forsion1';
+  themePreset: import('../types').ThemePreset;
 }
 
 const DEFAULT_CONFIG: AgentConfig = {

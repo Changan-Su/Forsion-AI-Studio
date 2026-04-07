@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { Message, AIModel } from '../types';
-import { Bot, Cpu, AlertCircle, BrainCircuit, ChevronDown, ChevronRight, UploadCloud, Copy, Check, RefreshCw, Wrench, Play, Loader2 } from 'lucide-react';
+import { Bot, Cpu, AlertCircle, BrainCircuit, ChevronDown, ChevronRight, UploadCloud, Copy, Check, RefreshCw, Wrench, Play, Loader2, Code, Brain, Image as ImageIcon, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -12,13 +12,15 @@ import ExecutionOutput from './ExecutionOutput';
 import { pyodideService } from '../services/pyodideService';
 import { workspaceService } from '../services/workspaceService';
 import { motion, AnimatePresence, AnimatedCollapse } from './AnimatedUI';
+import { useVirtualMessages } from '../services/useVirtualMessages';
+import { useI18n } from '../i18n';
 
 // Code Block Component with Copy functionality and Python Run button
 const CodeBlock: React.FC<{
   language?: string;
   children: string;
   sessionId?: string;
-  themePreset?: 'default' | 'notion' | 'monet' | 'apple' | 'forsion1';
+  themePreset?: import('../types').ThemePreset;
 }> = ({ language, children, sessionId, themePreset }) => {
   const [copied, setCopied] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -104,7 +106,7 @@ const CodeBlock: React.FC<{
           images={execResult?.images ?? []}
           isRunning={isRunning}
           durationMs={execResult?.durationMs}
-          themePreset={themePreset ?? 'monet'}
+          themePreset={themePreset ?? 'apple'}
         />
       )}
     </div>
@@ -221,19 +223,53 @@ interface ChatAreaProps {
   isProcessing: boolean;
   currentModel: AIModel;
   allModels: AIModel[]; // All available models for looking up message-specific model
-  themePreset: 'default' | 'notion' | 'monet' | 'apple' | 'forsion1';
+  themePreset: import('../types').ThemePreset;
   onFileUpload: (file: File) => void;
   onRegenerateMessage?: (messageId: string) => void;
   user?: { username: string; nickname?: string; avatar?: string }; // User info for avatar display
   sessionId?: string; // For workspace Python execution
+  streamingMessageId?: string | null; // Currently streaming message ID for pretext height optimization
 }
 
-const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentModel, allModels, themePreset, onFileUpload, onRegenerateMessage, user, sessionId }) => {
+const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentModel, allModels, themePreset, onFileUpload, onRegenerateMessage, user, sessionId, streamingMessageId }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const dragCounter = useRef(0);
   const animatedIdsRef = useRef<Set<string>>(new Set());
+  const [contentWidth, setContentWidth] = useState(768);
+  const { t } = useI18n();
+
+  // Track container width for pretext measurements
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContentWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(el);
+    setContentWidth(el.clientWidth);
+    return () => observer.disconnect();
+  }, []);
+
+  // Virtual scrolling powered by pretext
+  const {
+    virtualItems,
+    totalHeight,
+    visibleRange,
+    measureRef,
+    onScroll: handleVirtualScroll,
+    isVirtualized,
+  } = useVirtualMessages({
+    messages,
+    containerRef: scrollContainerRef,
+    contentWidth,
+    themePreset,
+    streamingMessageId,
+  });
 
   // Copy message content to clipboard
   const handleCopyMessage = async (messageId: string, content: string) => {
@@ -311,6 +347,17 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
   const isMonet = themePreset === 'monet';
   const isApple = themePreset === 'apple';
   const isForsion1 = themePreset === 'forsion1';
+  const isQbird = themePreset === 'qbird';
+
+  // Filter messages to render based on virtual scroll range (must be before early return)
+  const messagesToRender = useMemo(() => {
+    if (!isVirtualized) return messages.map((msg, i) => ({ msg, index: i }));
+    const result: { msg: Message; index: number }[] = [];
+    for (let i = visibleRange.start; i <= visibleRange.end && i < messages.length; i++) {
+      result.push({ msg: messages[i], index: i });
+    }
+    return result;
+  }, [messages, isVirtualized, visibleRange]);
 
   if (messages.length === 0) {
     return (
@@ -324,7 +371,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
                 ? 'bg-apple-surface'
                 : isForsion1
                   ? 'bg-forsion1-surface'
-                  : 'bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.97),_rgba(228,238,255,0.92))] dark:bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.25),_#030712)]'
+                  : isQbird
+                    ? 'bg-qbird-surface'
+                    : 'bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.97),_rgba(228,238,255,0.92))] dark:bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.25),_#030712)]'
         }`}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
@@ -348,7 +397,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
                       ? 'border-blue-400/60 dark:border-blue-500/40 bg-white/50 dark:bg-gray-900/50 backdrop-blur-md'
                       : isForsion1
                         ? 'border-amber-500/60 dark:border-amber-600/40 bg-[#edeae5]/60 dark:bg-[#1a1918]/60 backdrop-blur-md'
-                        : 'border-forsion-400/50 dark:border-forsion-400/30 bg-forsion-500/5 dark:bg-forsion-500/10 backdrop-blur-sm'
+                        : isQbird
+                          ? 'border-cyan-400/60 dark:border-cyan-500/40 bg-[#F5F5F7]/60 dark:bg-[#1C1C1E]/60 backdrop-blur-md'
+                          : 'border-forsion-400/50 dark:border-forsion-400/30 bg-forsion-500/5 dark:bg-forsion-500/10 backdrop-blur-sm'
               }`}
               style={{ borderRadius: 'var(--radius-xl)' }}
             >
@@ -362,13 +413,14 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
                   : isMonet ? 'text-[#4A4B6A]'
                   : isApple ? 'text-blue-600 dark:text-blue-400'
                   : isForsion1 ? 'text-amber-800 dark:text-amber-300'
+                  : isQbird ? 'text-cyan-600 dark:text-cyan-400'
                   : 'text-forsion-600 dark:text-forsion-400'
                 }`}
               >
                 <UploadCloud size={52} className="opacity-90" />
                 <div className="text-center">
-                  <p className="text-xl font-semibold">Drop file here</p>
-                  <p className={`text-sm mt-1 opacity-70`}>Images, PDF, Word, Text files</p>
+                  <p className="text-xl font-semibold">{t('chat.dropToUpload')}</p>
+                  <p className={`text-sm mt-1 opacity-70`}>{t('chat.dropHint')}</p>
                 </div>
               </motion.div>
             </motion.div>
@@ -390,7 +442,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
                    ? 'bg-blue-500 shadow-2xl shadow-blue-500/20'
                    : isForsion1
                      ? 'bg-amber-700 shadow-2xl shadow-amber-700/20'
-                     : 'bg-gradient-to-tr from-forsion-500 to-indigo-600 shadow-2xl shadow-forsion-500/20'
+                     : isQbird
+                       ? 'bg-cyan-600 shadow-2xl shadow-cyan-600/20'
+                       : 'bg-gradient-to-tr from-forsion-500 to-indigo-600 shadow-2xl shadow-forsion-500/20'
           }`}>
             <Bot size={40} className={isNotion ? "text-gray-800 dark:text-gray-200" : isMonet ? "text-[#4A4B6A]" : "text-white"} />
           </div>
@@ -403,24 +457,67 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
                    ? 'text-blue-600 dark:text-blue-400'
                    : isForsion1
                      ? 'text-amber-800 dark:text-amber-300'
-                     : 'text-transparent bg-clip-text bg-gradient-to-r from-forsion-600 to-indigo-600 dark:from-forsion-400 dark:to-indigo-400'
+                     : isQbird
+                       ? 'text-cyan-600 dark:text-cyan-400'
+                       : 'text-transparent bg-clip-text bg-gradient-to-r from-forsion-600 to-indigo-600 dark:from-forsion-400 dark:to-indigo-400'
           }`}>
-            Forsion AI Studio
+            {t('chat.empty.title')}
           </h2>
           <p className={`text-center max-w-md text-lg ${
-             isNotion ? 'text-gray-500 dark:text-gray-400 font-serif italic' : isMonet ? 'text-[#4A4B6A]/80 font-medium' : isApple ? 'text-gray-500 dark:text-gray-400' : isForsion1 ? 'text-stone-500 dark:text-stone-400' : 'text-slate-500 dark:text-gray-400'
+             isNotion ? 'text-gray-500 dark:text-gray-400 font-serif italic' : isMonet ? 'text-[#4A4B6A]/80 font-medium' : isApple ? 'text-gray-500 dark:text-gray-400' : isForsion1 ? 'text-stone-500 dark:text-stone-400' : isQbird ? 'text-gray-500 dark:text-gray-400' : 'text-slate-500 dark:text-gray-400'
           }`}>
-            Start a conversation with <span className={`font-semibold ${isNotion ? 'text-gray-800 dark:text-gray-200 underline decoration-dotted' : isMonet ? 'text-[#4A4B6A] underline decoration-[#4A4B6A]/30' : isApple ? 'text-blue-600 dark:text-blue-400' : isForsion1 ? 'text-amber-800 dark:text-amber-300' : 'text-forsion-600 dark:text-forsion-400'}`}>{currentModel.name}</span>.
+            Start a conversation with <span className={`font-semibold ${isNotion ? 'text-gray-800 dark:text-gray-200 underline decoration-dotted' : isMonet ? 'text-[#4A4B6A] underline decoration-[#4A4B6A]/30' : isApple ? 'text-blue-600 dark:text-blue-400' : isForsion1 ? 'text-amber-800 dark:text-amber-300' : isQbird ? 'text-cyan-600 dark:text-cyan-400' : 'text-forsion-600 dark:text-forsion-400'}`}>{currentModel.name}</span>.
           </p>
+
+          {/* Quick-start suggestion cards */}
+          <div className="grid grid-cols-2 gap-3 mt-8 max-w-md">
+            {[
+              { icon: Code, key: 'suggest.code' },
+              { icon: Brain, key: 'suggest.explain' },
+              { icon: ImageIcon, key: 'suggest.image' },
+              { icon: Sparkles, key: 'suggest.creative' },
+            ].map((s) => (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => {
+                  const el = document.querySelector('textarea');
+                  if (el) {
+                    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+                    nativeInputValueSetter?.call(el, t(s.key));
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.focus();
+                  }
+                }}
+                className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium text-left transition-all hover:-translate-y-0.5 active:scale-[0.98] ${
+                  isNotion
+                    ? 'bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    : isMonet
+                      ? 'glass text-[#4A4B6A] dark:text-white/80 hover:bg-white/60'
+                      : isApple
+                        ? 'apple-glass text-gray-700 dark:text-gray-300 hover:bg-white/90 dark:hover:bg-white/10'
+                        : isForsion1
+                          ? 'forsion1-glass text-stone-700 dark:text-stone-300 hover:bg-white/80 dark:hover:bg-white/10'
+                          : isQbird
+                            ? 'qbird-glass text-gray-700 dark:text-gray-300 hover:bg-white/90 dark:hover:bg-white/10'
+                            : 'bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/10 text-slate-700 dark:text-gray-300 hover:bg-white/80 dark:hover:bg-white/10 backdrop-blur-sm'
+                }`}
+              >
+                <s.icon size={16} className="flex-shrink-0 opacity-60" />
+                <span>{t(s.key)}</span>
+              </button>
+            ))}
+          </div>
         </motion.div>
       </div>
     );
   }
 
   return (
-    <div 
-      className={`flex-1 overflow-y-auto p-4 md:p-6 space-y-8 scroll-smooth transition-colors duration-300 relative ${
-        isNotion 
+    <div
+      ref={scrollContainerRef}
+      className={`flex-1 overflow-y-auto p-4 md:p-6 scroll-smooth transition-colors duration-300 relative ${
+        isNotion
           ? 'bg-notion-bg dark:bg-notion-darkbg'
           : isMonet
             ? 'bg-transparent'
@@ -428,16 +525,30 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
               ? 'bg-apple-surface'
               : isForsion1
                 ? 'bg-forsion1-surface'
-                : 'bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.98),_rgba(227,238,255,0.9))] dark:bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.25),_#030712)]'
+                : isQbird
+                  ? 'bg-qbird-surface'
+                  : 'bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.98),_rgba(227,238,255,0.9))] dark:bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.25),_#030712)]'
       }`}
+      onScroll={handleVirtualScroll}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      
+      {/* Virtual scroll container — pretext estimates total height, only visible messages rendered */}
+      <div style={isVirtualized ? { height: totalHeight, position: 'relative' } : undefined}>
+        <div
+          style={isVirtualized ? {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            transform: `translateY(${virtualItems[visibleRange.start]?.offsetTop ?? 0}px)`,
+          } : undefined}
+          className="space-y-8"
+        >
 
-      {messages.map((msg, msgIdx) => {
+      {messagesToRender.map(({ msg, index: msgIdx }) => {
         // Tool result messages are rendered inline via ToolCallBlock on the preceding model message
         if (msg.role === 'tool') return null;
 
@@ -452,6 +563,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
         return (
         <motion.div
           key={msg.id}
+          ref={measureRef(msgIdx)}
           initial={isNewMsg ? { opacity: 0, y: 12 } : false}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 300, damping: 28, mass: 0.8 }}
@@ -471,7 +583,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
                       ? 'bg-blue-500 text-white'
                       : isForsion1
                         ? 'bg-amber-700 text-white'
-                        : 'bg-forsion-600 text-white'
+                        : isQbird
+                          ? 'bg-cyan-600 text-white'
+                          : 'bg-forsion-600 text-white'
               }`}
             >
               {user?.avatar ? (
@@ -513,7 +627,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
                           ? 'bg-blue-500 text-white border-2 border-white dark:border-gray-800'
                           : isForsion1
                             ? 'bg-amber-700 text-white border-2 border-white dark:border-gray-800'
-                            : 'bg-indigo-600 text-white border-2 border-white dark:border-gray-800'
+                            : isQbird
+                              ? 'bg-cyan-600 text-white border-2 border-white dark:border-gray-800'
+                              : 'bg-indigo-600 text-white border-2 border-white dark:border-gray-800'
                   }`}
                   fallbackIcon={<Cpu size={18} className={isNotion ? "text-gray-800 dark:text-gray-200" : ""} />}
                 />
@@ -537,7 +653,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
                             ? 'bg-blue-500 text-white rounded-[var(--radius-lg)] rounded-tr-[var(--radius-xs)] shadow-md border border-blue-400/30'
                             : isForsion1
                               ? 'bg-amber-700 text-white rounded-[var(--radius-lg)] rounded-tr-[var(--radius-xs)] shadow-md border border-amber-600/30'
-                              : 'bg-gradient-to-br from-forsion-500 via-indigo-500 to-indigo-600 text-white rounded-[var(--radius-lg)] rounded-tr-[var(--radius-xs)] border border-white/30 shadow-[0_20px_45px_rgba(79,70,229,0.35)]'
+                              : isQbird
+                                ? 'bg-gradient-to-br from-[#0891B2] to-[#0D9488] text-white rounded-[var(--radius-lg)] rounded-tr-[var(--radius-xs)] shadow-md border border-white/10'
+                                : 'bg-gradient-to-br from-forsion-500 via-indigo-500 to-indigo-600 text-white rounded-[var(--radius-lg)] rounded-tr-[var(--radius-xs)] border border-white/30 shadow-[0_20px_45px_rgba(79,70,229,0.35)]'
                       : msg.isError
                         ? 'rounded-[var(--radius-md)] bg-red-50 border border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200'
                         : isMonet
@@ -546,7 +664,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
                             ? 'apple-glass text-gray-900 dark:text-gray-100 rounded-[var(--radius-lg)] rounded-tl-[var(--radius-xs)] shadow-sm'
                             : isForsion1
                               ? 'forsion1-glass text-stone-900 dark:text-stone-100 rounded-[var(--radius-lg)] rounded-tl-[var(--radius-xs)] shadow-sm'
-                              : 'bg-white/80 text-slate-800 border border-white/70 backdrop-blur-md dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-[var(--radius-lg)] rounded-tl-[var(--radius-xs)] shadow-[0_15px_45px_rgba(15,23,42,0.08)] dark:shadow-none'}`
+                              : isQbird
+                                ? 'qbird-glass text-gray-900 dark:text-gray-100 rounded-[var(--radius-lg)] rounded-tl-[var(--radius-xs)] shadow-sm'
+                                : 'bg-white/80 text-slate-800 border border-white/70 backdrop-blur-md dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 rounded-[var(--radius-lg)] rounded-tl-[var(--radius-xs)] shadow-[0_15px_45px_rgba(15,23,42,0.08)] dark:shadow-none'}`
               }`}
             >
               {/* User Attachments — chip style */}
@@ -721,6 +841,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
         );
       })}
 
+        </div>
+      </div>
+
       <AnimatePresence>
         {isProcessing && (
           <motion.div
@@ -736,9 +859,11 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
               avatarData={currentModel.avatar}
               size={36}
               className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center shadow-md ${
-                isNotion 
+                isNotion
                   ? 'bg-transparent border border-gray-300 dark:border-gray-600'
-                  : 'bg-indigo-600 text-white border-2 border-white dark:border-gray-800'
+                  : isQbird
+                    ? 'bg-cyan-600 text-white border-2 border-white dark:border-gray-800'
+                    : 'bg-indigo-600 text-white border-2 border-white dark:border-gray-800'
               }`}
               fallbackIcon={
                 <div className={`w-5 h-5 border-2 border-t-transparent rounded-full animate-spin ${
@@ -753,7 +878,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, isProcessing, currentMode
                    : 'text-slate-500 dark:text-gray-400 bg-white dark:bg-gray-800 shadow-sm border border-slate-100 dark:border-gray-700'
               }`}>
                 <span className="inline-flex items-center gap-1">
-                  Processing request
+                  {t('chat.processing')}
                   <span className="inline-flex gap-0.5">
                     <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                     <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />

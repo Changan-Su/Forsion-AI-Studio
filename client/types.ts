@@ -4,12 +4,15 @@ export enum UserRole {
   USER = 'USER'
 }
 
+export type MembershipTier = 'free' | 'plus' | 'pro';
+
 export interface User {
   id: string;
   username: string;
   role: UserRole;
   nickname?: string;
   avatar?: string;
+  membershipTier?: MembershipTier;
 }
 
 
@@ -172,11 +175,15 @@ export interface AIModel {
   supportedFileTypes?: string[]; // MIME types supported for upload (e.g., ['image/*', 'application/pdf'])
 }
 
+export type ThemePreset = 'default' | 'notion' | 'monet' | 'apple' | 'forsion1' | 'qbird';
+export type Locale = 'en' | 'zh';
+
 export interface AppSettings {
   nickname?: string;
   avatar?: string;
   theme?: 'light' | 'dark';
-  themePreset?: 'default' | 'notion' | 'monet' | 'apple' | 'forsion1';
+  themePreset?: ThemePreset;
+  locale?: Locale;
   customModels?: AIModel[];
   defaultModelId?: string;
   developerMode?: boolean;

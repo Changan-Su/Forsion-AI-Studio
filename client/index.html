@@ -43,6 +43,10 @@
                 darksidebar: '#202020',
                 border: '#e9e9e8',
                 darkborder: '#2f2f2f'
+              },
+              qbird: {
+                bg: '#F5F5F7',
+                darkbg: '#1C1C1E',
               }
             },
             fontFamily: {
@@ -168,6 +172,22 @@
       .bg-forsion1-surface { background: #edeae5; }
       .dark .bg-forsion1-surface { background: #1a1918; }
 
+      /* QBird Theme - Apple HIG inspired with cyan/teal accent */
+      .qbird-glass {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(20px) saturate(140%);
+        -webkit-backdrop-filter: blur(20px) saturate(140%);
+        border: 1px solid rgba(0, 0, 0, 0.09);
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06), 0 0 1px rgba(0, 0, 0, 0.08);
+      }
+      .dark .qbird-glass {
+        background: rgba(255, 255, 255, 0.07);
+        border-color: rgba(255, 255, 255, 0.1);
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+      }
+      .bg-qbird-surface { background: #F5F5F7; }
+      .dark .bg-qbird-surface { background: #1C1C1E; }
+
       /* Shadow for white text on light backgrounds */
       .text-shadow-sm {
         text-shadow: 0 1px 2px rgba(0,0,0,0.1);
@@ -220,7 +240,24 @@
 }
 </script>
 </head>
-  <body class="bg-white dark:bg-dark-bg transition-colors duration-300">
+  <body>
+    <script>
+      // Apply cached theme immediately to prevent flash of default theme
+      (function() {
+        var theme = localStorage.getItem('forsion_theme') || 'dark';
+        var preset = localStorage.getItem('forsion_theme_preset') || 'qbird';
+        if (theme === 'dark') document.documentElement.classList.add('dark');
+        var map = {
+          monet: 'bg-desktop-surface',
+          apple: theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100',
+          forsion1: theme === 'dark' ? 'bg-zinc-900' : 'bg-[#edeae5]',
+          notion: theme === 'dark' ? 'bg-notion-darkbg' : 'bg-notion-bg',
+          qbird: theme === 'dark' ? 'bg-[#1C1C1E]' : 'bg-[#F5F5F7]',
+          default: theme === 'dark' ? 'bg-dark-bg' : 'bg-white',
+        };
+        document.body.className = (map[preset] || map['default']) + ' transition-colors duration-300';
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

@@ -205,6 +205,17 @@ export const backendService = {
     }
   },
 
+  async getMyMembership(): Promise<{ tier: string; status: string; expiresAt?: string } | null> {
+    try {
+      const res = await fetch(`${API_URL}/membership/my`, { headers: getHeaders() });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.membership || null;
+    } catch {
+      return null;
+    }
+  },
+
   // 3. Get Settings
   async getSettings(): Promise<AppSettings> {
     const currentUser = localStorage.getItem('current_username');

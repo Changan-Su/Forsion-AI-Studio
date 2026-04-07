@@ -13,7 +13,7 @@ tools:
       properties: {}
       required: []
   - name: memory_append
-    description: "Append a natural-language line to the memory notebook. Write in Markdown (e.g. '- 用户名字叫 zzc'). NEVER use JSON."
+    description: "Append a natural-language line to the memory notebook. Write in Markdown (e.g. '- 用户名字叫 zzc','-用户最近学习线性代数','-用户已经学习到量子力学第一章了'，'用户希望用亲切的语气回复'). NEVER use JSON."
     executor: builtin
     parameters:
       type: object

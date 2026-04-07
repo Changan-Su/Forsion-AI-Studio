@@ -7,7 +7,7 @@ interface ExecutionOutputProps {
   images: Array<{ path: string; dataUrl: string }>;
   isRunning: boolean;
   durationMs?: number;
-  themePreset: 'default' | 'notion' | 'monet' | 'apple' | 'forsion1';
+  themePreset: import('../types').ThemePreset;
 }
 
 const ExecutionOutput: React.FC<ExecutionOutputProps> = ({

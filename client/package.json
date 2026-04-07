@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@chenglou/pretext": "^0.0.4",
     "@google/genai": "^1.30.0",
     "framer-motion": "^12.38.0",
     "katex": "^0.16.27",

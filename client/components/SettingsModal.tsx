@@ -24,7 +24,7 @@ interface SettingsModalProps {
   onReconnect: () => Promise<boolean>;
 }
 
-type TabType = 'general' | 'agent' | 'skills' | 'account' | 'developer';
+type TabType = 'general' | 'agent' | 'skills';
 
 const SKILL_ICONS: Record<string, React.ElementType> = { Globe, Code2, Zap, Wrench, Brain };
 
@@ -387,28 +387,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               <Bot size={18} />
               Agent
             </button>
-            <button
-              onClick={() => setActiveTab('account')}
-              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                activeTab === 'account' 
-                  ? isMonet ? 'bg-white/20 text-white shadow-sm' : 'bg-forsion-100 text-forsion-700 dark:bg-forsion-900/20 dark:text-forsion-400' 
-                  : 'text-gray-600 dark:text-dark-muted hover:bg-gray-100 dark:hover:bg-zinc-800'
-              }`}
-            >
-              <User size={18} />
-              Account
-            </button>
-            <button
-              onClick={() => setActiveTab('developer')}
-              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                activeTab === 'developer' 
-                  ? isMonet ? 'bg-white/20 text-white shadow-sm' : 'bg-forsion-100 text-forsion-700 dark:bg-forsion-900/20 dark:text-forsion-400' 
-                  : 'text-gray-600 dark:text-dark-muted hover:bg-gray-100 dark:hover:bg-zinc-800'
-              }`}
-            >
-              <Code size={18} />
-              Developer
-            </button>
           </div>
 
           {/* Content Area */}
@@ -452,93 +430,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             {/* --- GENERAL TAB --- */}
             {activeTab === 'general' && (
               <div className="space-y-8">
-                {/* User Profile */}
-                <div>
-                  <h3 className={`text-lg font-medium mb-4 flex items-center gap-2 ${isMonet ? 'text-[#4A4B6A]' : 'text-gray-900 dark:text-white'}`}>
-                    <User size={20} className={isMonet ? 'text-[#4A4B6A]' : 'text-gray-500'} />
-                    User Profile
-                  </h3>
-                  <div className="space-y-4">
-                    {/* Avatar Upload */}
-                    <div className="flex items-center gap-4">
-                      <div className="relative">
-                        <div className={`w-20 h-20 rounded-full overflow-hidden border-2 ${isMonet ? 'border-white/30' : 'border-gray-300 dark:border-dark-border'}`}>
-                          {avatarData ? (
-                            <img src={avatarData} alt="Avatar" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className={`w-full h-full flex items-center justify-center font-bold text-2xl ${isMonet ? 'bg-white/20 text-[#4A4B6A]' : 'bg-gray-200 dark:bg-zinc-800 text-gray-600 dark:text-gray-400'}`}>
-                              {(user.nickname || user.username).substring(0, 2).toUpperCase()}
-                            </div>
-                          )}
-                        </div>
-                        <input
-                          type="file"
-                          id="avatar-upload"
-                          accept="image/*"
-                          onChange={handleAvatarUpload}
-                          className="hidden"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <label
-                          htmlFor="avatar-upload"
-                          className={`inline-block px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${
-                            isMonet
-                              ? 'bg-white/30 hover:bg-white/40 text-[#4A4B6A] border border-white/30'
-                              : 'bg-forsion-100 hover:bg-forsion-200 text-forsion-700 dark:bg-forsion-900/20 dark:hover:bg-forsion-900/30 dark:text-forsion-400'
-                          }`}
-                        >
-                          Upload Avatar
-                        </label>
-                        <p className={`text-xs mt-1 ${isMonet ? 'text-[#4A4B6A]/70' : 'text-gray-500 dark:text-dark-muted'}`}>
-                          Max size: 2MB, formats: JPG, PNG, GIF
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Nickname */}
-                    <div>
-                      <label className={`block text-sm font-medium mb-1 ${isMonet ? 'text-[#4A4B6A]' : 'text-gray-700 dark:text-gray-300'}`}>
-                        Nickname (optional)
-                      </label>
-                      <input
-                        type="text"
-                        value={nickname}
-                        onChange={(e) => {
-                          setNickname(e.target.value);
-                          setProfileChanged(true);
-                        }}
-                        placeholder={user.username}
-                        className={`w-full max-w-md px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-forsion-500 ${
-                          isMonet
-                            ? 'bg-white/30 border border-white/30 text-[#4A4B6A] placeholder-[#4A4B6A]/50'
-                            : 'bg-gray-50 dark:bg-zinc-900 border border-gray-300 dark:border-dark-border text-gray-900 dark:text-white'
-                        }`}
-                      />
-                      <p className={`text-xs mt-1 ${isMonet ? 'text-[#4A4B6A]/70' : 'text-gray-500 dark:text-dark-muted'}`}>
-                        Will be displayed instead of username if set
-                      </p>
-                    </div>
-
-                    {/* Save Button */}
-                    {profileChanged && (
-                      <div>
-                        <button
-                          onClick={handleSaveProfile}
-                          className={`px-6 py-2.5 rounded-lg font-medium transition-all hover:shadow-lg ${
-                            isMonet
-                              ? 'bg-[#4A4B6A] hover:bg-[#3E406F] text-white'
-                              : 'bg-forsion-600 hover:bg-forsion-500 text-white'
-                          }`}
-                        >
-                          <Save size={16} className="inline mr-2" />
-                          Save Profile
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
                 {/* Theme Mode */}
                 <div>
                   <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Appearance</h3>
@@ -633,6 +524,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       <div className="font-bold mb-1" style={{ color: '#8e8578' }}>Forsion Theme 1</div>
                       <div className="text-xs text-gray-500 dark:text-dark-muted">Morandi colors, warm glass.</div>
                     </button>
+
+                    <button
+                      onClick={() => onPresetChange('qbird')}
+                      className={`p-4 border rounded-xl text-left transition-all ${
+                        currentPreset === 'qbird'
+                          ? 'border-cyan-400 bg-[#F5F5F7] dark:bg-[#1C1C1E] ring-2 ring-cyan-400/20'
+                          : 'border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-zinc-800'
+                      }`}
+                    >
+                      <div className="font-bold text-cyan-600 dark:text-cyan-400 mb-1">QBird</div>
+                      <div className="text-xs text-gray-500 dark:text-dark-muted">Apple HIG, cyan accent.</div>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -722,7 +625,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                               ? isMonet
                                 ? 'border-[#4A4B6A] bg-[#4A4B6A]/10 text-[#4A4B6A]'
                                 : 'border-forsion-500 bg-forsion-50 dark:bg-forsion-900/20 text-forsion-700 dark:text-forsion-400'
-                              : 'border-gray-200 dark:border-dark-border opacity-60 hover:opacity-100'
+                              : 'border-gray-200 dark:border-dark-border text-gray-600 dark:text-gray-400 opacity-60 hover:opacity-100'
                           }`}
                         >
                           <Icon size={16} />
@@ -973,173 +876,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             )}
 
             {/* --- ACCOUNT TAB --- */}
-            {activeTab === 'account' && (
-              <div className="max-w-md">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Change Password</h3>
-                <form onSubmit={handlePasswordChange} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">New Password</label>
-                    <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full bg-gray-50 dark:bg-zinc-900 border border-gray-300 dark:border-dark-border rounded-lg px-4 py-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-forsion-500" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Confirm Password</label>
-                    <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full bg-gray-50 dark:bg-zinc-900 border border-gray-300 dark:border-dark-border rounded-lg px-4 py-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-forsion-500" />
-                  </div>
-                  {passwordMsg.text && (
-                    <div className={`text-sm ${passwordMsg.type === 'error' ? 'text-red-500' : 'text-green-500'}`}>
-                      {passwordMsg.text}
-                    </div>
-                  )}
-                  <button type="submit" className="bg-forsion-600 hover:bg-forsion-500 text-white px-6 py-2 rounded-lg font-medium transition-colors">
-                    Update Password
-                  </button>
-                </form>
-              </div>
-            )}
 
-            {/* --- DEVELOPER TAB --- */}
-            {activeTab === 'developer' && (
-              <div className="space-y-8">
-                {/* Developer Mode Toggle */}
-                <div className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 p-6 rounded-xl border border-purple-200 dark:border-purple-800">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <Code size={24} className="text-purple-600 dark:text-purple-400" />
-                      <div>
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">Developer Mode</h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Enable advanced features for adding custom models</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={async () => {
-                        const newValue = !developerMode;
-                        setDeveloperMode(newValue);
-                        await backendService.updateSettings({ developerMode: newValue });
-                      }}
-                      className="p-2 rounded-lg transition-colors"
-                    >
-                      {developerMode ? (
-                        <ToggleRight size={40} className="text-purple-600 dark:text-purple-400" />
-                      ) : (
-                        <ToggleLeft size={40} className="text-gray-400" />
-                      )}
-                    </button>
-                  </div>
-                  {developerMode && (
-                    <div className="mt-4 p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                      <p className="text-sm text-purple-800 dark:text-purple-200">
-                        ✓ Developer mode enabled. You can now add custom models below.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Custom Models Section (Only visible when developer mode is on) */}
-                {developerMode && (
-                  <>
-                    {/* Add Custom Model Section */}
-                    <div className="bg-gray-50 dark:bg-zinc-900/40 p-6 rounded-xl border border-gray-200 dark:border-dark-border">
-                      <div className="flex items-center gap-2 mb-4 text-forsion-600 dark:text-forsion-400">
-                        <Plus size={20} />
-                        <h3 className="text-lg font-bold">Add Custom Model</h3>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-500 dark:text-dark-muted uppercase mb-1">Display Name</label>
-                          <input type="text" value={newModelName} onChange={e => setNewModelName(e.target.value)} placeholder="My Custom Model" className="w-full bg-white dark:bg-zinc-900 border border-gray-300 dark:border-dark-border rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-500 dark:text-dark-muted uppercase mb-1">API Model ID</label>
-                          <input type="text" value={newApiModelId} onChange={e => setNewApiModelId(e.target.value)} placeholder="gpt-4o-mini" className="w-full bg-white dark:bg-zinc-900 border border-gray-300 dark:border-dark-border rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white font-mono" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-500 dark:text-dark-muted uppercase mb-1">Base URL</label>
-                          <input type="text" value={newBaseUrl} onChange={e => setNewBaseUrl(e.target.value)} placeholder="https://api.openai.com/v1" className="w-full bg-white dark:bg-zinc-900 border border-gray-300 dark:border-dark-border rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-500 dark:text-dark-muted uppercase mb-1">API Key</label>
-                          <input type="password" value={newApiKey} onChange={e => setNewApiKey(e.target.value)} placeholder="sk-..." className="w-full bg-white dark:bg-zinc-900 border border-gray-300 dark:border-dark-border rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white" />
-                        </div>
-                      </div>
-                      <div className="mt-4 flex justify-end">
-                        <button onClick={handleAddCustomModel} className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-opacity">
-                          Add Model
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Custom Models List */}
-                    {customModels.length > 0 && (
-                      <div>
-                        <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">Your Custom Models</h3>
-                        <div className="space-y-3">
-                          {customModels.map(model => (
-                            <div key={model.id} className="flex items-center justify-between p-3 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-dark-border rounded-lg">
-                              <div className="flex items-center gap-3">
-                                <Box size={18} className="text-purple-500" />
-                                <div>
-                                  <div className="font-bold text-gray-900 dark:text-white text-sm">{model.name}</div>
-                                  <div className="text-xs text-gray-500 dark:text-dark-muted font-mono">{model.apiModelId} • {model.defaultBaseUrl}</div>
-                                </div>
-                              </div>
-                              <button onClick={() => handleDeleteModel(model.id, model.configKey)} className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-md transition-colors">
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* API Configurations */}
-                    <div>
-                      <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">API Configurations</h3>
-                      <div className="space-y-4">
-                        {builtinProviders.map(providerKey => {
-                          const representativeModel = BUILTIN_MODELS.find(m => (m.configKey || m.id) === providerKey);
-                          const providerName = providerKey.charAt(0).toUpperCase() + providerKey.slice(1);
-                          
-                          return (
-                            <div key={providerKey} className="bg-gray-50 dark:bg-zinc-900/40 p-4 rounded-xl border border-gray-200 dark:border-dark-border">
-                              <div className="flex items-center justify-between mb-3">
-                                <span className="font-semibold text-sm text-gray-900 dark:text-white">{providerName}</span>
-                                <span className="text-[10px] bg-gray-200 dark:bg-zinc-800 px-2 py-0.5 rounded text-gray-600 dark:text-gray-300 font-mono">{providerKey}</span>
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div>
-                                  <label className="block text-[10px] font-bold text-gray-400 dark:text-dark-muted uppercase mb-1">API Key</label>
-                                  <input type="password" value={configs[providerKey]?.apiKey || ''} onChange={(e) => updateConfig(providerKey, 'apiKey', e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-gray-300 dark:border-dark-border rounded px-2 py-1.5 text-xs text-gray-900 dark:text-white" placeholder="Enter API Key" />
-                                </div>
-                                {representativeModel?.provider === 'external' && (
-                                  <div>
-                                    <label className="block text-[10px] font-bold text-gray-400 dark:text-dark-muted uppercase mb-1">Base URL</label>
-                                    <input type="text" value={configs[providerKey]?.baseUrl || ''} onChange={(e) => updateConfig(providerKey, 'baseUrl', e.target.value)} className="w-full bg-white dark:bg-zinc-900 border border-gray-300 dark:border-dark-border rounded px-2 py-1.5 text-xs text-gray-900 dark:text-white" placeholder="Default used" />
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )
-                        })}
-                        
-                        <div className="flex justify-end">
-                          <button onClick={handleSaveApiKeys} className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                            <Save size={16} /> Save Configurations
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {!developerMode && (
-                  <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                    <Code size={48} className="mx-auto mb-4 opacity-50" />
-                    <p>Enable Developer Mode to add custom models and configure APIs</p>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
       </AnimatedModalContent>
