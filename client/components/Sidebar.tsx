@@ -51,7 +51,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const isApple = themePreset === 'apple';
   const isForsion1 = themePreset === 'forsion1';
   const isQbird = themePreset === 'qbird';
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   // Refs
   const menuRef = useRef<HTMLDivElement>(null);
@@ -435,7 +435,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 )}
               </div>
               <p className={`text-xs truncate ${isMonet ? 'text-[#4A4B6A]/70' : 'text-gray-500 dark:text-gray-400'}`}>
-                {user.membershipTier === 'pro' ? 'Pro Member' : user.membershipTier === 'plus' ? 'Plus Member' : 'Free'}
+                {locale === 'en' ? 'Account Center' : '用户中心'}
               </p>
             </div>
           </div>

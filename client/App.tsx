@@ -1404,8 +1404,12 @@ const App: React.FC = () => {
         }
       }
 
-      // Log API usage after successful completion
-      if (usage && user) {
+      // Log API usage after successful completion.
+      // 全局模型走 proxyChatCompletions → 后端 /api/chat/completions 已经自动写 api_usage_logs
+      // 并扣减 token 点数，前端再调用 logApiUsage 会造成重复记录（参见 bug: 同一次对话被
+      // 记录两次，其中一条 app_source=unknown）。所以只有走直连分支时才由前端补记。
+      const wasBackendProxy = !!(currentModel as any).isGlobal && currentModel.id !== 'gemini-2.5-flash-image';
+      if (usage && user && !wasBackendProxy) {
         try {
           await backendService.logApiUsage(
             currentModel.id,
@@ -1653,8 +1657,10 @@ const App: React.FC = () => {
         }
       }
 
-      // Log API usage after successful completion
-      if (usage && user) {
+      // Log API usage after successful completion (see note in primary send handler).
+      // 走后端代理时，服务端已经写了 api_usage_logs 并扣减 token 点数，前端不能重复记录。
+      const wasBackendProxy = !!(currentModel as any).isGlobal && currentModel.id !== 'gemini-2.5-flash-image';
+      if (usage && user && !wasBackendProxy) {
         try {
           await backendService.logApiUsage(
             currentModel.id,
@@ -1693,8 +1699,11 @@ const App: React.FC = () => {
         return;
       }
       
-      // Log failed API usage
-      if (currentModel) {
+      // Log failed API usage.
+      // 失败路径同样要跳过后端代理已经落库的那一侧：/api/chat/completions 在上游 4xx/5xx 时
+      // 会在服务端写一条 success=false 的记录。前端只在走直连分支时补记失败。
+      const wasBackendProxyErr = !!(currentModel as any)?.isGlobal && currentModel?.id !== 'gemini-2.5-flash-image';
+      if (currentModel && !wasBackendProxyErr) {
         try {
           // Try to get username from user object or localStorage
           const username = user?.username || localStorage.getItem('current_username') || 'anonymous';
@@ -2001,16 +2010,16 @@ const App: React.FC = () => {
           </div>
 
           {/* Right controls: Language + Theme toggle */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => setLocale(prev => prev === 'en' ? 'zh' : 'en')}
-              className={`p-2 rounded-lg transition-all text-xs font-bold tracking-wide ${
-                isNotion ? 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
-                : isMonet ? 'text-[#4A4B6A]/70 hover:text-[#4A4B6A] hover:bg-white/30'
-                : isApple ? 'text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'
-                : isForsion1 ? 'text-stone-500 dark:text-stone-400 hover:text-amber-700 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20'
-                : isQbird ? 'text-gray-500 dark:text-gray-400 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/20'
-                : 'text-slate-500 dark:text-gray-400 hover:text-forsion-600 dark:hover:text-forsion-400 hover:bg-slate-100 dark:hover:bg-white/10'
+              className={`h-8 min-w-[32px] px-2 rounded-full border transition-all text-[11px] font-semibold flex items-center justify-center ${
+                isNotion ? 'border-gray-200 dark:border-gray-700/50 bg-white/50 dark:bg-white/5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-white hover:border-gray-300 dark:hover:border-gray-600'
+                : isMonet ? 'border-white/20 bg-white/30 text-[#4A4B6A]/70 hover:text-[#4A4B6A] hover:bg-white/50 hover:border-[#4A4B6A]/30'
+                : isApple ? 'border-gray-200/60 dark:border-white/10 bg-white/40 dark:bg-white/5 text-gray-500 dark:text-gray-400 hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-500/40'
+                : isForsion1 ? 'border-[#d5d0c8]/60 dark:border-white/10 bg-white/40 dark:bg-white/5 text-stone-500 dark:text-stone-400 hover:bg-amber-500/10 hover:text-amber-700 dark:hover:text-amber-400 hover:border-amber-500/40'
+                : isQbird ? 'border-gray-200/60 dark:border-white/10 bg-white/40 dark:bg-white/5 text-gray-500 dark:text-gray-400 hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 hover:border-cyan-500/40'
+                : 'border-gray-200/60 dark:border-white/10 bg-white/40 dark:bg-white/5 text-slate-500 dark:text-gray-400 hover:bg-forsion-500/10 hover:text-forsion-600 dark:hover:text-forsion-400 hover:border-forsion-500/40'
               }`}
               title={locale === 'en' ? 'Switch to Chinese' : '切换到英文'}
             >
@@ -2018,17 +2027,17 @@ const App: React.FC = () => {
             </button>
             <button
               onClick={() => updateAppSettings({ theme: theme === 'dark' ? 'light' : 'dark' })}
-              className={`p-2 rounded-lg transition-all ${
-                isNotion ? 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
-                : isMonet ? 'text-[#4A4B6A]/70 hover:text-[#4A4B6A] hover:bg-white/30'
-                : isApple ? 'text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'
-                : isForsion1 ? 'text-stone-500 dark:text-stone-400 hover:text-amber-700 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20'
-                : isQbird ? 'text-gray-500 dark:text-gray-400 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/20'
-                : 'text-slate-500 dark:text-gray-400 hover:text-forsion-600 dark:hover:text-forsion-400 hover:bg-slate-100 dark:hover:bg-white/10'
+              className={`h-8 w-8 rounded-full border transition-all flex items-center justify-center ${
+                isNotion ? 'border-gray-200 dark:border-gray-700/50 bg-white/50 dark:bg-white/5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-white hover:border-gray-300 dark:hover:border-gray-600'
+                : isMonet ? 'border-white/20 bg-white/30 text-[#4A4B6A]/70 hover:text-[#4A4B6A] hover:bg-white/50 hover:border-[#4A4B6A]/30'
+                : isApple ? 'border-gray-200/60 dark:border-white/10 bg-white/40 dark:bg-white/5 text-gray-500 dark:text-gray-400 hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-500/40'
+                : isForsion1 ? 'border-[#d5d0c8]/60 dark:border-white/10 bg-white/40 dark:bg-white/5 text-stone-500 dark:text-stone-400 hover:bg-amber-500/10 hover:text-amber-700 dark:hover:text-amber-400 hover:border-amber-500/40'
+                : isQbird ? 'border-gray-200/60 dark:border-white/10 bg-white/40 dark:bg-white/5 text-gray-500 dark:text-gray-400 hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 hover:border-cyan-500/40'
+                : 'border-gray-200/60 dark:border-white/10 bg-white/40 dark:bg-white/5 text-slate-500 dark:text-gray-400 hover:bg-forsion-500/10 hover:text-forsion-600 dark:hover:text-forsion-400 hover:border-forsion-500/40'
               }`}
               title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
             >
-              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+              {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
             </button>
           </div>
         </header>
